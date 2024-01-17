@@ -54,10 +54,10 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             env = load_assetbundle(f)
             static_mesh_gameobjects, armatures = search_env_meshes(env)
 
-            def add_material(m_Materials : Material, obj : bpy.types.Object):
+            def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser = None):
                 for ppmat in m_Materials:
                     material : Material = ppmat.read()
-                    asset = import_material(material.name, material)
+                    asset = materialParser(material.name, material)
                     obj.data.materials.append(asset)
                     print('* Imported Material', material.name)
             
@@ -68,7 +68,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     mesh_data : Mesh = mesh_filter.m_Mesh.read()
                     if mesh_data.name == wm.sssekai_assetbundle_preview:
                         mesh, obj = import_mesh(mesh_go.name, mesh_data,False)
-                        add_material(mesh_rnd.m_Materials, obj)    
+                        add_material(mesh_rnd.m_Materials, obj, import_scene_material)    
                         print('* Imported Static Mesh', mesh_data.name)
                         return {'FINISHED'}
             
@@ -81,7 +81,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         mesh, obj = import_mesh(armature.name, mesh_data,True, armature.bone_path_hash_tbl)
                         obj.parent = armObj
                         obj.modifiers.new('Armature', 'ARMATURE').object = armObj
-                        add_material(mesh_rnd.m_Materials, obj)    
+                        add_material(mesh_rnd.m_Materials, obj, import_character_material)    
                         print('* Imported Armature and Skinned Mesh', mesh_data.name)
                         return {'FINISHED'}
 

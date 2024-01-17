@@ -94,7 +94,6 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
         Tuple[bpy.types.Mesh, bpy.types.Object]: Created mesh and its parent object
     '''
     print('* Importing Mesh', data.name, 'Skinned=', skinned)
-    bpy.ops.object.mode_set(mode='OBJECT')
     mesh = bpy.data.meshes.new(name=data.name)
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
@@ -264,11 +263,30 @@ def import_texture(name : str, data : Texture2D):
         print('* Imported Texture', name)
         return img
 
-def import_material(name : str,data : Material):
-    '''Imports Material assets into blender. 
-    A custom shader / material block is imported from the SekaiShaderStandalone.blend file.
-    
+def load_sssekai_shader_blend():
+    if not 'SekaiShaderChara' in bpy.data.materials or not 'SekaiShaderScene' in bpy.data.materials:
+        print('! SekaiShader not loaded. Importing from source.')
+        with bpy.data.libraries.load(SHADER_BLEND_FILE, link=False) as (data_from, data_to):
+            data_to.materials = data_from.materials
+            print('! Loaded shader blend file.')
 
+def make_material_texture_node(material : bpy.types.Material, ppTexture):
+    texCoord = material.node_tree.nodes.new('ShaderNodeTexCoord')
+    uvRemap = material.node_tree.nodes.new('ShaderNodeMapping')
+    uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X
+    uvRemap.inputs[1].default_value[1] = ppTexture.m_Offset.Y
+    uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.X
+    uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.Y
+    texture : Texture2D = ppTexture.m_Texture.read()
+    texNode = material.node_tree.nodes.new('ShaderNodeTexImage')
+    texNode.image = import_texture(texture.name, texture)
+    material.node_tree.links.new(texCoord.outputs['UV'], uvRemap.inputs['Vector'])
+    material.node_tree.links.new(uvRemap.outputs['Vector'], texNode.inputs['Vector'])
+    return texNode
+
+def import_character_material(name : str,data : Material):
+    '''Imports Material assets for Characters into blender. 
+    
     Args:
         name (str): material name
         data (Material): UnityPy Material
@@ -276,35 +294,41 @@ def import_material(name : str,data : Material):
     Returns:
         bpy.types.Material: Created material        
     '''
-    if not 'SekaiShader' in bpy.data.materials:
-        print('! No SekaiShader found. Importing from source.')
-        with bpy.data.libraries.load(SHADER_BLEND_FILE, link=False) as (data_from, data_to):
-            data_to.materials = data_from.materials
-            print('! Loaded shader blend file.')
-    material = bpy.data.materials["SekaiShader"].copy()
+    load_sssekai_shader_blend()
+    material = bpy.data.materials["SekaiShaderChara"].copy()
     material.name = name
-    def setup_texnode(ppTexture):
-        texCoord = material.node_tree.nodes.new('ShaderNodeTexCoord')
-        uvRemap = material.node_tree.nodes.new('ShaderNodeMapping')
-        uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X
-        uvRemap.inputs[1].default_value[1] = ppTexture.m_Offset.Y
-        uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.X
-        uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.Y
-        texture : Texture2D = ppTexture.m_Texture.read()
-        texNode = material.node_tree.nodes.new('ShaderNodeTexImage')
-        texNode.image = import_texture(texture.name, texture)
-        material.node_tree.links.new(texCoord.outputs['UV'], uvRemap.inputs['Vector'])
-        material.node_tree.links.new(uvRemap.outputs['Vector'], texNode.inputs['Vector'])
-        return texNode
     sekaiShader = material.node_tree.nodes['Group']
     textures = data.m_SavedProperties.m_TexEnvs
     if '_MainTex' in textures:
-        mainTex = setup_texnode(textures['_MainTex'])
+        mainTex = make_material_texture_node(material, textures['_MainTex'])
         material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
     if '_ShadowTex' in textures:
-        shadowTex = setup_texnode(textures['_ShadowTex'])
+        shadowTex = make_material_texture_node(material, textures['_ShadowTex'])
         material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs[1])
     if '_ValueTex' in textures:
-        valueTex = setup_texnode(textures['_ValueTex'])
+        valueTex = make_material_texture_node(material, textures['_ValueTex'])
         material.node_tree.links.new(valueTex.outputs['Color'], sekaiShader.inputs[2])
+    return material
+
+def import_scene_material(name : str,data : Material):
+    '''Imports Material assets for Non-Character (i.e. Stage) into blender. 
+    
+    Args:
+        name (str): material name
+        data (Material): UnityPy Material
+
+    Returns:
+        bpy.types.Material: Created material        
+    '''
+    load_sssekai_shader_blend()
+    material = bpy.data.materials["SekaiShaderScene"].copy()
+    material.name = name
+    sekaiShader = material.node_tree.nodes['Group']
+    textures = data.m_SavedProperties.m_TexEnvs
+    if '_MainTex' in textures:
+        mainTex = make_material_texture_node(material, textures['_MainTex'])
+        material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
+    if '_LightMapTex' in textures:
+        lightMapTex = make_material_texture_node(material, textures['_LightMapTex'])
+        material.node_tree.links.new(lightMapTex.outputs['Color'], sekaiShader.inputs[1])
     return material
