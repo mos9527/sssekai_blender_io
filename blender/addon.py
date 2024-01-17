@@ -63,8 +63,9 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             
             for mesh_go in static_mesh_gameobjects:
                 mesh_rnd : MeshRenderer = mesh_go.m_MeshRenderer.read()
-                if getattr(mesh_rnd,'m_Mesh',None):
-                    mesh_data : Mesh = mesh_rnd.m_Mesh.read()
+                mesh_filter : MeshFilter = mesh_go.m_MeshFilter.read()
+                if getattr(mesh_filter,'m_Mesh',None):
+                    mesh_data : Mesh = mesh_filter.m_Mesh.read()
                     if mesh_data.name == wm.sssekai_assetbundle_preview:
                         mesh, obj = import_mesh(mesh_go.name, mesh_data,False)
                         add_material(mesh_rnd.m_Materials, obj)    
@@ -156,9 +157,9 @@ def enumerate_assets(self, context):
             env = load_assetbundle(f)
             static_mesh_gameobjects, armatures = search_env_meshes(env)
             for mesh_go in static_mesh_gameobjects:
-                mesh_rnd : MeshRenderer = mesh_go.m_MeshRenderer.read()
-                if getattr(mesh_rnd,'m_Mesh',None):
-                    mesh_data : Mesh = mesh_rnd.m_Mesh.read()    
+                mesh_filter : MeshFilter = mesh_go.m_MeshFilter.read()
+                if getattr(mesh_filter,'m_Mesh',None):
+                    mesh_data : Mesh = mesh_filter.m_Mesh.read()    
                     enum_items.append((mesh_data.name,mesh_data.name,'Static Mesh %s' % mesh_data.name, 'MESH_DATA', index))
                     index+=1
 
