@@ -1,8 +1,6 @@
 # sssekai_blender_io
 Blender I/O for the game's assets. (actually it's imports only)
 
-Refer to https://github.com/mos9527/sssekai for downloads!
-
 Currently supports:  
   * Textures
   * Character NPR Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai-blender-io/blob/main/sssekai_blender_io/assets/SekaiShaderStandalone.blend))
