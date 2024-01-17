@@ -61,11 +61,15 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
         etrans, erot = local_space_trans_rot[bone.name]
         erot_inv = erot.conjugated()
         return erot_inv @ (vec - etrans)
+    # Note for Eulers
+    # The angles are modified in XYZ rotation mode here
+    # but the rotation order is set to XZY when it's finally applied to the objects
+    # as per the coordinate system conversion
     def to_pose_euler(bone : bpy.types.PoseBone, euler : Euler):
         etrans, erot = local_space_trans_rot[bone.name]
         erot_inv = erot.conjugated()
         result = erot_inv @ euler.to_quaternion()
-        result = result.to_euler('XYZ') # XXX make compatible for euler interpolation
+        result = result.to_euler('XYZ')
         return result
     # Reset the pose 
     bpy.ops.object.mode_set(mode='POSE')
@@ -93,7 +97,7 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
         # Euler rotations
         bone_name = bone_table[str(bone_hash)]
         bone = dest_arma.pose.bones[bone_name]
-        bone.rotation_mode = 'XYZ'
+        bone.rotation_mode = 'XZY'
         values = [to_pose_euler(bone, swizzle_euler(keyframe.value)) for keyframe in track.Curve]
         frames = [time_to_frame(keyframe.time) for keyframe in track.Curve]
         import_fcurve(action,'pose.bones["%s"].rotation_euler' % bone_name, values, frames, 3)            
@@ -125,7 +129,7 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
     camera.animation_data_create()
     action = bpy.data.actions.new(name)
     camera.animation_data.action = action
-    camera.rotation_mode = 'XYZ'
+    camera.rotation_mode = 'XZY'
     def swizzle_euler_camera(euler : Euler):
         # Unity camera resets by viewing at Z+, which is the front direction
         # Blenders looks at -Z, which is its down direction

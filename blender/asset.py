@@ -133,10 +133,9 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
         if deform_layer:
             for i in range(4):
                 skin = data.m_Skin[vtx]
-                if skin.weight[i] == 0:
-                    break # Weight is sorted
                 vertex_group_index = skin.boneIndex[i]
                 vert[deform_layer][vertex_group_index] = skin.weight[i]
+                print(vtx,i,skin.weight[i])
     bm.verts.ensure_lookup_table()
     # Indices
     for idx in range(0, len(data.m_Indices), 3):
