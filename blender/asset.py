@@ -297,10 +297,14 @@ def import_material(name : str,data : Material):
         material.node_tree.links.new(uvRemap.outputs['Vector'], texNode.inputs['Vector'])
         return texNode
     sekaiShader = material.node_tree.nodes['Group']
-    mainTex = setup_texnode(data.m_SavedProperties.m_TexEnvs['_MainTex'])
-    shadowTex = setup_texnode(data.m_SavedProperties.m_TexEnvs['_ShadowTex'])
-    valueTex = setup_texnode(data.m_SavedProperties.m_TexEnvs['_ValueTex'])
-    material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
-    material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs[1])
-    material.node_tree.links.new(valueTex.outputs['Color'], sekaiShader.inputs[2])
+    textures = data.m_SavedProperties.m_TexEnvs
+    if '_MainTex' in textures:
+        mainTex = setup_texnode(textures['_MainTex'])
+        material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
+    if '_ShadowTex' in textures:
+        shadowTex = setup_texnode(textures['_ShadowTex'])
+        material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs[1])
+    if '_ValueTex' in textures:
+        valueTex = setup_texnode(textures['_ValueTex'])
+        material.node_tree.links.new(valueTex.outputs['Color'], sekaiShader.inputs[2])
     return material
