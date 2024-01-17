@@ -270,7 +270,7 @@ def load_sssekai_shader_blend():
             data_to.materials = data_from.materials
             print('! Loaded shader blend file.')
 
-def make_material_texture_node(material : bpy.types.Material, ppTexture):
+def make_material_texture_node(material , ppTexture):
     texCoord = material.node_tree.nodes.new('ShaderNodeTexCoord')
     uvRemap = material.node_tree.nodes.new('ShaderNodeMapping')
     uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X

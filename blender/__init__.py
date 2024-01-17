@@ -50,6 +50,11 @@ KEY_BONE_NAME_HASH_TBL = 'sssekai_bone_name_hash_tbl' # Bone *full path hash* to
 KEY_SHAPEKEY_NAME_HASH_TBL = 'sssekai_shapekey_name_hash_tbl' # ShapeKey name hash to ShapeKey names
 KEY_BINDPOSE_TRANS = 'sssekai_bindpose_trans' # Bone name to bind pose translation
 KEY_BINDPOSE_QUAT = 'sssekai_bindpose_quat' # Bone name to bind pose quaternion
+# CRC Constants
+NULL_CRC = 0
+BLENDSHAPES_UNK_CRC = 2770785369
+CAMERA_UNK_CRC = 3326594866
+CAMERA_ADJ_UNK_CRC = 3305885265
 # UnityPy deps
 from UnityPy import Environment
 from UnityPy.enums import ClassIDType
@@ -58,7 +63,6 @@ from UnityPy.math import Vector3, Quaternion as UnityQuaternion
 # SSSekai deps
 from sssekai.unity.AnimationClip import read_animation, Animation, TransformType
 from sssekai.unity.AssetBundle import load_assetbundle
-from sssekai.unity.constant.CommonPathNames import BLENDSHAPES_UNK_CRC
 @dataclass
 class Bone:
     name : str

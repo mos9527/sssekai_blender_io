@@ -88,7 +88,10 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             animations = search_env_animations(env)    
             for animation in animations:
                 if animation.name == wm.sssekai_assetbundle_preview:
-                    assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature"
+                    def check_is_active_armature():
+                        assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature for this animation!"
+                    def check_is_active_camera():
+                        assert bpy.context.active_object and bpy.context.active_object.type == 'CAMERA', "Please select a camera for this animation!"
                     print('* Reading AnimationClip:', animation.name)
                     print('* Byte size:',animation.byte_size)
                     print('* Loading...')
@@ -103,11 +106,24 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     print('* Blender FPS set to:', bpy.context.scene.render.fps)
                     if BLENDSHAPES_UNK_CRC in clip.FloatTracks:
                         print('* Importing Keyshape animation', animation.name)
+                        check_is_active_armature()
                         arm_mesh_obj = bpy.context.active_object.children[0]
                         import_keyshape_animation(animation.name, clip, arm_mesh_obj)
                         print('* Imported Keyshape animation', animation.name)
+                    elif CAMERA_UNK_CRC in clip.TransformTracks[TransformType.Translation]:
+                        print('* Importing Camera animation', animation.name)
+                        check_is_active_camera()
+                        import_camera_animation(animation.name, clip, bpy.context.active_object)
+                        print('* Imported Camera animation', animation.name)
+                    elif NULL_CRC in clip.FloatTracks and CAMERA_ADJ_UNK_CRC in clip.FloatTracks[NULL_CRC]:
+                        # XXX not working yet. don't know what the values mean
+                        print('* Importing Camera Parameter animation', animation.name)
+                        check_is_active_camera()
+                        import_camera_parameter_animation(animation.name, clip, bpy.context.active_object)
+                        print('* Imported Camera Parameter animation', animation.name)
                     else:
                         print('* Importing Armature animation', animation.name)
+                        check_is_active_armature()
                         import_armature_animation(animation.name, clip, bpy.context.active_object)
                         print('* Imported Armature animation', animation.name)
                     return {'FINISHED'}

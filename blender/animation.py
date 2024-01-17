@@ -77,8 +77,6 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
     # Setup actions
     action = bpy.data.actions.new(name)
     dest_arma.animation_data.action = action
-    # https://github.com/KhronosGroup/glTF-Blender-IO/issues/76
-    # Batch the keyframes to load *way* faster otherwise
     for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
         # Quaternion rotations
         bone_name = bone_table[str(bone_hash)]
@@ -121,3 +119,35 @@ def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.type
     for attrCRC, track in data.FloatTracks[BLENDSHAPES_UNK_CRC].items():
         bsName = keyshape_table[str(attrCRC)]
         import_fcurve(action,'key_blocks["%s"].value' % bsName, [keyframe.value / 100.0 for keyframe in track.Curve], [time_to_frame(keyframe.time) for keyframe in track.Curve])
+
+def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object):
+    camera.animation_data_clear()
+    camera.animation_data_create()
+    action = bpy.data.actions.new(name)
+    camera.animation_data.action = action
+    camera.rotation_mode = 'XYZ'
+    def swizzle_euler_camera(euler : Euler):
+        # Unity camera resets by viewing at Z+, which is the front direction
+        # Blenders looks at -Z, which is its down direction
+        offset = Euler((math.radians(90),0,math.radians(-180)),'XYZ')
+        euler = Euler(swizzle_euler(euler),'XYZ')
+        offset.rotate(euler)
+        return offset
+    if CAMERA_UNK_CRC in data.TransformTracks[TransformType.EulerRotation]:
+        curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_UNK_CRC].Curve
+        import_fcurve(action,'rotation_euler', [swizzle_euler_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time) for keyframe in curve], 3)        
+    
+    if CAMERA_UNK_CRC in data.TransformTracks[TransformType.Translation]:
+        curve = data.TransformTracks[TransformType.Translation][CAMERA_UNK_CRC].Curve
+        import_fcurve(action,'location', [swizzle_vector(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time) for keyframe in curve], 3)     
+
+def import_camera_parameter_animation(name : str, data : Animation, camera : bpy.types.Object):
+    camera.data.animation_data_clear()
+    camera.data.animation_data_create()
+    action = bpy.data.actions.new(name)
+    camera.data.animation_data.action = action
+    camera.data.lens_unit = 'FOV'
+    # FOV
+    if CAMERA_ADJ_UNK_CRC in data.FloatTracks[NULL_CRC]:
+        curve = data.FloatTracks[NULL_CRC][CAMERA_ADJ_UNK_CRC].Curve
+        import_fcurve(action,'angle',[keyframe.value for keyframe in curve],[time_to_frame(keyframe.time) for keyframe in curve], 1)
