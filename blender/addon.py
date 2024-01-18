@@ -8,6 +8,7 @@ from bpy.types import WindowManager
 from bpy.props import (
     StringProperty,
     EnumProperty,
+    BoolProperty
 )
 preview_collections = dict()
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
@@ -78,7 +79,8 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     if getattr(mesh_rnd,'m_Mesh',None):
                         mesh_data : Mesh = mesh_rnd.m_Mesh.read()
                         armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
-                        import_armature_physics_constraints(armObj, armature)
+                        if wm.sssekai_armature_import_physics:
+                            import_armature_physics_constraints(armObj, armature)
                         mesh, obj = import_mesh(armature.name, mesh_data,True, armature.bone_path_hash_tbl)
                         obj.parent = armObj
                         obj.modifiers.new('Armature', 'ARMATURE').object = armObj
@@ -148,6 +150,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_assetbundle_preview")
         layout.separator()
         row = layout.row()
+        row.prop(wm, "sssekai_armature_import_physics")
+        row = layout.row()
         row.operator(SSSekaiBlenderImportOperator.bl_idname)
 
 def enumerate_assets(self, context):
@@ -203,6 +207,11 @@ def register():
         name="Asset",
         description="Asset",
         items=enumerate_assets,
+    )
+    WindowManager.sssekai_armature_import_physics = BoolProperty(
+        name="Import Physics",
+        description="Import Physics",
+        default=False
     )
     pcoll = bpy.utils.previews.new()
     pcoll.sssekai_assetbundle_file = ""

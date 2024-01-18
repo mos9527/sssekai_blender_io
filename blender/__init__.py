@@ -79,6 +79,7 @@ class BonePhysicsType(IntEnum):
 @dataclass
 class BoneAngularLimit:
     active : bool = 0
+    # In degrees
     min : float = 0
     max : float = 0
 @dataclass
@@ -93,8 +94,8 @@ class BonePhysics:
     springForce : float = 0
     dragForce : float = 0 
     angularStiffness : float = 0
-    yAngularLimits : BoneAngularLimit = None
-    zAngularLimits : BoneAngularLimit = None
+    yAngleLimits : BoneAngularLimit = None
+    zAngleLimits : BoneAngularLimit = None
 
     @staticmethod
     def from_dict(data : dict):
@@ -102,6 +103,10 @@ class BonePhysics:
         for k,v in data.items():
             if hasattr(phy, k):
                 setattr(phy, k, v)
+        if phy.yAngleLimits:
+            phy.yAngleLimits = BoneAngularLimit(**phy.yAngleLimits)
+        if phy.zAngleLimits:
+            phy.zAngleLimits = BoneAngularLimit(**phy.zAngleLimits)
         return phy
 @dataclass
 class Bone:

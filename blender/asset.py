@@ -274,7 +274,6 @@ def import_armature_physics_constraints(armature, data : Armature):
     '''    
     bpy.context.view_layer.objects.active = armature
     bpy.ops.object.mode_set(mode='OBJECT')
-    arma = armature.data
     bone = data.root.recursive_locate_by_name('Position')
     if bone:
         for parent, child, _ in bone.dfs_generator():            
@@ -297,11 +296,84 @@ def import_armature_physics_constraints(armature, data : Armature):
                         obj.rigid_body.type = 'PASSIVE'
                         obj.rigid_body.collision_shape = 'CAPSULE'
                     if obj:
-                        constraint = obj.constraints.new('COPY_TRANSFORMS')
-                        constraint.target = armature
-                        constraint.subtarget = child.name
+                        obj.rigid_body.kinematic = True
+                        obj.parent = armature
+                        obj.parent_bone = child.name
+                        obj.parent_type = 'BONE'                    
                 if child.physics.type & BonePhysicsType.Bone:
                     # Add bones
+                    def ensure_bone_rigidbody(bone_name : str, is_pivot = True, radius=0.004):
+                        fullname = f'{armature.name}_{bone_name}_{"pivot" if is_pivot else "target"}_rigidbody'
+                        if not fullname in bpy.context.scene.objects:
+                            bpy.ops.mesh.primitive_uv_sphere_add(radius=radius)
+                            obj = bpy.context.object
+                            obj.name = fullname
+                            bpy.ops.rigidbody.object_add()
+                            obj.rigid_body.collision_shape = 'SPHERE'
+                            obj.rigid_body.collision_collections[0] = False
+                            obj.rigid_body.type = 'ACTIVE'       
+                            if is_pivot:
+                                obj.rigid_body.kinematic = True
+                                obj.parent = armature
+                                obj.parent_bone = bone_name
+                                obj.parent_type = 'BONE'
+                            else:
+                                obj.rigid_body.kinematic = False
+                                # Accessing pose bone
+                                bpy.context.view_layer.objects.active = armature
+                                bpy.ops.object.mode_set(mode='POSE')
+                                pbone : bpy.types.PoseBone = armature.pose.bones[bone_name]
+                                # Bind inverse should then be identity
+                                global_transform = armature.matrix_world @ pbone.matrix
+                                obj.matrix_world = global_transform
+                                # Add the constraints                        
+                                constraint = pbone.constraints.new('COPY_TRANSFORMS')
+                                constraint.target = obj      
+                                constraint.mix_mode = 'REPLACE'           
+                            return obj
+                        return bpy.context.scene.objects[fullname]
+                    if child.physics.type == BonePhysicsType.SpringBone:
+                        pivot = ensure_bone_rigidbody(child.physics.pivot, True)
+                        target = ensure_bone_rigidbody(child.name, False)                        
+                        # A joint per relationship
+                        joint = bpy.data.objects.new("Joint", None)
+                        joint.empty_display_size = 0.1
+                        joint.empty_display_type = 'ARROWS'
+                        # Joint follows the pivot
+                        bpy.context.collection.objects.link(joint)
+                        joint.parent = pivot
+                        bpy.context.view_layer.objects.active = joint    
+                        # Add the constraint
+                        bpy.ops.rigidbody.constraint_add(type='GENERIC_SPRING')
+                        ct = joint.rigid_body_constraint
+                        ct.use_limit_lin_x = True
+                        ct.use_limit_lin_y = True
+                        ct.use_limit_lin_z = True
+                        # No linear movement
+                        ct.limit_lin_x_lower = ct.limit_lin_x_upper = 0
+                        ct.limit_lin_y_lower = ct.limit_lin_y_upper = 0
+                        ct.limit_lin_z_lower = ct.limit_lin_z_upper = 0
+                        # Angular movement per physics data
+                        # Note that the axis are swapped
+                        ct.use_limit_ang_x = True
+                        ct.use_limit_ang_y = child.physics.zAngleLimits.active
+                        ct.use_limit_ang_z = child.physics.yAngleLimits.active
+                        ct.limit_ang_x_lower = 0
+                        ct.limit_ang_x_upper = 0
+                        ct.limit_ang_y_lower = math.radians(child.physics.zAngleLimits.min)
+                        ct.limit_ang_y_upper = math.radians(child.physics.zAngleLimits.max)
+                        ct.limit_ang_z_lower = math.radians(child.physics.yAngleLimits.min)
+                        ct.limit_ang_z_upper = math.radians(child.physics.yAngleLimits.max)
+                        # Spring damping effect
+                        # XXX: These are not going to be accurate
+                        ct.use_spring_ang_x = False
+                        ct.use_spring_ang_y = True
+                        ct.use_spring_ang_z = True                        
+                        ct.spring_stiffness_y = ct.spring_stiffness_z = child.physics.angularStiffness
+                        # Link the objects!
+                        joint.rigid_body_constraint.object1 = pivot
+                        joint.rigid_body_constraint.object2 = target
+
                     pass
 
 

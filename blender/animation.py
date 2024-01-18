@@ -132,17 +132,24 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
     def swizzle_euler_camera(euler : Euler):
         # Unity camera resets by viewing at Z+, which is the front direction
         # Blenders looks at -Z, which is its down direction
-        offset = Euler((math.radians(90),0,math.radians(-180)),'XYZ')
-        euler = Euler(swizzle_euler(euler),'XYZ')
+        offset = Euler((math.radians(90),0,math.radians(180)),'XZY')
+        euler = Euler(swizzle_euler(euler),'XZY')
         offset.rotate(euler)
         return offset
+    def swizzer_translation_camera(vector : Vector):
+        result = swizzle_vector(vector)
+        # XXX: This is a hack
+        # Don't know how the translation is offsetted yet. Need to investigate
+        result += Vector((0,0,-0.55))
+        result.z = max(result.z, 0)
+        return result
     if CAMERA_UNK_CRC in data.TransformTracks[TransformType.EulerRotation]:
         curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_UNK_CRC].Curve
         import_fcurve(action,'rotation_euler', [swizzle_euler_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time) for keyframe in curve], 3)        
     
     if CAMERA_UNK_CRC in data.TransformTracks[TransformType.Translation]:
         curve = data.TransformTracks[TransformType.Translation][CAMERA_UNK_CRC].Curve
-        import_fcurve(action,'location', [swizzle_vector(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time) for keyframe in curve], 3)     
+        import_fcurve(action,'location', [swizzer_translation_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time) for keyframe in curve], 3)     
 
 def import_camera_parameter_animation(name : str, data : Animation, camera : bpy.types.Object):
     camera.data.animation_data_clear()
