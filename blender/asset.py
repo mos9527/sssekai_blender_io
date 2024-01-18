@@ -29,21 +29,47 @@ def search_env_meshes(env : Environment):
         armature.bone_name_tbl = dict()
         def dfs(root : Transform, parent : Bone = None):
             gameObject = root.m_GameObject.read()
-            name = gameObject.m_Name        
+            name = gameObject.m_Name
+            # Addtional properties
+            # Skinned Mesh Renderer
             if getattr(gameObject,'m_SkinnedMeshRenderer',None):
                 armature.skinned_mesh_gameobject = gameObject
+            # Complete path. Used for CRC hash later on
             path_from_root = ''
             if parent and parent.global_path:
                 path_from_root = parent.global_path + '/' + name
             elif parent:
                 path_from_root = name
+            # Physics Rb + Collider
+            # XXX: Some properties are not implemented yet
+            bonePhysics = None
+            for component in gameObject.m_Components:
+                if component.type == ClassIDType.MonoBehaviour:
+                    component = component.read()
+                    if component.m_Script:
+                        physicsScript = component.m_Script.read()
+                        physics = component.read_typetree()
+                        phy_type = None
+                        if physicsScript.name == 'SpringSphereCollider':
+                            phy_type = BonePhysicsType.SphereCollider
+                        if physicsScript.name == 'SpringCapsuleCollider':
+                            phy_type = BonePhysicsType.CapsuleCollider
+                        if physicsScript.name == 'SekaiSpringBone':
+                            phy_type = BonePhysicsType.SpringBone
+                        if physicsScript.name == 'SpringManager':
+                            phy_type = BonePhysicsType.SpringManager
+                        if phy_type != None:
+                            bonePhysics = BonePhysics.from_dict(physics)
+                            bonePhysics.type = phy_type
             bone = Bone(
                 name,
                 root.m_LocalPosition,
                 root.m_LocalRotation,
                 root.m_LocalScale,
                 list(),
-                path_from_root
+                path_from_root,
+                None,
+                bonePhysics
             )
             armature.bone_name_tbl[name] = bone
             armature.bone_path_hash_tbl[get_name_hash(path_from_root)] = bone

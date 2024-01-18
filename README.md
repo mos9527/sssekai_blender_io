@@ -3,7 +3,7 @@ Blender I/O for the game's assets. (actually it's imports only)
 
 Currently supports:  
   * Textures
-  * Character NPR Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai-blender-io/blob/main/sssekai_blender_io/assets/SekaiShaderStandalone.blend))
+  * Character NPR Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/main/sssekai_blender_io/assets/SekaiShaderStandalone.blend))
   * Static Mesh
   * Skinned Mesh
   * Armatures (built through GameObject hierarchy)

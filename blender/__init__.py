@@ -24,6 +24,7 @@ import zlib
 import tempfile
 from typing import List, Dict
 from dataclasses import dataclass
+from enum import IntEnum
 # Coordinate System | Forward |  Up  |  Left
 # Unity:   LH, Y Up |   Z     |   Y  |   X
 # Blender: RH, Z Up |  -Y     |   Z  |  -X
@@ -63,6 +64,38 @@ from UnityPy.math import Vector3, Quaternion as UnityQuaternion
 # SSSekai deps
 from sssekai.unity.AnimationClip import read_animation, Animation, TransformType
 from sssekai.unity.AssetBundle import load_assetbundle
+class BonePhysicsType(IntEnum):
+    NoPhysics = 0
+    SpringBone = 1
+    SphereCollider = 2
+    CapsuleCollider = 3
+    SpringManager = 4
+@dataclass
+class BoneAngularLimit:
+    active : bool = 0
+    min : float = 0
+    max : float = 0
+@dataclass
+class BonePhysics:
+    type : BonePhysicsType = BonePhysicsType.NoPhysics
+
+    radius : float = 0
+    height : float = 0
+    
+    # SpringBones only
+    springForce : float = 0
+    dragForce : float = 0 
+    angularStiffness : float = 0
+    yAngularLimits : BoneAngularLimit = None
+    zAngularLimits : BoneAngularLimit = None
+
+    @staticmethod
+    def from_dict(data : dict):
+        phy = BonePhysics()
+        for k,v in data.items():
+            if hasattr(phy, k):
+                setattr(phy, k, v)
+        return phy
 @dataclass
 class Bone:
     name : str
@@ -73,6 +106,8 @@ class Bone:
     children : list # Bone
     global_path : str = ''
     global_transform : Matrix = None
+    # Physics
+    physics : BonePhysics = None
     # Helpers
     def get_blender_local_position(self):
         return swizzle_vector(self.localPosition)
@@ -93,7 +128,7 @@ class Bone:
                 yield from dfs(child, bone, depth + 1)
         yield from dfs(root or self)        
     # Extra
-    edit_bone = None # Blender Bone
+    edit_bone = None # Blender EditBone
 
 @dataclass
 class Armature:
