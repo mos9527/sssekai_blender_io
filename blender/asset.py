@@ -27,7 +27,8 @@ def search_env_meshes(env : Environment):
         armature = Armature(root.m_GameObject.read().m_Name)
         armature.bone_path_hash_tbl = dict()
         armature.bone_name_tbl = dict()
-        def dfs(root : Transform, parent : Bone = None):
+        path_id_tbl = dict() # Only used locally
+        def dfs(root : Transform, parent : Bone = None):            
             gameObject = root.m_GameObject.read()
             name = gameObject.m_Name
             # Addtional properties
@@ -49,7 +50,7 @@ def search_env_meshes(env : Environment):
                     if component.m_Script:
                         physicsScript = component.m_Script.read()
                         physics = component.read_typetree()
-                        phy_type = None
+                        phy_type = None                        
                         if physicsScript.name == 'SpringSphereCollider':
                             phy_type = BonePhysicsType.SphereCollider
                         if physicsScript.name == 'SpringCapsuleCollider':
@@ -59,8 +60,10 @@ def search_env_meshes(env : Environment):
                         if physicsScript.name == 'SpringManager':
                             phy_type = BonePhysicsType.SpringManager
                         if phy_type != None:
-                            bonePhysics = BonePhysics.from_dict(physics)
+                            bonePhysics = BonePhysics.from_dict(physics)                            
                             bonePhysics.type = phy_type
+                            if 'pivotNode' in physics:
+                                bonePhysics.pivot = path_id_tbl[physics['pivotNode']['m_PathID']].name
             bone = Bone(
                 name,
                 root.m_LocalPosition,
@@ -71,6 +74,7 @@ def search_env_meshes(env : Environment):
                 None,
                 bonePhysics
             )
+            path_id_tbl[root.path_id] = bone
             armature.bone_name_tbl[name] = bone
             armature.bone_path_hash_tbl[get_name_hash(path_from_root)] = bone
             if not parent:
@@ -159,9 +163,10 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
         if deform_layer:
             for i in range(4):
                 skin = data.m_Skin[vtx]
-                vertex_group_index = skin.boneIndex[i]
+                if skin.weight[i] <= 0:
+                    break
+                vertex_group_index = skin.boneIndex[i]                
                 vert[deform_layer][vertex_group_index] = skin.weight[i]
-                print(vtx,i,skin.weight[i])
     bm.verts.ensure_lookup_table()
     # Indices
     for idx in range(0, len(data.m_Indices), 3):
@@ -234,40 +239,71 @@ def import_armature(name : str, data : Armature):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode='EDIT')
     # HACK: *Seems like* the only useful root bone is 'Position' (which is the root of the actual skeleton)
-    for bone in data.root.children:
-        bone : Bone
-        if bone.name == 'Position':
-            print('* Found valid armature root', bone.name, 'at', bone.global_path, 'with', len(bone.children), 'children')
-            bone.global_transform = Matrix.Identity(4)
-            # Build global transforms
-            # I think using the inverse of m_BindPose could work too
-            # but I kinda missed it until I implemented all this so...            
-            for parent, child, _ in bone.dfs_generator():
-                if parent:
-                    child.global_transform = parent.global_transform @ child.to_trs_matrix()
-                else:
-                    child.global_transform = child.to_trs_matrix()
-            # Build bone hierarchy in blender
-            for parent, child, _ in bone.dfs_generator():
-                ebone = armature.edit_bones.new(child.name)
-                ebone.use_local_location = True
-                ebone.use_relative_parent = False                
-                ebone.use_connect = False
-                ebone.use_deform = True
-                ebone[KEY_BINDPOSE_TRANS] = [v for v in child.get_blender_local_position()]
-                ebone[KEY_BINDPOSE_QUAT] = [v for v in child.get_blender_local_rotation()]
-                child.edit_bone = ebone
-                # Treat the joints as extremely small bones
-                # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198
-                # TODO: Alternative shapes for bones                                                
-                ebone.head = child.global_transform @ Vector((0,0,0))
-                ebone.tail = child.global_transform @ Vector((0,1,0))
-                ebone.length = 0.01
-                ebone.align_roll(child.global_transform @ Vector((0,0,1)) - ebone.head)
-                if parent:
-                    ebone.parent = parent.edit_bone
+    bone = data.root.recursive_locate_by_name('Position')
+    if bone:
+        # Build global transforms           
+        bone.calculate_global_transforms()
+        # Build bone hierarchy in blender
+        for parent, child, _ in bone.dfs_generator():
+            ebone = armature.edit_bones.new(child.name)
+            ebone.use_local_location = True
+            ebone.use_relative_parent = False                
+            ebone.use_connect = False
+            ebone.use_deform = True
+            ebone[KEY_BINDPOSE_TRANS] = [v for v in child.get_blender_local_position()]
+            ebone[KEY_BINDPOSE_QUAT] = [v for v in child.get_blender_local_rotation()]
+            child.edit_bone = ebone
+            # Treat the joints as extremely small bones
+            # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198
+            # TODO: Alternative shapes for bones                                                
+            ebone.head = child.global_transform @ Vector((0,0,0))
+            ebone.tail = child.global_transform @ Vector((0,1,0))
+            ebone.length = 0.01
+            ebone.align_roll(child.global_transform @ Vector((0,0,1)) - ebone.head)
+            if parent:
+                ebone.parent = parent.edit_bone
 
     return armature, obj
+
+def import_armature_physics_constraints(armature, data : Armature):
+    '''Imports the rigid body constraints for the armature
+
+    Args:
+        armature (bpy.types.Object): Armature object
+        data (Armature): Armature data
+    '''    
+    bpy.context.view_layer.objects.active = armature
+    bpy.ops.object.mode_set(mode='OBJECT')
+    arma = armature.data
+    bone = data.root.recursive_locate_by_name('Position')
+    if bone:
+        for parent, child, _ in bone.dfs_generator():            
+            if child.physics:
+                if child.physics.type & BonePhysicsType.Collider:
+                    # Add colliders
+                    obj = None
+                    if child.physics.type == BonePhysicsType.SphereCollider:
+                        bpy.ops.mesh.primitive_uv_sphere_add(radius=child.physics.radius)
+                        obj = bpy.context.object
+                        obj.name = child.name
+                        bpy.ops.rigidbody.object_add()
+                        obj.rigid_body.type = 'PASSIVE'
+                        obj.rigid_body.collision_shape = 'SPHERE'
+                    if child.physics.type == BonePhysicsType.CapsuleCollider:
+                        bpy.ops.mesh.primitive_cylinder_add(radius=child.physics.radius,depth=child.physics.height)
+                        obj = bpy.context.object
+                        obj.name = child.name
+                        bpy.ops.rigidbody.object_add()
+                        obj.rigid_body.type = 'PASSIVE'
+                        obj.rigid_body.collision_shape = 'CAPSULE'
+                    if obj:
+                        constraint = obj.constraints.new('COPY_TRANSFORMS')
+                        constraint.target = armature
+                        constraint.subtarget = child.name
+                if child.physics.type & BonePhysicsType.Bone:
+                    # Add bones
+                    pass
+
 
 def import_texture(name : str, data : Texture2D):
     '''Imports Texture2D assets into blender

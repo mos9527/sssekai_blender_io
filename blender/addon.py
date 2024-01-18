@@ -78,6 +78,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     if getattr(mesh_rnd,'m_Mesh',None):
                         mesh_data : Mesh = mesh_rnd.m_Mesh.read()
                         armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
+                        import_armature_physics_constraints(armObj, armature)
                         mesh, obj = import_mesh(armature.name, mesh_data,True, armature.bone_path_hash_tbl)
                         obj.parent = armObj
                         obj.modifiers.new('Armature', 'ARMATURE').object = armObj

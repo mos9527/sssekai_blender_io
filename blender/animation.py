@@ -113,7 +113,6 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
 def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object):
     mesh = dest_mesh.data
     assert KEY_SHAPEKEY_NAME_HASH_TBL in mesh, "Shape Key table not found. You can only import blend shape animations on meshes with blend shapes!"
-    print(list(data.FloatTracks.keys()))
     assert BLENDSHAPES_UNK_CRC in data.FloatTracks, "No blend shape animation found!"
     keyshape_table = json.loads(mesh[KEY_SHAPEKEY_NAME_HASH_TBL])
     action = bpy.data.actions.new(name)

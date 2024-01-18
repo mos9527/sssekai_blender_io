@@ -65,11 +65,17 @@ from UnityPy.math import Vector3, Quaternion as UnityQuaternion
 from sssekai.unity.AnimationClip import read_animation, Animation, TransformType
 from sssekai.unity.AssetBundle import load_assetbundle
 class BonePhysicsType(IntEnum):
-    NoPhysics = 0
-    SpringBone = 1
-    SphereCollider = 2
-    CapsuleCollider = 3
-    SpringManager = 4
+    NoPhysics = 0x00
+
+    Bone = 0x10
+    SpringBone = 0x11
+
+    Collider = 0x20
+    SphereCollider = 0x21
+    CapsuleCollider = 0x22
+
+    Manager = 0x30
+    SpringManager = 0x30
 @dataclass
 class BoneAngularLimit:
     active : bool = 0
@@ -83,6 +89,7 @@ class BonePhysics:
     height : float = 0
     
     # SpringBones only
+    pivot : str = '' # Bone name
     springForce : float = 0
     dragForce : float = 0 
     angularStiffness : float = 0
@@ -126,7 +133,26 @@ class Bone:
             yield parent, bone, depth
             for child in bone.children:
                 yield from dfs(child, bone, depth + 1)
-        yield from dfs(root or self)        
+        yield from dfs(root or self)
+    def calculate_global_transforms(self):
+        '''Calculates global transforms for this bone and all its children recursively.'''
+        if not self.global_transform:
+            self.global_transform = Matrix.Identity(4)
+        for parent, child, _ in self.dfs_generator():
+            if parent:
+                child.global_transform = parent.global_transform @ child.to_trs_matrix()
+            else:
+                child.global_transform = child.to_trs_matrix()
+    def recursive_search(self, predicate = lambda x: True):
+        '''Searches for a bone that matches the predicate, recursively.'''
+        for parent, child, _ in self.dfs_generator():
+            if predicate(child):
+                yield child
+    def recursive_locate_by_name(self, name):
+        try:
+            return next(self.recursive_search(lambda x: x.name == name))
+        except StopIteration:
+            return None
     # Extra
     edit_bone = None # Blender EditBone
 
