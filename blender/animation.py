@@ -1,7 +1,17 @@
 from . import *
 
-def time_to_frame(time : float):
-    return int(time * bpy.context.scene.render.fps) + 1
+def time_to_frame(time : float, frame_offset : int):
+    return int(time * bpy.context.scene.render.fps) + 1 + frame_offset
+
+def ensure_action(object, name : str, always_create_new : bool):
+    if always_create_new or not object.animation_data or not object.animation_data.action:
+        object.animation_data_clear()
+        object.animation_data_create()
+        action = bpy.data.actions.new(name)
+        object.animation_data.action = action
+        return action
+    else:
+        return object.animation_data.action
 
 def import_fcurve(action : bpy.types.Action, data_path : str , values : list, frames : list, num_curves : int = 1):
     '''Imports an Fcurve into an action
@@ -16,16 +26,22 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
     valueIterable = type(values[0])
     valueIterable = valueIterable != float and valueIterable != int
     assert valueIterable or (not valueIterable and num_curves == 1), "Cannot import multiple curves for non-iterable values"
-    fcurve = [action.fcurves.new(data_path=data_path, index=i) for i in range(num_curves)]
-    curve_data = [0] * (len(frames) * 2)
+    fcurve = [action.fcurves.find(data_path=data_path, index=i) or action.fcurves.new(data_path=data_path, index=i) for i in range(num_curves)]
     for i in range(num_curves):
+        curve_data = [0] * (len(frames) * 2)
         curve_data[::2] = frames
         curve_data[1::2] = [v[i] if valueIterable else v for v in values]
-        fcurve[i].keyframe_points.add(len(frames))
+        if len(fcurve[i].keyframe_points) > 0:
+            # Has existing data. Always append them
+            existing_data = [0] * (len(fcurve[i].keyframe_points) * 2)
+            fcurve[i].keyframe_points.foreach_get('co', existing_data)
+            curve_data = existing_data + curve_data
+        fcurve[i].keyframe_points.clear()
+        fcurve[i].keyframe_points.add(len(curve_data) // 2)
         fcurve[i].keyframe_points.foreach_set('co', curve_data)
         fcurve[i].update()
 
-def import_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object):
+def import_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
     mesh_obj = dest_arma.children[0]
     mesh = mesh_obj.data   
     assert KEY_BONE_NAME_HASH_TBL in mesh, "Bone table not found. Invalid armature!" 
@@ -75,12 +91,9 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
     bpy.ops.object.mode_set(mode='POSE')
     bpy.ops.pose.select_all(action='SELECT')
     bpy.ops.pose.transforms_clear()
-    bpy.ops.pose.select_all(action='DESELECT')    
-    dest_arma.animation_data_clear()
-    dest_arma.animation_data_create()
+    bpy.ops.pose.select_all(action='DESELECT')
     # Setup actions
-    action = bpy.data.actions.new(name)
-    dest_arma.animation_data.action = action
+    action = ensure_action(dest_arma, name, always_create_new)
     for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
         # Quaternion rotations
         bone_name = bone_table[str(bone_hash)]
@@ -91,7 +104,7 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
         for i in range(0,len(values) - 1):
             if values[i].dot(values[i+1]) < 0:
                 values[i+1] = -values[i+1]
-        frames = [time_to_frame(keyframe.time) for keyframe in track.Curve]
+        frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
         import_fcurve(action,'pose.bones["%s"].rotation_quaternion' % bone_name, values, frames, 4)
     for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
         # Euler rotations
@@ -99,35 +112,29 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
         bone = dest_arma.pose.bones[bone_name]
         bone.rotation_mode = 'XZY'
         values = [to_pose_euler(bone, swizzle_euler(keyframe.value)) for keyframe in track.Curve]
-        frames = [time_to_frame(keyframe.time) for keyframe in track.Curve]
+        frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
         import_fcurve(action,'pose.bones["%s"].rotation_euler' % bone_name, values, frames, 3)            
     for bone_hash, track in data.TransformTracks[TransformType.Translation].items():
         # Translations
         bone_name = bone_table[str(bone_hash)]
         bone = dest_arma.pose.bones[bone_name]
         values = [to_pose_translation(bone, swizzle_vector(keyframe.value)) for keyframe in track.Curve]
-        frames = [time_to_frame(keyframe.time) for keyframe in track.Curve]
+        frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
         import_fcurve(action,'pose.bones["%s"].location' % bone_name, values, frames, 3)       
     # No scale.
 
-def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object):
+def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object, frame_offset : int, always_create_new : bool):
     mesh = dest_mesh.data
     assert KEY_SHAPEKEY_NAME_HASH_TBL in mesh, "Shape Key table not found. You can only import blend shape animations on meshes with blend shapes!"
     assert BLENDSHAPES_UNK_CRC in data.FloatTracks, "No blend shape animation found!"
     keyshape_table = json.loads(mesh[KEY_SHAPEKEY_NAME_HASH_TBL])
-    action = bpy.data.actions.new(name)
-    mesh.shape_keys.animation_data_clear()
-    mesh.shape_keys.animation_data_create()        
-    mesh.shape_keys.animation_data.action = action
+    action = ensure_action(mesh.shape_keys, name, always_create_new)
     for attrCRC, track in data.FloatTracks[BLENDSHAPES_UNK_CRC].items():
         bsName = keyshape_table[str(attrCRC)]
-        import_fcurve(action,'key_blocks["%s"].value' % bsName, [keyframe.value / 100.0 for keyframe in track.Curve], [time_to_frame(keyframe.time) for keyframe in track.Curve])
+        import_fcurve(action,'key_blocks["%s"].value' % bsName, [keyframe.value / 100.0 for keyframe in track.Curve], [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve])
 
-def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object):
-    camera.animation_data_clear()
-    camera.animation_data_create()
-    action = bpy.data.actions.new(name)
-    camera.animation_data.action = action
+def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool):
+    action = ensure_action(camera, name, always_create_new)
     camera.rotation_mode = 'XZY'
     def swizzle_euler_camera(euler : Euler):
         # Unity camera resets by viewing at Z+, which is the front direction
@@ -145,19 +152,16 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         return result
     if CAMERA_UNK_CRC in data.TransformTracks[TransformType.EulerRotation]:
         curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_UNK_CRC].Curve
-        import_fcurve(action,'rotation_euler', [swizzle_euler_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time) for keyframe in curve], 3)        
+        import_fcurve(action,'rotation_euler', [swizzle_euler_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)        
     
     if CAMERA_UNK_CRC in data.TransformTracks[TransformType.Translation]:
         curve = data.TransformTracks[TransformType.Translation][CAMERA_UNK_CRC].Curve
-        import_fcurve(action,'location', [swizzer_translation_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time) for keyframe in curve], 3)     
+        import_fcurve(action,'location', [swizzer_translation_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)     
 
-def import_camera_parameter_animation(name : str, data : Animation, camera : bpy.types.Object):
-    camera.data.animation_data_clear()
-    camera.data.animation_data_create()
-    action = bpy.data.actions.new(name)
-    camera.data.animation_data.action = action
+def import_camera_parameter_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool):
+    action = ensure_action(camera, name, always_create_new)
     camera.data.lens_unit = 'FOV'
     # FOV
     if CAMERA_ADJ_UNK_CRC in data.FloatTracks[NULL_CRC]:
         curve = data.FloatTracks[NULL_CRC][CAMERA_ADJ_UNK_CRC].Curve
-        import_fcurve(action,'angle',[keyframe.value for keyframe in curve],[time_to_frame(keyframe.time) for keyframe in curve], 1)
+        import_fcurve(action,'angle',[keyframe.value + frame_offset for keyframe in curve],[time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 1)

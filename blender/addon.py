@@ -8,7 +8,8 @@ from bpy.types import WindowManager
 from bpy.props import (
     StringProperty,
     EnumProperty,
-    BoolProperty
+    BoolProperty,
+    IntProperty
 )
 preview_collections = dict()
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
@@ -102,7 +103,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     print('* Importing...')
                     # Set the fps. Otherwise keys may get lost!
                     bpy.context.scene.render.fps = int(clip.Framerate)
-                    bpy.context.scene.frame_end = max(bpy.context.scene.frame_end,int(clip.Framerate * clip.Duration + 0.5))
+                    bpy.context.scene.frame_end = max(bpy.context.scene.frame_end,int(clip.Framerate * clip.Duration + 0.5 + wm.sssekai_animation_import_offset))
                     print('* Duration', clip.Duration)
                     print('* Framerate', clip.Framerate)
                     print('* Frames', bpy.context.scene.frame_end)
@@ -111,23 +112,23 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         print('* Importing Keyshape animation', animation.name)
                         check_is_active_armature()
                         arm_mesh_obj = bpy.context.active_object.children[0]
-                        import_keyshape_animation(animation.name, clip, arm_mesh_obj)
+                        import_keyshape_animation(animation.name, clip, arm_mesh_obj, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
                         print('* Imported Keyshape animation', animation.name)
                     elif CAMERA_UNK_CRC in clip.TransformTracks[TransformType.Translation]:
                         print('* Importing Camera animation', animation.name)
                         check_is_active_camera()
-                        import_camera_animation(animation.name, clip, bpy.context.active_object)
+                        import_camera_animation(animation.name, clip, bpy.context.active_object,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
                         print('* Imported Camera animation', animation.name)
                     elif NULL_CRC in clip.FloatTracks and CAMERA_ADJ_UNK_CRC in clip.FloatTracks[NULL_CRC]:
                         # XXX not working yet. don't know what the values mean
                         print('* Importing Camera Parameter animation', animation.name)
                         check_is_active_camera()
-                        import_camera_parameter_animation(animation.name, clip, bpy.context.active_object)
+                        import_camera_parameter_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
                         print('* Imported Camera Parameter animation', animation.name)
                     else:
                         print('* Importing Armature animation', animation.name)
                         check_is_active_armature()
-                        import_armature_animation(animation.name, clip, bpy.context.active_object)
+                        import_armature_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
                         print('* Imported Armature animation', animation.name)
                     return {'FINISHED'}
         return {'CANCELLED'}
@@ -150,7 +151,13 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_assetbundle_preview")
         layout.separator()
         row = layout.row()
+        row.label(text="Armature Options")
         row.prop(wm, "sssekai_armature_import_physics")
+        row = layout.row()
+        row.label(text="Animation Options")
+        row = layout.row()
+        row.prop(wm, "sssekai_animation_import_offset")
+        row.prop(wm, "sssekai_animation_append_exisiting")
         row = layout.row()
         row.operator(SSSekaiBlenderImportOperator.bl_idname)
 
@@ -212,6 +219,16 @@ def register():
         name="Import Physics",
         description="Import Physics",
         default=False
+    )
+    WindowManager.sssekai_animation_append_exisiting = BoolProperty(
+        name="Append",
+        description="Append Animations to the existing Action, instead of overwriting it",
+        default=False
+    )
+    WindowManager.sssekai_animation_import_offset = IntProperty(
+        name="Offset",
+        description="Animation Offset in frames",
+        default=0
     )
     pcoll = bpy.utils.previews.new()
     pcoll.sssekai_assetbundle_file = ""
