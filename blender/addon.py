@@ -161,7 +161,7 @@ class SSSekaiBlenderRemovePhysicsOperator(bpy.types.Operator):
         arma = bpy.context.active_object
         # Removes all rigidbodies, and, consequently, all constraints
         for child in get_rigidbodies_from_arma(arma):
-            child.select_set(True)
+            child.select_set(True)            
             for cchild in child.children:
                 cchild.select_set(True)
         arma.select_set(False)
@@ -176,8 +176,10 @@ class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
         display = not wm.sssekai_armature_display_physics
         for child in get_rigidbodies_from_arma(arma):
             child.hide_set(display)
+            child.hide_render = display
             for cchild in child.children:
                 cchild.hide_set(display)
+                cchild.hide_render = display
         return {'FINISHED'}
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"

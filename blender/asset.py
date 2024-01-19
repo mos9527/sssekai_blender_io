@@ -277,7 +277,7 @@ def import_armature_physics_constraints(armature, data : Armature):
     SPHERE_RADIUS_FACTOR = 0.5
     CAPSULE_RADIUS_FACTOR = 1
     CAPSULE_HEIGHT_FACTOR = 1
-    SPRINGBONE_RADIUS_FACTOR = 0.5
+    SPRINGBONE_RADIUS_FACTOR = 0.35
     bpy.context.view_layer.objects.active = armature
     bpy.ops.object.mode_set(mode='OBJECT')
     bone = data.root.recursive_locate_by_name('Position')
@@ -394,7 +394,7 @@ def import_armature_physics_constraints(armature, data : Armature):
     if target_rigid_bodies:
         def set_no_collision(obj, parent_obj):
             joint = bpy.data.objects.new("NoCollisionJoint", None)
-            joint.empty_display_size = 0.1
+            joint.empty_display_size = 0.0001
             joint.empty_display_type = 'ARROWS'
             # Joint follows the pivot
             bpy.context.collection.objects.link(joint)    
