@@ -1,10 +1,11 @@
+from typing import Set
 from . import *
 from .asset import *
 from .animation import *
 
 import bpy
 import bpy.utils.previews
-from bpy.types import WindowManager
+from bpy.types import Context, WindowManager
 from bpy.props import (
     StringProperty,
     EnumProperty,
@@ -80,8 +81,6 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     if getattr(mesh_rnd,'m_Mesh',None):
                         mesh_data : Mesh = mesh_rnd.m_Mesh.read()
                         armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
-                        if wm.sssekai_armature_import_physics:
-                            import_armature_physics_constraints(armObj, armature)
                         mesh, obj = import_mesh(armature.name, mesh_data,True, armature.bone_path_hash_tbl)
                         obj.parent = armObj
                         obj.modifiers.new('Armature', 'ARMATURE').object = armObj
@@ -132,7 +131,54 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         print('* Imported Armature animation', animation.name)
                     return {'FINISHED'}
         return {'CANCELLED'}
+class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
+    bl_idname = "sssekai.import_physics_op"
+    bl_label = "Import Physics"
 
+    def execute(self, context):
+        assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to import physics data to!"
+        wm = context.window_manager
+        print('* Loading physics data from', wm.sssekai_assetbundle_file, 'for', wm.sssekai_assetbundle_preview)
+        with open(wm.sssekai_assetbundle_file, 'rb') as f:
+            env = load_assetbundle(f)
+            static_mesh_gameobjects, armatures = search_env_meshes(env)
+            for armature in armatures:
+                if armature.name == wm.sssekai_assetbundle_preview:
+                    bpy.context.scene.frame_current = 0
+                    import_armature_physics_constraints(bpy.context.active_object, armature)
+                    return {'FINISHED'}
+        return {'CANCELLED'}
+
+def get_rigidbodies_from_arma(arma : bpy.types.Object):
+    for child in arma.children:
+        if '_rigidbody' in child.name:
+            yield child
+class SSSekaiBlenderRemovePhysicsOperator(bpy.types.Operator):
+    bl_idname = "sssekai.remove_physics_op"
+    bl_label = "Remove Physics"                
+    def execute(self, context):
+        assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to remove physics data from!"
+        arma = bpy.context.active_object
+        # Removes all rigidbodies, and, consequently, all constraints
+        for child in get_rigidbodies_from_arma(arma):
+            child.select_set(True)
+            for cchild in child.children:
+                cchild.select_set(True)
+        arma.select_set(False)
+        return bpy.ops.object.delete()
+class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
+    bl_idname = "sssekai.display_physics_op"
+    bl_label = "Show Physics Objects"                
+    def execute(self, context):
+        assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature!"
+        arma = bpy.context.active_object
+        wm = context.window_manager
+        display = not wm.sssekai_armature_display_physics
+        for child in get_rigidbodies_from_arma(arma):
+            child.hide_set(display)
+            for cchild in child.children:
+                cchild.hide_set(display)
+        return {'FINISHED'}
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
     bl_label = "Importer"
@@ -152,7 +198,12 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         layout.separator()
         row = layout.row()
         row.label(text="Armature Options")
-        row.prop(wm, "sssekai_armature_import_physics")
+        row = layout.row()
+        row.operator(SSSekaiBlenderImportPhysicsOperator.bl_idname)
+        row = layout.row()
+        row.operator(SSSekaiBlenderRemovePhysicsOperator.bl_idname)
+        row = layout.row()
+        row.prop(wm, "sssekai_armature_display_physics", toggle=True)
         row = layout.row()
         row.label(text="Animation Options")
         row = layout.row()
@@ -215,10 +266,11 @@ def register():
         description="Asset",
         items=enumerate_assets,
     )
-    WindowManager.sssekai_armature_import_physics = BoolProperty(
-        name="Import Physics",
-        description="Import Physics",
-        default=False
+    WindowManager.sssekai_armature_display_physics = BoolProperty(
+        name="Display Physics",
+        description="Display Physics Objects",
+        default=True,
+        update=SSSekaiBlenderPhysicsDisplayOperator.execute
     )
     WindowManager.sssekai_animation_append_exisiting = BoolProperty(
         name="Append",
@@ -242,6 +294,10 @@ def register():
     bpy.types.Scene.sssekai_util_neck_attach_obj_body = bpy.props.PointerProperty(name="Body",type=bpy.types.Armature)
     bpy.utils.register_class(SSSekaiBlenderUtilNeckAttachOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilNeckAttach)
+    bpy.utils.register_class(SSSekaiBlenderImportPhysicsOperator)
+    bpy.utils.register_class(SSSekaiBlenderRemovePhysicsOperator)
+    bpy.utils.register_class(SSSekaiBlenderPhysicsDisplayOperator)
+
 
 def unregister():
     del WindowManager.sssekai_assetbundle_preview
@@ -253,3 +309,6 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderImportPanel)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttachOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttach)
+    bpy.utils.unregister_class(SSSekaiBlenderImportPhysicsOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderRemovePhysicsOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderPhysicsDisplayOperator)

@@ -115,8 +115,9 @@ class Bone:
     localRotation : UnityQuaternion
     localScale : Vector3
     # Hierarchy. Built after asset import
+    parent : object # Bone
     children : list # Bone
-    global_path : str = ''
+    global_path : str
     global_transform : Matrix = None
     # Physics
     physics : BonePhysics = None
