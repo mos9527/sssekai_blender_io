@@ -165,7 +165,7 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
             for i in range(4):
                 skin = data.m_Skin[vtx]
                 if skin.weight[i] <= 0:
-                    break
+                    continue
                 vertex_group_index = skin.boneIndex[i]                
                 vert[deform_layer][vertex_group_index] = skin.weight[i]
     bm.verts.ensure_lookup_table()
@@ -232,7 +232,7 @@ def import_armature(name : str, data : Armature):
         Tuple[bpy.types.Armature, bpy.types.Object]: Created armature and its parent object
     '''
     armature = bpy.data.armatures.new(name)
-    armature.display_type = 'STICK'
+    armature.display_type = 'OCTAHEDRAL'
     armature.relation_line_position = 'HEAD'
 
     obj = bpy.data.objects.new(name, armature)
@@ -274,17 +274,154 @@ def import_armature_physics_constraints(armature, data : Armature):
         data (Armature): Armature data
     '''
     PIVOT_SIZE = 0.004
-    SPHERE_RADIUS_FACTOR = 0.5
+    SPHERE_RADIUS_FACTOR = 1
     CAPSULE_RADIUS_FACTOR = 1
     CAPSULE_HEIGHT_FACTOR = 1
-    SPRINGBONE_RADIUS_FACTOR = 0.35
-    bpy.context.view_layer.objects.active = armature
-    bpy.ops.object.mode_set(mode='OBJECT')
+    SPRINGBONE_RADIUS_FACTOR = 1
+    BBONE_SEGMENTS = 4
+    bpy.context.view_layer.objects.active = armature    
     bone = data.root.recursive_locate_by_name('Position')
 
     target_rigid_bodies = dict()
 
     if bone:
+        # Connect all spring bones
+        # SpringBones are observed to be never animated. 
+        # Connecting them will make our lives a lot eaiser
+        bpy.ops.object.mode_set(mode='EDIT')
+        class SpringBoneChain:
+            begin : object = None
+            end : object = None
+        springbone_chains : Dict[str,SpringBoneChain] = dict()
+        armature.data.display_type = 'BBONE'
+        for parent, child, _ in bone.dfs_generator():
+            if child.name in armature.data.edit_bones:
+                ebone = armature.data.edit_bones[child.name]
+                ebone.bbone_x = ebone.bbone_z = PIVOT_SIZE
+        def connect_spring_bones(bone : Bone, parent = None):
+            if not parent:
+                if bone.physics and bone.physics.type == BonePhysicsType.SpringBone:
+                    parent = bone
+                if parent:
+                    # First Physics bone in the chain                                        
+                    springbone_chains[parent.name] = SpringBoneChain()
+                    springbone_chains[parent.name].begin = parent
+            if parent:
+                ebone = armature.data.edit_bones[bone.name]                
+                # EX (Physics) bone always has a parent Offset bone with them
+                # We don't need them as they do not contribute to the mesh
+                parent_bone = bone.parent                
+                if parent_bone.name in armature.data.edit_bones:
+                    if '_offset' in parent_bone.name and not bone.name in springbone_chains: # Keep the fisrt bone's parent. The rest are connected
+                        armature.data.edit_bones.remove(armature.data.edit_bones[parent_bone.name])   
+                        ebone.parent = armature.data.edit_bones[parent_bone.parent.name]
+                    ebone.use_connect = True
+                    scaled_segments = BBONE_SEGMENTS if ebone.length > 0.03 else 1 # XXX: Is there a better way to do this?
+                    ebone.bbone_segments = scaled_segments
+                    if bone.physics:
+                        ebone.bbone_x = ebone.bbone_z = bone.physics.radius * SPRINGBONE_RADIUS_FACTOR
+                    elif bone.parent.physics:
+                        ebone.bbone_x = ebone.bbone_z = bone.parent.physics.radius * SPRINGBONE_RADIUS_FACTOR
+                if not bone.children:
+                    springbone_chains[parent.name].end = bone
+            for child in bone.children:
+                connect_spring_bones(child, parent)
+        connect_spring_bones(bone)
+        # XXX: PoC. Using two rigid bodies to simulate the whole chain
+        # Works if...the bendy bone chain is not too long.
+        # e.g. a banana (huh?)
+        # Here's the link BTW https://www.youtube.com/watch?v=_QY12thfOPc&ab_channel=SouthernShotty    
+        # NOTE: https://github.com/Pauan/blender-rigid-body-bones produced quite visually pleasing results
+        # with the prep work done previously here.
+        # I'll try to implement it later on...
+        if False:
+            def ensure_bone_rigidbody(name : str, is_pivot : bool, radius : float):
+                bpy.ops.mesh.primitive_uv_sphere_add(radius=radius)
+                obj = bpy.context.object
+                obj.name = name + '_rigidbody'
+                bpy.ops.rigidbody.object_add()
+                obj.rigid_body.collision_shape = 'SPHERE'                            
+                obj.rigid_body.type = 'ACTIVE'       
+                obj.parent = armature
+                if is_pivot:
+                    obj.rigid_body.collision_collections[0] = False # Does not collide with anything
+                    obj.rigid_body.kinematic = True
+                else:                                
+                    obj.rigid_body.collision_collections[0] = True # Collides with selected RBs. see below..
+                    obj.rigid_body.kinematic = False
+                return obj  
+            def set_bone_parent(object : bpy.types.Object, bone_name : str):
+                object.parent = armature
+                object.parent_type = 'BONE'
+                object.parent_bone = bone_name
+            def set_bone_constraint(bone_name : str, target):
+                pbone : bpy.types.PoseBone = armature.pose.bones[bone_name] 
+                ct = pbone.constraints.new('CHILD_OF')                       
+                ct.target = target
+                bpy.context.active_object.data.bones.active = pbone.bone
+                context_override = bpy.context.copy()
+                with bpy.context.temp_override(**context_override):
+                    bpy.ops.constraint.childof_set_inverse(constraint=ct.name, owner='BONE')
+
+            for chain in springbone_chains.values():  
+                bpy.ops.object.mode_set(mode='EDIT')
+                ebone_begin : bpy.types.EditBone = armature.data.edit_bones[chain.begin.name]
+                ebone_end : bpy.types.EditBone = armature.data.edit_bones[chain.end.name]
+
+                pre_name = chain.begin.parent.name
+                begin_name = chain.begin.name
+                end_name = chain.end.name
+                begin_radius = ebone_begin.bbone_x
+                end_radius = ebone_end.bbone_x
+                end_matrix = ebone_end.matrix
+                bpy.ops.object.mode_set(mode='OBJECT')
+                print('! Connecting SpringBone Chain', begin_name,end_name)
+                # Create rigidbodies at the beginning and the end
+                rb_begin = ensure_bone_rigidbody(begin_name, True, begin_radius)
+                rb_end = ensure_bone_rigidbody(end_name, False, end_radius)
+                # Both are connected to the armature. So assign arm space matrix
+                set_bone_parent(rb_begin, begin_name)
+                rb_end.matrix_world = end_matrix
+                # Spring Constraint
+                joint = bpy.data.objects.new("SpringBoneJoint", None)
+                joint.empty_display_size = 0.1
+                joint.empty_display_type = 'ARROWS'
+                # Joint follows the pivot
+                bpy.context.collection.objects.link(joint)
+                set_bone_parent(joint, begin_name)
+                bpy.context.view_layer.objects.active = joint    
+                # Add the constraint
+                bpy.ops.rigidbody.constraint_add(type='GENERIC_SPRING')
+                ct = joint.rigid_body_constraint
+                # Spring damping effect
+                # XXX: These are not going to be accurate
+                ct.use_spring_ang_x = True
+                ct.use_spring_ang_y = True
+                ct.use_spring_ang_z = True                        
+                # Link the objects!
+                joint.rigid_body_constraint.object1 = rb_begin
+                joint.rigid_body_constraint.object2 = rb_end
+                # Point Constraint
+                joint = bpy.data.objects.new("PointBoneJoint", None)
+                joint.empty_display_size = 0.1
+                joint.empty_display_type = 'ARROWS'
+                # Joint follows the pivot
+                bpy.context.collection.objects.link(joint)
+                set_bone_parent(joint, begin_name)
+                bpy.context.view_layer.objects.active = joint    
+                # Add the constraint
+                bpy.ops.rigidbody.constraint_add(type='POINT')
+                ct = joint.rigid_body_constraint            
+                # Link the objects!
+                joint.rigid_body_constraint.object1 = rb_begin
+                joint.rigid_body_constraint.object2 = rb_end
+                # Add constraints to the bones
+                bpy.context.view_layer.objects.active = armature
+                bpy.ops.object.mode_set(mode='POSE')
+                set_bone_constraint(begin_name, rb_begin)
+                set_bone_constraint(end_name, rb_end)
+        
+        bpy.ops.object.mode_set(mode='OBJECT')
         for parent, child, _ in bone.dfs_generator():            
             if child.physics:
                 if child.physics.type & BonePhysicsType.Collider:
@@ -308,106 +445,7 @@ def import_armature_physics_constraints(armature, data : Armature):
                         obj.rigid_body.kinematic = True
                         obj.parent = armature
                         obj.parent_bone = child.name
-                        obj.parent_type = 'BONE'                    
-                if child.physics.type & BonePhysicsType.Bone:
-                    # Add bones
-                    def get_rb_name(bone_name : str, is_pivot : bool):
-                        return f'{armature.name}_{bone_name}_{"pivot" if is_pivot else "target"}_rigidbody'
-                    def ensure_bone_rigidbody(bone_name : str, is_pivot : bool, radius : float):
-                        fullname = get_rb_name(bone_name, is_pivot)
-                        if not fullname in bpy.context.scene.objects:
-                            bpy.ops.mesh.primitive_uv_sphere_add(radius=radius)
-                            obj = bpy.context.object
-                            obj.name = fullname
-                            bpy.ops.rigidbody.object_add()
-                            obj.rigid_body.collision_shape = 'SPHERE'                            
-                            obj.rigid_body.type = 'ACTIVE'       
-                            obj.parent = armature
-                            if is_pivot:
-                                obj.rigid_body.collision_collections[0] = False # Does not collide with anything
-                                obj.rigid_body.kinematic = True
-                                obj.parent_bone = bone_name
-                                obj.parent_type = 'BONE'
-                            else:                                
-                                obj.rigid_body.collision_collections[0] = True # Collides with selected RBs. see below..
-                                obj.rigid_body.kinematic = False
-                                # Accessing pose bone
-                                bpy.context.view_layer.objects.active = armature
-                                bpy.ops.object.mode_set(mode='POSE')
-                                pbone : bpy.types.PoseBone = armature.pose.bones[bone_name]
-                                # Bind inverse should then be identity
-                                global_transform = armature.matrix_world @ pbone.matrix
-                                obj.matrix_world = global_transform
-                                target_rigid_bodies[obj.name] = obj
-                            return obj
-                        return bpy.context.scene.objects[fullname]
-                    if child.physics.type == BonePhysicsType.SpringBone:
-                        pivot = ensure_bone_rigidbody(child.physics.pivot, True, PIVOT_SIZE)
-                        target = ensure_bone_rigidbody(child.name, False, child.physics.radius * SPRINGBONE_RADIUS_FACTOR)                        
-                        # A joint per relationship
-                        joint = bpy.data.objects.new("SpringBoneJoint", None)
-                        joint.empty_display_size = 0.1
-                        joint.empty_display_type = 'ARROWS'
-                        # Joint follows the pivot
-                        bpy.context.collection.objects.link(joint)
-                        joint.parent = pivot
-                        bpy.context.view_layer.objects.active = joint    
-                        # Add the constraint
-                        bpy.ops.rigidbody.constraint_add(type='GENERIC_SPRING')
-                        ct = joint.rigid_body_constraint
-                        ct.use_limit_lin_x = True
-                        ct.use_limit_lin_y = True
-                        ct.use_limit_lin_z = True
-                        # No linear movement
-                        ct.limit_lin_x_lower = 0
-                        ct.limit_lin_x_upper = 0
-                        ct.limit_lin_y_lower = 0
-                        ct.limit_lin_y_upper = 0
-                        ct.limit_lin_z_lower = 0
-                        ct.limit_lin_z_upper = 0
-                        # Angular movement per physics data
-                        # Note that the axis are swapped
-                        ct.use_limit_ang_x = False
-                        ct.use_limit_ang_y = True
-                        ct.use_limit_ang_z = True
-                        ct.limit_ang_y_lower = math.radians(child.physics.zAngleLimits.min)
-                        ct.limit_ang_y_upper = math.radians(child.physics.zAngleLimits.max)
-                        ct.limit_ang_z_lower = math.radians(child.physics.yAngleLimits.min)
-                        ct.limit_ang_z_upper = math.radians(child.physics.yAngleLimits.max)
-                        # Spring damping effect
-                        # XXX: These are not going to be accurate
-                        ct.use_spring_ang_x = True
-                        ct.use_spring_ang_y = True
-                        ct.use_spring_ang_z = True                        
-                        ct.spring_stiffness_y = ct.spring_stiffness_z = child.physics.angularStiffness
-                        # Link the objects!
-                        joint.rigid_body_constraint.object1 = pivot
-                        joint.rigid_body_constraint.object2 = target
-                        # Add the bone constraint
-                        bpy.context.view_layer.objects.active = armature
-                        bpy.ops.object.mode_set(mode='POSE')
-                        pbone : bpy.types.PoseBone = armature.pose.bones[child.name]
-                        ct = pbone.constraints.new('COPY_TRANSFORMS')
-                        ct.target = target
-
-                    pass
-    if target_rigid_bodies:
-        def set_no_collision(obj, parent_obj):
-            joint = bpy.data.objects.new("NoCollisionJoint", None)
-            joint.empty_display_size = 0.0001
-            joint.empty_display_type = 'ARROWS'
-            # Joint follows the pivot
-            bpy.context.collection.objects.link(joint)    
-            joint.parent = parent_obj                                
-            bpy.context.view_layer.objects.active = joint
-            bpy.ops.rigidbody.constraint_add(type='GENERIC_SPRING') # Without limits. This acts as a dummy constraint
-            ct = joint.rigid_body_constraint
-            ct.object1 = obj
-            ct.object2 = parent_obj
-        rbs = list(target_rigid_bodies.values())
-        for i in range(len(rbs)):
-            for j in range(i+1, len(rbs)):
-                set_no_collision(rbs[i], rbs[j])                
+                        obj.parent_type = 'BONE'             
 
 def import_texture(name : str, data : Texture2D):
     '''Imports Texture2D assets into blender
