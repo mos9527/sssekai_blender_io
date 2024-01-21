@@ -25,3 +25,14 @@ python -m pip install sssekai
 ## Usage
 Refer to the Wiki!
 https://github.com/mos9527/sssekai_blender_io/wiki （附带简中）
+
+## References
+https://github.com/KhronosGroup/glTF-Blender-IO
+
+https://github.com/theturboturnip/yk_gmd_io
+
+https://github.com/SutandoTsukai181/yakuza-gmt-blender
+
+https://github.com/UuuNyaa/blender_mmd_tools
+
+https://github.com/Pauan/blender-rigid-body-bones

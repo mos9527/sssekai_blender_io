@@ -138,7 +138,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
         return {'CANCELLED'}
 class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_physics_op"
-    bl_label = "Import Physics"
+    bl_label = "Import Physics (IRREVERSIBLE)"
 
     def execute(self, context):
         assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to import physics data to!"
@@ -160,7 +160,7 @@ def get_rigidbodies_from_arma(arma : bpy.types.Object):
             yield child
 class SSSekaiBlenderRemovePhysicsOperator(bpy.types.Operator):
     bl_idname = "sssekai.remove_physics_op"
-    bl_label = "Remove Physics"                
+    bl_label = "Remove Physics (IRREVERSIBLE)"                
     def execute(self, context):
         assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to remove physics data from!"
         arma = bpy.context.active_object

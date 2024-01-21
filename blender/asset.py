@@ -442,7 +442,7 @@ def import_armature_physics_constraints(armature, data : Armature):
                     ct.use_limit_lin_x = True
                     # For good mesaure...
                     ct.limit_lin_x_lower = math.radians(-10)
-                    ct.limit_lin_x_upper = math.radians(-10)
+                    ct.limit_lin_x_upper = math.radians(10)
                     ct.use_limit_lin_y = True
                     ct.use_limit_lin_z = True
                     if phys_data:
@@ -466,7 +466,10 @@ def import_armature_physics_constraints(armature, data : Armature):
                     # XXX: These are not going to be accurate
                     ct.use_spring_ang_x = True
                     ct.use_spring_ang_y = True
-                    ct.use_spring_ang_z = True                        
+                    ct.use_spring_ang_z = True
+                    if phys_data:
+                        ct.spring_stiffness_ang_x = ct.spring_stiffness_ang_y = ct.spring_stiffness_ang_z = phys_data.angularStiffness
+                        ct.spring_damping_x = ct.spring_damping_y = ct.spring_damping_z = phys_data.dragForce
                     # Link the objects!
                     joint.rigid_body_constraint.object1 = parent
                     joint.rigid_body_constraint.object2 = target
