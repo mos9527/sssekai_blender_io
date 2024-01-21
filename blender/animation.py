@@ -42,9 +42,13 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
         fcurve[i].update()
 
 def import_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
-    mesh_obj = dest_arma.children[0]
+    mesh_obj = None
+    for obj in dest_arma.children:
+        if KEY_BONE_NAME_HASH_TBL in obj.data:
+            mesh_obj = obj
+            break
+    assert mesh_obj, "Bone table not found. Invalid armature!" 
     mesh = mesh_obj.data   
-    assert KEY_BONE_NAME_HASH_TBL in mesh, "Bone table not found. Invalid armature!" 
     bone_table = json.loads(mesh[KEY_BONE_NAME_HASH_TBL])
     bpy.ops.object.mode_set(mode='EDIT')
     # Collect bone space <-> local space transforms

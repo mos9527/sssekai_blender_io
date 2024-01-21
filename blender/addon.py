@@ -162,10 +162,21 @@ class SSSekaiBlenderRemovePhysicsOperator(bpy.types.Operator):
         # Removes all rigidbodies, and, consequently, all constraints
         for child in get_rigidbodies_from_arma(arma):
             child.select_set(True)            
-            for cchild in child.children:
+            for cchild in child.children_recursive:
                 cchild.select_set(True)
         arma.select_set(False)
-        return bpy.ops.object.delete()
+        bpy.ops.object.delete()
+        # For all bones, restore the original hierarchy and transform
+        bpy.ops.object.mode_set(mode='EDIT')
+        for bone in arma.data.edit_bones:
+            if KEY_ORIGINAL_PARENT in bone:
+                bone.parent = arma.data.edit_bones[bone[KEY_ORIGINAL_PARENT]]
+                del bone[KEY_ORIGINAL_PARENT]
+        for bone in arma.data.edit_bones:        
+            if KEY_ORIGINAL_WORLD_MATRIX in bone:
+                bone.matrix = unpack_matrix(bone[KEY_ORIGINAL_WORLD_MATRIX])
+                del bone[KEY_ORIGINAL_WORLD_MATRIX]
+        return {'FINISHED'}
 class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
     bl_idname = "sssekai.display_physics_op"
     bl_label = "Show Physics Objects"                

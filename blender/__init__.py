@@ -51,6 +51,8 @@ KEY_BONE_NAME_HASH_TBL = 'sssekai_bone_name_hash_tbl' # Bone *full path hash* to
 KEY_SHAPEKEY_NAME_HASH_TBL = 'sssekai_shapekey_name_hash_tbl' # ShapeKey name hash to ShapeKey names
 KEY_BINDPOSE_TRANS = 'sssekai_bindpose_trans' # Bone name to bind pose translation
 KEY_BINDPOSE_QUAT = 'sssekai_bindpose_quat' # Bone name to bind pose quaternion
+KEY_ORIGINAL_PARENT = 'sssekai_original_parent' # Bone name to original parent bone name
+KEY_ORIGINAL_WORLD_MATRIX = 'sssekai_original_world_matrix' # Bone name to original world matrix
 # CRC Constants
 NULL_CRC = 0
 BLENDSHAPES_UNK_CRC = 2770785369
@@ -178,3 +180,9 @@ class Armature:
     def debug_print_bone_hierarchy(self):
         for parent, child, depth in self.root.dfs_generator():
             print('\t' * depth, child.name)
+
+def pack_matrix(matrix : Matrix):
+    return [matrix[i][j] for i in range(4) for j in range(4)]
+
+def unpack_matrix(data : list):
+    return Matrix([data[i:i+4] for i in range(0,16,4)])
