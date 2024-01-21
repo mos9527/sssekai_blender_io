@@ -110,8 +110,13 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     if BLENDSHAPES_UNK_CRC in clip.FloatTracks:
                         print('* Importing Keyshape animation', animation.name)
                         check_is_active_armature()
-                        arm_mesh_obj = bpy.context.active_object.children[0]
-                        import_keyshape_animation(animation.name, clip, arm_mesh_obj, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                        mesh_obj = None
+                        for obj in bpy.context.active_object.children:
+                            if KEY_BONE_NAME_HASH_TBL in obj.data:
+                                mesh_obj = obj
+                                break
+                        assert mesh_obj, "Bone table not found. Invalid armature!" 
+                        import_keyshape_animation(animation.name, clip, mesh_obj, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
                         print('* Imported Keyshape animation', animation.name)
                     elif CAMERA_UNK_CRC in clip.TransformTracks[TransformType.Translation]:
                         print('* Importing Camera animation', animation.name)
@@ -188,7 +193,7 @@ class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
         for child in get_rigidbodies_from_arma(arma):
             child.hide_set(display)
             child.hide_render = display
-            for cchild in child.children:
+            for cchild in child.children_recursive:
                 cchild.hide_set(display)
                 cchild.hide_render = display
         return {'FINISHED'}
