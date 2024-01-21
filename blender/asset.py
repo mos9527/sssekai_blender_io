@@ -266,6 +266,11 @@ def import_armature(name : str, data : Armature):
 
     return armature, obj
 
+# XXX: This is irrevesible. Armature hierarchy will be simplified and there is not way to go back
+#      Also, the workflow of animation import will require strict order of operations
+#      One should import all physics constraints before importing animations
+#      Since the import only works on rest pose for some reason?
+#      Maybe this is enough for now..
 def import_armature_physics_constraints(armature, data : Armature):
     '''Imports the rigid body constraints for the armature
 
@@ -356,7 +361,7 @@ def import_armature_physics_constraints(armature, data : Armature):
             object.parent_type = 'BONE'
             object.parent_bone = bone_name
         def set_bone_constraint(bone_name : str, target):
-            pbone : bpy.types.PoseBone = armature.pose.bones[bone_name] 
+            pbone : bpy.types.PoseBone = armature.pose.bones[bone_name]
             ct = pbone.constraints.new('CHILD_OF')                       
             ct.target = target
             bpy.context.active_object.data.bones.active = pbone.bone
@@ -364,11 +369,9 @@ def import_armature_physics_constraints(armature, data : Armature):
             with bpy.context.temp_override(**context_override):
                 bpy.ops.constraint.childof_set_inverse(constraint=ct.name, owner='BONE')
         def unparent_bone(bone_name):
-            print('Unparenting', bone_name)
-            bpy.ops.object.mode_set(mode='POSE')
-            arma_matrix = armature.pose.bones[bone_name].matrix
             bpy.ops.object.mode_set(mode='EDIT')
-            ebone = armature.data.edit_bones[bone_name]           
+            ebone = armature.data.edit_bones[bone_name] 
+            arma_matrix = ebone.matrix          
             ebone[KEY_ORIGINAL_PARENT] = ebone.parent.name
             ebone[KEY_ORIGINAL_WORLD_MATRIX] = pack_matrix(arma_matrix)
             ebone.parent = None
@@ -393,12 +396,10 @@ def import_armature_physics_constraints(armature, data : Armature):
             parent_all = {bone.name : bone.parent.name for bone in chain_all if bone.parent}
             bonesize_all = {bone.name : bone.length for bone in chain_all}            
             # Read this later on in pose mode since constraits/animations are not available in edit mode
-            world_all = {bone.name : None for bone in chain_all + [bone.parent for bone in chain_all if bone.parent]}                
+            world_all = {bone.name : bone.matrix for bone in chain_all + [bone.parent for bone in chain_all if bone.parent]}                
             chain_all = [bone.name for bone in chain_all]
-            print('Chain', chain.begin.name, '->', chain.end.name, 'Length', len(chain_all), 'Bones',*chain_all)
-            # Read the world matrix for each bone in Pose Mode
+            # print('Chain', chain.begin.name, '->', chain.end.name, 'Length', len(chain_all), 'Bones',*chain_all)
             bpy.ops.object.mode_set(mode='POSE')
-            world_all = {bone : armature.pose.bones[bone].matrix for bone in world_all}
             for bone in chain_all: 
                 unparent_bone(bone)
             bpy.ops.object.mode_set(mode='OBJECT')
@@ -408,13 +409,12 @@ def import_armature_physics_constraints(armature, data : Armature):
             prev_radius = PIVOT_SIZE
             for bone_name in [pivot_bone_name] + chain_all:
                 parent = parent_all.get(bone_name,None)
-                print('Creating joint for', bone_name)                    
+                # print('Creating joint for', bone_name)                    
                 joint = create_joint(bone_name + 'joint')
                 joints[bone_name] = joint
                 if parent:
                     joint.parent = joints[parent]
-                    joint.matrix_parent_inverse = world_all[parent].inverted()
-                    joint.matrix_local = joint.matrix_parent_inverse @ world_all[bone_name]
+                    joint.matrix_local = world_all[parent].inverted() @ world_all[bone_name]
                     
                     phys_data = data.bone_name_tbl[bone_name].physics
                     if phys_data:
@@ -427,7 +427,7 @@ def import_armature_physics_constraints(armature, data : Armature):
                         length=bonesize_all[bone_name]
                     )
                     target.parent = joint
-                    target.matrix_world = world_all[bone_name]
+                    target.matrix_local = Matrix.Identity(4)
                     # Correct pose in local space
                     target.rotation_euler.rotate_axis("X", math.radians(-90))
                     target.location += Vector((0, bonesize_all[bone_name] / 2,0))
