@@ -16,7 +16,7 @@ preview_collections = dict()
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_attach_op"
     bl_label = "Attach Selected"
-
+    bl_description = "Attach the selected face armature to the selected body armature"
     def execute(self, context):
         scene = context.scene
         face_arma = scene.sssekai_util_neck_attach_obj_face
@@ -38,6 +38,7 @@ class SSSekaiBlenderUtilNeckAttach(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "SSSekai"
+
     def draw(self, context):
         layout = self.layout
         scene = context.scene
@@ -49,7 +50,7 @@ class SSSekaiBlenderUtilNeckAttach(bpy.types.Panel):
 class SSSekaiBlenderImportOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_op"
     bl_label = "Import Selected"
-
+    bl_description = "Import the selected asset from the selected asset bundle"
     def execute(self, context):
         wm = context.window_manager
         print('* Loading from', wm.sssekai_assetbundle_file, 'for', wm.sssekai_assetbundle_preview)
@@ -57,10 +58,10 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             env = load_assetbundle(f)
             static_mesh_gameobjects, armatures = search_env_meshes(env)
 
-            def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser = None):
+            def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser = None): 
                 for ppmat in m_Materials:
                     material : Material = ppmat.read()
-                    asset = materialParser(material.name, material)
+                    asset = materialParser(material.name, material, use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf)
                     obj.data.materials.append(asset)
                     print('* Imported Material', material.name)
             
@@ -123,12 +124,13 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         check_is_active_camera()
                         import_camera_animation(animation.name, clip, bpy.context.active_object,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
                         print('* Imported Camera animation', animation.name)
-                    elif NULL_CRC in clip.FloatTracks and CAMERA_ADJ_UNK_CRC in clip.FloatTracks[NULL_CRC]:
-                        # XXX not working yet. don't know what the values mean
-                        print('* Importing Camera Parameter animation', animation.name)
+                    elif CAMERA_DOF_UNK_CRC in clip.FloatTracks and CAMERA_DOF_FOV_UNK_CRC in clip.FloatTracks[CAMERA_DOF_UNK_CRC]:
+                        # depth_of_field animations
+                        # Don't know why FOV is here though...but it is!
+                        print('* Importing Camera FOV animation', animation.name)
                         check_is_active_camera()
-                        import_camera_parameter_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                        print('* Imported Camera Parameter animation', animation.name)
+                        import_camera_fov_animation(animation.name, clip.FloatTracks[CAMERA_DOF_UNK_CRC][CAMERA_DOF_FOV_UNK_CRC].Curve, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                        print('* Imported Camera FOV animation', animation.name)
                     else:
                         print('* Importing Armature animation', animation.name)
                         check_is_active_armature()
@@ -138,8 +140,8 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
         return {'CANCELLED'}
 class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_physics_op"
-    bl_label = "Import Physics (IRREVERSIBLE)"
-
+    bl_label = "Import Physics"
+    bl_description = "Import physics data from the selected asset bundle. NOTE: This operation is irreversible!"
     def execute(self, context):
         assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to import physics data to!"
         wm = context.window_manager
@@ -160,7 +162,8 @@ def get_rigidbodies_from_arma(arma : bpy.types.Object):
             yield child
 class SSSekaiBlenderRemovePhysicsOperator(bpy.types.Operator):
     bl_idname = "sssekai.remove_physics_op"
-    bl_label = "Remove Physics (IRREVERSIBLE)"                
+    bl_label = "Remove Physics"
+    bl_description = "Remove physics data from the selected armature. NOTE: This operation is irreversible!"
     def execute(self, context):
         assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to remove physics data from!"
         arma = bpy.context.active_object
@@ -184,7 +187,8 @@ class SSSekaiBlenderRemovePhysicsOperator(bpy.types.Operator):
         return {'FINISHED'}
 class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
     bl_idname = "sssekai.display_physics_op"
-    bl_label = "Show Physics Objects"                
+    bl_label = "Show Physics Objects"
+    bl_description = "Show or hide physics objects"          
     def execute(self, context):
         assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature!"
         arma = bpy.context.active_object
@@ -214,6 +218,10 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(wm, "sssekai_assetbundle_preview")
         layout.separator()
+        row = layout.row()
+        row.label(text="Material Options")
+        row = layout.row()
+        row.prop(wm, "sssekai_materials_use_principled_bsdf")
         row = layout.row()
         row.label(text="Armature Options")
         row = layout.row()
@@ -284,6 +292,11 @@ def register():
         description="Asset",
         items=enumerate_assets,
     )
+    WindowManager.sssekai_materials_use_principled_bsdf = BoolProperty(
+        name="Use Principled BSDF",
+        description="Use Principled BSDF instead of SekaiShader for imported materials",
+        default=False        
+    )    
     WindowManager.sssekai_armature_display_physics = BoolProperty(
         name="Display Physics",
         description="Display Physics Objects",

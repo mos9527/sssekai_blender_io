@@ -11,12 +11,12 @@ def search_env_meshes(env : Environment):
     '''
     # Collect all static meshes and skinned meshes's *root transform* object
     # UnityPy does not construct the Bone Hierarchy so we have to do it ourselves
-    static_mesh_gameobjects : List[GameObject] = list() # No extra care needed
+    static_mesh_gameobjects = dict() # No extra care needed
     transform_roots = []
     for obj in env.objects:
         data = obj.read()
         if obj.type == ClassIDType.GameObject and getattr(data,'m_MeshRenderer',None):
-            static_mesh_gameobjects.append(data)
+            static_mesh_gameobjects[data.name] = data
         if obj.type == ClassIDType.Transform:
             if hasattr(data,'m_Children') and not data.m_Father.path_id:
                 transform_roots.append(data)
@@ -87,6 +87,9 @@ def search_env_meshes(env : Environment):
         dfs(root)    
         if armature.skinned_mesh_gameobject:
             armatures.append(armature)
+    static_mesh_gameobjects = list(static_mesh_gameobjects.values())
+    static_mesh_gameobjects = sorted(static_mesh_gameobjects, key=lambda x: x.name)
+    armatures = sorted(armatures, key=lambda x: x.name)
     return static_mesh_gameobjects, armatures
 
 def search_env_animations(env : Environment):
@@ -239,13 +242,12 @@ def import_armature(name : str, data : Armature):
     bpy.context.collection.objects.link(obj)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode='EDIT')
-    # HACK: *Seems like* the only useful root bone is 'Position' (which is the root of the actual skeleton)
-    bone = data.root.recursive_locate_by_name('Position')
-    if bone:
-        # Build global transforms           
-        bone.calculate_global_transforms()
-        # Build bone hierarchy in blender
-        for parent, child, _ in bone.dfs_generator():
+    root = data.root
+    # Build global transforms           
+    root.calculate_global_transforms()
+    # Build bone hierarchy in blender
+    for parent, child, _ in root.dfs_generator():
+        if child.name != root.name:
             ebone = armature.edit_bones.new(child.name)
             ebone.use_local_location = True
             ebone.use_relative_parent = False                
@@ -261,7 +263,7 @@ def import_armature(name : str, data : Armature):
             ebone.tail = child.global_transform @ Vector((0,1,0))
             ebone.length = 0.01
             ebone.align_roll(child.global_transform @ Vector((0,0,1)) - ebone.head)
-            if parent:
+            if parent and parent.name != root.name: # Let the root be the armature itself
                 ebone.parent = parent.edit_bone
 
     return armature, obj
@@ -554,7 +556,12 @@ def make_material_texture_node(material , ppTexture):
     material.node_tree.links.new(uvRemap.outputs['Vector'], texNode.inputs['Vector'])
     return texNode
 
-def import_character_material(name : str,data : Material):
+def create_principled_bsdf_material(name : str):
+    material = bpy.data.materials.new(name)
+    material.use_nodes = True
+    return material
+
+def import_character_material(name : str,data : Material, use_principled_bsdf=False):
     '''Imports Material assets for Characters into blender. 
     
     Args:
@@ -565,22 +572,31 @@ def import_character_material(name : str,data : Material):
         bpy.types.Material: Created material        
     '''
     load_sssekai_shader_blend()
-    material = bpy.data.materials["SekaiShaderChara"].copy()
-    material.name = name
-    sekaiShader = material.node_tree.nodes['Group']
+    if not use_principled_bsdf:
+        material = bpy.data.materials["SekaiShaderChara"].copy()
+        material.name = name
+    else:
+        material = create_principled_bsdf_material(name)
+    
     textures = data.m_SavedProperties.m_TexEnvs
-    if '_MainTex' in textures:
-        mainTex = make_material_texture_node(material, textures['_MainTex'])
-        material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
-    if '_ShadowTex' in textures:
-        shadowTex = make_material_texture_node(material, textures['_ShadowTex'])
-        material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs[1])
-    if '_ValueTex' in textures:
-        valueTex = make_material_texture_node(material, textures['_ValueTex'])
-        material.node_tree.links.new(valueTex.outputs['Color'], sekaiShader.inputs[2])
+    if not use_principled_bsdf:
+        sekaiShader = material.node_tree.nodes['Group']
+        if '_MainTex' in textures:
+            mainTex = make_material_texture_node(material, textures['_MainTex'])
+            material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
+        if '_ShadowTex' in textures:
+            shadowTex = make_material_texture_node(material, textures['_ShadowTex'])
+            material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs[1])
+        if '_ValueTex' in textures:
+            valueTex = make_material_texture_node(material, textures['_ValueTex'])
+            material.node_tree.links.new(valueTex.outputs['Color'], sekaiShader.inputs[2])
+    else:
+        if '_MainTex' in textures:
+            mainTex = make_material_texture_node(material, textures['_MainTex'])
+            material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
     return material
 
-def import_scene_material(name : str,data : Material):
+def import_scene_material(name : str,data : Material,use_principled_bsdf=False):
     '''Imports Material assets for Non-Character (i.e. Stage) into blender. 
     
     Args:
@@ -591,14 +607,24 @@ def import_scene_material(name : str,data : Material):
         bpy.types.Material: Created material        
     '''
     load_sssekai_shader_blend()
-    material = bpy.data.materials["SekaiShaderScene"].copy()
-    material.name = name
-    sekaiShader = material.node_tree.nodes['Group']
-    textures = data.m_SavedProperties.m_TexEnvs
-    if '_MainTex' in textures:
-        mainTex = make_material_texture_node(material, textures['_MainTex'])
-        material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
-    if '_LightMapTex' in textures:
-        lightMapTex = make_material_texture_node(material, textures['_LightMapTex'])
-        material.node_tree.links.new(lightMapTex.outputs['Color'], sekaiShader.inputs[1])
+    if not use_principled_bsdf:
+        material = bpy.data.materials["SekaiShaderScene"].copy()
+        material.name = name
+    else:
+        material = create_principled_bsdf_material(name)
+    
+    if not use_principled_bsdf:
+        sekaiShader = material.node_tree.nodes['Group']
+        textures = data.m_SavedProperties.m_TexEnvs
+        if '_MainTex' in textures:
+            mainTex = make_material_texture_node(material, textures['_MainTex'])
+            material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
+        if '_LightMapTex' in textures:
+            lightMapTex = make_material_texture_node(material, textures['_LightMapTex'])
+            material.node_tree.links.new(lightMapTex.outputs['Color'], sekaiShader.inputs[1])
+    else:
+        textures = data.m_SavedProperties.m_TexEnvs
+        if '_MainTex' in textures:
+            mainTex = make_material_texture_node(material, textures['_MainTex'])
+            material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
     return material

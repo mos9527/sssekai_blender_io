@@ -162,10 +162,13 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         curve = data.TransformTracks[TransformType.Translation][CAMERA_UNK_CRC].Curve
         import_fcurve(action,'location', [swizzer_translation_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)     
 
-def import_camera_parameter_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool):
+def import_camera_fov_animation(name : str, curve : List[KeyFrame], camera : bpy.types.Object, frame_offset : int, always_create_new : bool):
     action = ensure_action(camera, name, always_create_new)
-    camera.data.lens_unit = 'FOV'
+    camera.data.lens_unit = 'MILLIMETERS'
+    def fov_to_focal_length(fov : float):
+        # FOV = 2 arctan [sensorSize/(2*focalLength)] 
+        # focalLength = sensorSize / (2 * tan(FOV/2))
+        print(fov)
+        return camera.data.sensor_width / (2 * math.tan(math.radians(fov) / 2))
     # FOV
-    if CAMERA_ADJ_UNK_CRC in data.FloatTracks[NULL_CRC]:
-        curve = data.FloatTracks[NULL_CRC][CAMERA_ADJ_UNK_CRC].Curve
-        import_fcurve(action,'angle',[keyframe.value + frame_offset for keyframe in curve],[time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 1)
+    import_fcurve(action,'data.lens',[fov_to_focal_length(keyframe.value) for keyframe in curve],[time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 1)

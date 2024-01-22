@@ -58,13 +58,15 @@ NULL_CRC = 0
 BLENDSHAPES_UNK_CRC = 2770785369
 CAMERA_UNK_CRC = 3326594866
 CAMERA_ADJ_UNK_CRC = 3305885265
+CAMERA_DOF_UNK_CRC = 1331491074
+CAMERA_DOF_FOV_UNK_CRC = 2974389626
 # UnityPy deps
 from UnityPy import Environment
 from UnityPy.enums import ClassIDType
 from UnityPy.classes import Mesh, SkinnedMeshRenderer, MeshRenderer, MeshFilter, GameObject, Transform, Texture2D, Material
 from UnityPy.math import Vector3, Quaternion as UnityQuaternion
 # SSSekai deps
-from sssekai.unity.AnimationClip import read_animation, Animation, TransformType
+from sssekai.unity.AnimationClip import read_animation, Animation, TransformType, KeyFrame
 from sssekai.unity.AssetBundle import load_assetbundle
 class BonePhysicsType(IntEnum):
     NoPhysics = 0x00
