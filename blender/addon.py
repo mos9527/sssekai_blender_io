@@ -58,10 +58,11 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             env = load_assetbundle(f)
             articulations, armatures = search_env_meshes(env)
 
+            texture_cache = dict()
             def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser = None): 
                 for ppmat in m_Materials:
                     material : Material = ppmat.read()
-                    asset = materialParser(material.name, material, use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf)
+                    asset = materialParser(material.name, material, use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf, texture_cache=texture_cache)
                     obj.data.materials.append(asset)
                     print('* Imported Material', material.name)
             

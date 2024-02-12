@@ -553,9 +553,7 @@ def load_sssekai_shader_blend():
             data_to.materials = data_from.materials
             print('! Loaded shader blend file.')
 
-texture_cache = dict() # XXX This is not a good idea
-def make_material_texture_node(material , ppTexture):
-    global texture_cache
+def make_material_texture_node(material , ppTexture, texture_cache = None):
     texCoord = material.node_tree.nodes.new('ShaderNodeTexCoord')
     uvRemap = material.node_tree.nodes.new('ShaderNodeMapping')
     uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X
@@ -565,11 +563,14 @@ def make_material_texture_node(material , ppTexture):
     texNode = material.node_tree.nodes.new('ShaderNodeTexImage')
     try:
         texture : Texture2D = ppTexture.m_Texture.read()
-        if not texture.name in texture_cache:
-            texture_cache[texture.name] = import_texture(texture.name, texture)
-        texNode.image = texture_cache[texture.name]
-    except:
-        print('! Failed to load texture. Discarding.')        
+        if texture_cache:
+            if not texture.name in texture_cache:
+                texture_cache[texture.name] = import_texture(texture.name, texture)
+            texNode.image = texture_cache[texture.name]
+        else:
+            texNode.image = import_texture(texture.name, texture)
+    except Exception as e:
+        print('! Failed to load texture. Discarding.',e)        
     material.node_tree.links.new(texCoord.outputs['UV'], uvRemap.inputs['Vector'])
     material.node_tree.links.new(uvRemap.outputs['Vector'], texNode.inputs['Vector'])
     return texNode
@@ -579,7 +580,7 @@ def create_principled_bsdf_material(name : str):
     material.use_nodes = True
     return material
 
-def import_character_material(name : str,data : Material, use_principled_bsdf=False):
+def import_character_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None):
     '''Imports Material assets for Characters into blender. 
     
     Args:
@@ -600,22 +601,22 @@ def import_character_material(name : str,data : Material, use_principled_bsdf=Fa
     if not use_principled_bsdf:
         sekaiShader = material.node_tree.nodes['Group']
         if '_MainTex' in textures:
-            mainTex = make_material_texture_node(material, textures['_MainTex'])
+            mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
             material.node_tree.links.new(mainTex.outputs['Alpha'], sekaiShader.inputs[6])
         if '_ShadowTex' in textures:
-            shadowTex = make_material_texture_node(material, textures['_ShadowTex'])
+            shadowTex = make_material_texture_node(material, textures['_ShadowTex'], texture_cache)
             material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs[1])
         if '_ValueTex' in textures:
-            valueTex = make_material_texture_node(material, textures['_ValueTex'])
+            valueTex = make_material_texture_node(material, textures['_ValueTex'], texture_cache)
             material.node_tree.links.new(valueTex.outputs['Color'], sekaiShader.inputs[2])
     else:
         if '_MainTex' in textures:
-            mainTex = make_material_texture_node(material, textures['_MainTex'])
+            mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
     return material
 
-def import_scene_material(name : str,data : Material,use_principled_bsdf=False):
+def import_scene_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None):
     '''Imports Material assets for Non-Character (i.e. Stage) into blender. 
     
     Args:
@@ -636,15 +637,15 @@ def import_scene_material(name : str,data : Material,use_principled_bsdf=False):
         sekaiShader = material.node_tree.nodes['Group']
         textures = data.m_SavedProperties.m_TexEnvs
         if '_MainTex' in textures:
-            mainTex = make_material_texture_node(material, textures['_MainTex'])
+            mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
             material.node_tree.links.new(mainTex.outputs['Alpha'], sekaiShader.inputs[2])
         if '_LightMapTex' in textures:
-            lightMapTex = make_material_texture_node(material, textures['_LightMapTex'])
+            lightMapTex = make_material_texture_node(material, textures['_LightMapTex'], texture_cache)
             material.node_tree.links.new(lightMapTex.outputs['Color'], sekaiShader.inputs[1])
     else:
         textures = data.m_SavedProperties.m_TexEnvs
         if '_MainTex' in textures:
-            mainTex = make_material_texture_node(material, textures['_MainTex'])
+            mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
     return material
