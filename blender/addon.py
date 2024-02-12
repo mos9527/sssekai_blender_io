@@ -56,7 +56,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
         print('* Loading from', wm.sssekai_assetbundle_file, 'for', wm.sssekai_assetbundle_preview)
         with open(wm.sssekai_assetbundle_file, 'rb') as f:
             env = load_assetbundle(f)
-            static_mesh_gameobjects, armatures = search_env_meshes(env)
+            articulations, armatures = search_env_meshes(env)
 
             def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser = None): 
                 for ppmat in m_Materials:
@@ -65,29 +65,52 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     obj.data.materials.append(asset)
                     print('* Imported Material', material.name)
             
-            for mesh_go in static_mesh_gameobjects:
-                mesh_rnd : MeshRenderer = mesh_go.m_MeshRenderer.read()
-                mesh_filter : MeshFilter = mesh_go.m_MeshFilter.read()
-                if getattr(mesh_filter,'m_Mesh',None):
-                    mesh_data : Mesh = mesh_filter.m_Mesh.read()
-                    if mesh_data.name == wm.sssekai_assetbundle_preview:
-                        mesh, obj = import_mesh(mesh_go.name, mesh_data,False)
+            def add_articulation(articulation):                
+                joint_map = dict()
+                for parent,bone,depth in articulation.root.dfs_generator():
+                    joint = bpy.data.objects.new(bone.name, None)
+                    joint.empty_display_size = 0.1
+                    joint.empty_display_type = 'ARROWS'     
+                    joint_map[bone.name] = joint         
+                    bpy.context.collection.objects.link(joint)
+                    # Make the artiulation
+                    joint.parent = joint_map[parent.name] if parent else None
+                    joint.location = swizzle_vector(bone.localPosition)
+                    joint.rotation_mode = 'QUATERNION'
+                    joint.rotation_quaternion = swizzle_quaternion(bone.localRotation)
+                    joint.scale = swizzle_vector_scale(bone.localScale)
+                    # Add the meshes, if any
+                    if bone.gameObject and getattr(bone.gameObject,'m_MeshFilter',None):
+                        mesh_filter : MeshFilter = bone.gameObject.m_MeshFilter.read()
+                        mesh_rnd : MeshRenderer = bone.gameObject.m_MeshRenderer.read()
+                        mesh_data = mesh_filter.m_Mesh.read()
+                        mesh, obj = import_mesh(mesh_data.name, mesh_data, False)
                         add_material(mesh_rnd.m_Materials, obj, import_scene_material)    
+                        obj.parent = joint
                         print('* Imported Static Mesh', mesh_data.name)
-                        return {'FINISHED'}
-            
+                print('* Imported Static Mesh Articulation', articulation.name)        
+
+            for articulation in articulations:
+                if articulation.name == wm.sssekai_assetbundle_preview:
+                    add_articulation(articulation)
+                    return {'FINISHED'}
+
             for armature in armatures:
                 if armature.name == wm.sssekai_assetbundle_preview:
-                    mesh_rnd : SkinnedMeshRenderer = armature.skinned_mesh_gameobject.m_SkinnedMeshRenderer.read()
-                    if getattr(mesh_rnd,'m_Mesh',None):
-                        mesh_data : Mesh = mesh_rnd.m_Mesh.read()
-                        armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
-                        mesh, obj = import_mesh(armature.name, mesh_data,True, armature.bone_path_hash_tbl)
-                        obj.parent = armObj
-                        obj.modifiers.new('Armature', 'ARMATURE').object = armObj
-                        add_material(mesh_rnd.m_Materials, obj, import_character_material)    
-                        print('* Imported Armature and Skinned Mesh', mesh_data.name)
+                    if wm.sssekai_armatures_as_articulations:
+                        add_articulation(armature)
                         return {'FINISHED'}
+                    else:
+                        mesh_rnd : SkinnedMeshRenderer = armature.skinnedMeshGameObject.m_SkinnedMeshRenderer.read()
+                        if getattr(mesh_rnd,'m_Mesh',None):
+                            mesh_data : Mesh = mesh_rnd.m_Mesh.read()
+                            armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
+                            mesh, obj = import_mesh(armature.name, mesh_data,True, armature.bone_path_hash_tbl)
+                            obj.parent = armObj
+                            obj.modifiers.new('Armature', 'ARMATURE').object = armObj
+                            add_material(mesh_rnd.m_Materials, obj, import_character_material)    
+                            print('* Imported Armature and Skinned Mesh', mesh_data.name)
+                            return {'FINISHED'}
 
             animations = search_env_animations(env)    
             for animation in animations:
@@ -214,7 +237,6 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         layout.label(text="Select Asset")
         row = layout.row()
         row.prop(wm, "sssekai_assetbundle_file")
-
         row = layout.row()
         row.prop(wm, "sssekai_assetbundle_preview")
         layout.separator()
@@ -224,6 +246,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_materials_use_principled_bsdf")
         row = layout.row()
         row.label(text="Armature Options")
+        row = layout.row()
+        row.prop(wm, "sssekai_armatures_as_articulations")
         row = layout.row()
         row.operator(SSSekaiBlenderImportPhysicsOperator.bl_idname)
         row = layout.row()
@@ -260,13 +284,10 @@ def enumerate_assets(self, context):
         index = 0
         with open(fname, 'rb') as f:
             env = load_assetbundle(f)
-            static_mesh_gameobjects, armatures = search_env_meshes(env)
-            for mesh_go in static_mesh_gameobjects:
-                mesh_filter : MeshFilter = mesh_go.m_MeshFilter.read()
-                if getattr(mesh_filter,'m_Mesh',None):
-                    mesh_data : Mesh = mesh_filter.m_Mesh.read()    
-                    enum_items.append((mesh_data.name,mesh_data.name,'Static Mesh %s' % mesh_data.name, 'MESH_DATA', index))
-                    index+=1
+            articulations, armatures = search_env_meshes(env)
+            for articulation in articulations:
+                enum_items.append((articulation.name,articulation.name,'Static Mesh %s' % articulation.name, 'MESH_DATA', index))
+                index+=1
 
             for armature in armatures:
                 enum_items.append((armature.name,armature.name,'Armature %s' % armature.name, 'ARMATURE_DATA',index))
@@ -292,6 +313,11 @@ def register():
         description="Asset",
         items=enumerate_assets,
     )
+    WindowManager.sssekai_armatures_as_articulations = BoolProperty(
+        name="Armatures as Articulations",
+        description="Treating armatures as articulations instead of skinned meshes. This is useful for importing stages.",
+        default=False        
+    )        
     WindowManager.sssekai_materials_use_principled_bsdf = BoolProperty(
         name="Use Principled BSDF",
         description="Use Principled BSDF instead of SekaiShader for imported materials",

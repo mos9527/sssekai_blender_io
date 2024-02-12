@@ -15,13 +15,12 @@ def search_env_meshes(env : Environment):
     transform_roots = []
     for obj in env.objects:
         data = obj.read()
-        if obj.type == ClassIDType.GameObject and getattr(data,'m_MeshRenderer',None):
-            static_mesh_gameobjects[data.name] = data
         if obj.type == ClassIDType.Transform:
             if hasattr(data,'m_Children') and not data.m_Father.path_id:
                 transform_roots.append(data)
-    # Collect all skinned meshes as Armature[s]
+    # Collect all skinned meshes as Armature[s], otherwise build articulations for
     # Note that Mesh maybe reused across Armatures, but we don't care...for now
+    articulations = []
     armatures = []
     for root in transform_roots:
         armature = Armature(root.m_GameObject.read().m_Name)
@@ -34,14 +33,15 @@ def search_env_meshes(env : Environment):
             # Addtional properties
             # Skinned Mesh Renderer
             if getattr(gameObject,'m_SkinnedMeshRenderer',None):
-                armature.skinned_mesh_gameobject = gameObject
+                armature.skinnedMeshGameObject = gameObject
             # Complete path. Used for CRC hash later on
             path_from_root = ''
             if parent and parent.global_path:
                 path_from_root = parent.global_path + '/' + name
             elif parent:
                 path_from_root = name
-            # Physics Rb + Collider
+            # Reads:
+            # - Physics Rb + Collider
             # XXX: Some properties are not implemented yet
             bonePhysics = None
             for component in gameObject.m_Components:
@@ -73,7 +73,8 @@ def search_env_meshes(env : Environment):
                 list(),
                 path_from_root,
                 None,
-                bonePhysics
+                bonePhysics,
+                gameObject
             )
             path_id_tbl[root.path_id] = bone
             armature.bone_name_tbl[name] = bone
@@ -85,12 +86,15 @@ def search_env_meshes(env : Environment):
             for child in root.m_Children:
                 dfs(child.read(), bone)
         dfs(root)    
-        if armature.skinned_mesh_gameobject:
+        if armature.skinnedMeshGameObject:
+            armature.is_articulation = False
             armatures.append(armature)
-    static_mesh_gameobjects = list(static_mesh_gameobjects.values())
-    static_mesh_gameobjects = sorted(static_mesh_gameobjects, key=lambda x: x.name)
+        else:
+            armature.is_articulation = True
+            articulations.append(armature)
+    articulations = sorted(articulations, key=lambda x: x.name)
     armatures = sorted(armatures, key=lambda x: x.name)
-    return static_mesh_gameobjects, armatures
+    return articulations, armatures
 
 def search_env_animations(env : Environment):
     '''Searches the Environment for AnimationClips
@@ -174,8 +178,11 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
     bm.verts.ensure_lookup_table()
     # Indices
     for idx in range(0, len(data.m_Indices), 3):
-        face = bm.faces.new([bm.verts[data.m_Indices[idx + j]] for j in range(3)])
-        face.smooth = True
+        try:
+            face = bm.faces.new([bm.verts[data.m_Indices[idx + j]] for j in range(3)])
+            face.smooth = True
+        except ValueError:
+            print('! Invalid face index', idx, 'Discarded.')
     bm.to_mesh(mesh)
     # UV Map
     uv_layer = mesh.uv_layers.new()
@@ -220,6 +227,9 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
     bm.free()      
     return mesh, obj
 
+def import_articulation(name : str, data : Armature):
+    pass
+
 def import_armature(name : str, data : Armature):
     '''Imports the Armature data generated into blender
 
@@ -234,6 +244,7 @@ def import_armature(name : str, data : Armature):
     Returns:
         Tuple[bpy.types.Armature, bpy.types.Object]: Created armature and its parent object
     '''
+    assert data.is_articulation == False, "Not an armature! Use import_articulation instead."
     armature = bpy.data.armatures.new(name)
     armature.display_type = 'OCTAHEDRAL'
     armature.relation_line_position = 'HEAD'
@@ -526,7 +537,7 @@ def import_texture(name : str, data : Texture2D):
     Returns:
         bpy.types.Image: Created image
     '''
-    with tempfile.NamedTemporaryFile(suffix='.bmp',delete=False) as temp:
+    with tempfile.NamedTemporaryFile(suffix='.tga',delete=False) as temp:
         print('* Saving Texture', name, 'to', temp.name)
         data.image.save(temp)
         temp.close()
@@ -542,16 +553,23 @@ def load_sssekai_shader_blend():
             data_to.materials = data_from.materials
             print('! Loaded shader blend file.')
 
+texture_cache = dict() # XXX This is not a good idea
 def make_material_texture_node(material , ppTexture):
+    global texture_cache
     texCoord = material.node_tree.nodes.new('ShaderNodeTexCoord')
     uvRemap = material.node_tree.nodes.new('ShaderNodeMapping')
     uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X
     uvRemap.inputs[1].default_value[1] = ppTexture.m_Offset.Y
     uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.X
     uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.Y
-    texture : Texture2D = ppTexture.m_Texture.read()
     texNode = material.node_tree.nodes.new('ShaderNodeTexImage')
-    texNode.image = import_texture(texture.name, texture)
+    try:
+        texture : Texture2D = ppTexture.m_Texture.read()
+        if not texture.name in texture_cache:
+            texture_cache[texture.name] = import_texture(texture.name, texture)
+        texNode.image = texture_cache[texture.name]
+    except:
+        print('! Failed to load texture. Discarding.')        
     material.node_tree.links.new(texCoord.outputs['UV'], uvRemap.inputs['Vector'])
     material.node_tree.links.new(uvRemap.outputs['Vector'], texNode.inputs['Vector'])
     return texNode
@@ -584,6 +602,7 @@ def import_character_material(name : str,data : Material, use_principled_bsdf=Fa
         if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'])
             material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
+            material.node_tree.links.new(mainTex.outputs['Alpha'], sekaiShader.inputs[6])
         if '_ShadowTex' in textures:
             shadowTex = make_material_texture_node(material, textures['_ShadowTex'])
             material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs[1])
@@ -619,6 +638,7 @@ def import_scene_material(name : str,data : Material,use_principled_bsdf=False):
         if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'])
             material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
+            material.node_tree.links.new(mainTex.outputs['Alpha'], sekaiShader.inputs[2])
         if '_LightMapTex' in textures:
             lightMapTex = make_material_texture_node(material, textures['_LightMapTex'])
             material.node_tree.links.new(lightMapTex.outputs['Color'], sekaiShader.inputs[1])

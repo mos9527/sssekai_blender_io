@@ -28,6 +28,8 @@ from enum import IntEnum
 # Coordinate System | Forward |  Up  |  Left
 # Unity:   LH, Y Up |   Z     |   Y  |   X
 # Blender: RH, Z Up |  -Y     |   Z  |  -X
+def swizzle_vector_scale(vec):
+    return Vector((vec.X,vec.Z,vec.Y))
 def swizzle_vector3(X,Y,Z):    
     return Vector((-X,-Z,Y))
 def swizzle_vector(vec):
@@ -125,6 +127,7 @@ class Bone:
     global_transform : Matrix = None
     # Physics
     physics : BonePhysics = None
+    gameObject : object = None # Unity GameObject
     # Helpers
     def get_blender_local_position(self):
         return swizzle_vector(self.localPosition)
@@ -163,13 +166,14 @@ class Bone:
             return next(self.recursive_search(lambda x: x.name == name))
         except StopIteration:
             return None
-    # Extra
-    edit_bone = None # Blender EditBone
+    # Extra    
+    edit_bone : object = None # Blender EditBone
 
 @dataclass
 class Armature:
     name : str
-    skinned_mesh_gameobject : GameObject = None
+    is_articulation : bool = False
+    skinnedMeshGameObject : GameObject = None
     root : Bone = None
     # Tables
     bone_path_hash_tbl : Dict[int,Bone] = None
