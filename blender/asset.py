@@ -113,7 +113,7 @@ def search_env_animations(env : Environment):
                 animations.append(data)
     return animations
 
-def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : Dict[str,Bone] = None):
+def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : Dict[str,Bone] = None, bone_order : list[str] = None):
     '''Imports the mesh data into blender.
 
     Takes care of the following:
@@ -143,11 +143,15 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
     # Bone Indices + Bone Weights
     deform_layer = None
     if skinned:
-        for boneHash in data.m_BoneNameHashes:
-            # boneHash is the CRC32 hash of the full bone path
-            # i.e Position/Hips/Spine/Spine1/Spine2/Neck/Head
-            group_name = bone_path_tbl[boneHash].name   
-            obj.vertex_groups.new(name=group_name)
+        if not bone_order:
+            for boneHash in data.m_BoneNameHashes:
+                # boneHash is the CRC32 hash of the full bone path
+                # i.e Position/Hips/Spine/Spine1/Spine2/Neck/Head
+                group_name = bone_path_tbl[boneHash].name 
+                obj.vertex_groups.new(name=group_name)
+        else:
+            for boneName in bone_order:
+                obj.vertex_groups.new(name=boneName)
         deform_layer = bm.verts.layers.deform.new()
         # Animations uses the hash to identify the bone
         # so this has to be stored in the metadata as well
@@ -362,7 +366,8 @@ def import_armature_physics_constraints(armature, data : Armature):
             obj.rigid_body.type = 'PASSIVE' if passive else 'ACTIVE'       
             obj.rigid_body.kinematic = True if passive else False
             obj.rigid_body.collision_collections[0] = has_collison
-            return obj  
+            obj.display_type = 'BOUNDS'
+            return obj
         def create_joint(name : str):
             joint = bpy.data.objects.new(name, None)
             joint.empty_display_size = 0.1
@@ -377,6 +382,7 @@ def import_armature_physics_constraints(armature, data : Armature):
             pbone : bpy.types.PoseBone = armature.pose.bones[bone_name]
             ct = pbone.constraints.new('CHILD_OF')                       
             ct.target = target
+            ct.use_scale_x = ct.use_scale_y = ct.use_scale_z = False
             bpy.context.active_object.data.bones.active = pbone.bone
             context_override = bpy.context.copy()
             with bpy.context.temp_override(**context_override):
@@ -525,7 +531,8 @@ def import_armature_physics_constraints(armature, data : Armature):
                         obj.rigid_body.kinematic = True
                         obj.parent = armature
                         obj.parent_bone = child.name
-                        obj.parent_type = 'BONE'             
+                        obj.parent_type = 'BONE'  
+                        obj.display_type = 'BOUNDS'           
 
 def import_texture(name : str, data : Texture2D):
     '''Imports Texture2D assets into blender

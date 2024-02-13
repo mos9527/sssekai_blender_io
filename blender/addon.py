@@ -61,10 +61,11 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             texture_cache = dict()
             def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser = None): 
                 for ppmat in m_Materials:
-                    material : Material = ppmat.read()
-                    asset = materialParser(material.name, material, use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf, texture_cache=texture_cache)
-                    obj.data.materials.append(asset)
-                    print('* Imported Material', material.name)
+                    if ppmat:                    
+                        material : Material = ppmat.read()
+                        asset = materialParser(material.name, material, use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf, texture_cache=texture_cache)
+                        obj.data.materials.append(asset)
+                        print('* Imported Material', material.name)
             
             def add_articulation(articulation):                
                 joint_map = dict()
@@ -95,6 +96,23 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 if articulation.name == wm.sssekai_assetbundle_preview:
                     add_articulation(articulation)
                     return {'FINISHED'}
+            
+            # XXX: Skinned meshes are expected to have identity transforms 
+            # maybe this would change in the future but for now, it's a safe assumption
+            def add_armature(armature):
+                armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
+                for parent,bone,depth in armature.root.dfs_generator():
+                    if bone.gameObject and getattr(bone.gameObject,'m_SkinnedMeshRenderer',None):
+                        mesh_rnd : SkinnedMeshRenderer = bone.gameObject.m_SkinnedMeshRenderer.read()
+                        bone_order  = [b.read().m_GameObject.read().name for b in mesh_rnd.m_Bones]
+                        if getattr(mesh_rnd,'m_Mesh',None):
+                            mesh_data : Mesh = mesh_rnd.m_Mesh.read()                            
+                            mesh, obj = import_mesh(bone.name, mesh_data,True, armature.bone_path_hash_tbl,bone_order)
+                            obj.parent = armObj
+                            obj.modifiers.new('Armature', 'ARMATURE').object = armObj
+                            add_material(mesh_rnd.m_Materials, obj, import_character_material)    
+                            print('* Imported Skinned Mesh', mesh_data.name)
+                print('* Imported Armature', armature.name)
 
             for armature in armatures:
                 if armature.name == wm.sssekai_assetbundle_preview:
@@ -102,16 +120,8 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         add_articulation(armature)
                         return {'FINISHED'}
                     else:
-                        mesh_rnd : SkinnedMeshRenderer = armature.skinnedMeshGameObject.m_SkinnedMeshRenderer.read()
-                        if getattr(mesh_rnd,'m_Mesh',None):
-                            mesh_data : Mesh = mesh_rnd.m_Mesh.read()
-                            armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
-                            mesh, obj = import_mesh(armature.name, mesh_data,True, armature.bone_path_hash_tbl)
-                            obj.parent = armObj
-                            obj.modifiers.new('Armature', 'ARMATURE').object = armObj
-                            add_material(mesh_rnd.m_Materials, obj, import_character_material)    
-                            print('* Imported Armature and Skinned Mesh', mesh_data.name)
-                            return {'FINISHED'}
+                        add_armature(armature)
+                        return {'FINISHED'}
 
             animations = search_env_animations(env)    
             for animation in animations:
