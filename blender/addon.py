@@ -6,6 +6,7 @@ from .animation import *
 import bpy
 import bpy.utils.previews
 from bpy.types import Context, WindowManager
+import bpy
 from bpy.props import (
     StringProperty,
     EnumProperty,
@@ -59,13 +60,26 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             articulations, armatures = search_env_meshes(env)
 
             texture_cache = dict()
-            def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser = None): 
+            def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser : callable , meshData : Mesh): 
                 for ppmat in m_Materials:
                     if ppmat:                    
                         material : Material = ppmat.read()
                         asset = materialParser(material.name, material, use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf, texture_cache=texture_cache)
                         obj.data.materials.append(asset)
                         print('* Imported Material', material.name)
+                
+                bpy.ops.object.mode_set(mode='OBJECT')
+                bpy.context.view_layer.objects.active = obj
+                mesh = obj.data
+                for index,sub in enumerate(meshData.m_SubMeshes):
+                    start, count = sub.firstVertex, sub.vertexCount
+                    for i in range(start, start + count):
+                        mesh.vertices[i].select = True
+                    bpy.ops.object.mode_set(mode='EDIT')
+                    bpy.context.object.active_material_index = index
+                    bpy.ops.object.material_slot_assign()
+                    bpy.ops.mesh.select_all(action='DESELECT')
+                    bpy.ops.object.mode_set(mode='OBJECT')
             
             def add_articulation(articulation):                
                 joint_map = dict()
@@ -87,7 +101,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         mesh_rnd : MeshRenderer = bone.gameObject.m_MeshRenderer.read()
                         mesh_data = mesh_filter.m_Mesh.read()
                         mesh, obj = import_mesh(mesh_data.name, mesh_data, False)
-                        add_material(mesh_rnd.m_Materials, obj, import_scene_material)    
+                        add_material(mesh_rnd.m_Materials, obj, import_scene_material, mesh_data)    
                         obj.parent = joint
                         print('* Imported Static Mesh', mesh_data.name)
                 print('* Imported Static Mesh Articulation', articulation.name)        
@@ -110,7 +124,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             mesh, obj = import_mesh(bone.name, mesh_data,True, armature.bone_path_hash_tbl,bone_order)
                             obj.parent = armObj
                             obj.modifiers.new('Armature', 'ARMATURE').object = armObj
-                            add_material(mesh_rnd.m_Materials, obj, import_character_material)    
+                            add_material(mesh_rnd.m_Materials, obj, import_character_material, mesh_data)    
                             print('* Imported Skinned Mesh', mesh_data.name)
                 print('* Imported Armature', armature.name)
 
@@ -147,10 +161,11 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         check_is_active_armature()
                         mesh_obj = None
                         for obj in bpy.context.active_object.children:
-                            if KEY_BONE_NAME_HASH_TBL in obj.data:
+                            if KEY_SHAPEKEY_NAME_HASH_TBL in obj.data:
                                 mesh_obj = obj
                                 break
-                        assert mesh_obj, "Bone table not found. Invalid armature!" 
+                        assert mesh_obj, "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes! Invalid armature!" 
+                        print("* Importing into", mesh_obj.name)
                         import_keyshape_animation(animation.name, clip, mesh_obj, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
                         print('* Imported Keyshape animation', animation.name)
                     elif CAMERA_UNK_CRC in clip.TransformTracks[TransformType.Translation]:
