@@ -60,13 +60,19 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             articulations, armatures = search_env_meshes(env)
 
             texture_cache = dict()
+            material_cache = dict()
             def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser : callable , meshData : Mesh): 
                 for ppmat in m_Materials:
                     if ppmat:                    
                         material : Material = ppmat.read()
-                        asset = materialParser(material.name, material, use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf, texture_cache=texture_cache)
+                        if material.name in material_cache:
+                            asset = material_cache[material.name]
+                            print('* Reusing Material', material.name)
+                        else:
+                            asset = materialParser(material.name, material, use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf, texture_cache=texture_cache)
+                            material_cache[material.name] = asset
+                            print('* Imported new Material', material.name)
                         obj.data.materials.append(asset)
-                        print('* Imported Material', material.name)
                 
                 bpy.context.view_layer.objects.active = obj
                 bpy.ops.object.mode_set(mode='OBJECT')
