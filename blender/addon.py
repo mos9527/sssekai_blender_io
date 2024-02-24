@@ -68,8 +68,8 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         obj.data.materials.append(asset)
                         print('* Imported Material', material.name)
                 
-                bpy.ops.object.mode_set(mode='OBJECT')
                 bpy.context.view_layer.objects.active = obj
+                bpy.ops.object.mode_set(mode='OBJECT')
                 mesh = obj.data
                 for index,sub in enumerate(meshData.m_SubMeshes):
                     start, count = sub.firstVertex, sub.vertexCount

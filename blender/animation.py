@@ -149,10 +149,6 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         return offset
     def swizzer_translation_camera(vector : Vector):
         result = swizzle_vector(vector)
-        # XXX: This is a hack
-        # Don't know how the translation is offsetted yet. Need to investigate
-        result += Vector((0,0,-0.55))
-        result.z = max(result.z, 0)
         return result
     if CAMERA_UNK_CRC in data.TransformTracks[TransformType.EulerRotation]:
         curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_UNK_CRC].Curve
