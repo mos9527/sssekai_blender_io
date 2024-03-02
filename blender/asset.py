@@ -166,11 +166,10 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
         # Blender always generates normals automatically
         # Custom normals needs a bit more work
         # See below for normals_split... calls
-        # XXX why is this flipped?
         vert.normal = swizzle_vector3(
-            -1 * data.m_Normals[vtx * normalFloats],
-            -1 * data.m_Normals[vtx * normalFloats + 1],
-            -1 * data.m_Normals[vtx * normalFloats + 2]
+            data.m_Normals[vtx * normalFloats],
+            data.m_Normals[vtx * normalFloats + 1],
+            data.m_Normals[vtx * normalFloats + 2]
         )
         if deform_layer:
             for i in range(4):
@@ -183,7 +182,7 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
     # Indices
     for idx in range(0, len(data.m_Indices), 3):
         try:
-            face = bm.faces.new([bm.verts[data.m_Indices[idx + j]] for j in range(3)])
+            face = bm.faces.new(reversed([bm.verts[data.m_Indices[idx + j]] for j in range(3)])) # UV rewinding
             face.smooth = True
         except ValueError:
             print('! Invalid face index', idx, 'Discarded.')
