@@ -1,6 +1,8 @@
 # sssekai_blender_io
 Blender I/O for the game's assets. (actually it's imports only)
 
+Tested on Blender `4.0.3`, `4.2.0 Alpha`
+
 Currently supports:  
   * Textures
   * Character NPR Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/master/assets/SekaiShaderStandalone.blend))
@@ -20,7 +22,7 @@ python -m pip install sssekai
 ```
 - Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master)
 - In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just downloaded.
-- The addon show appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
+- The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
 
 ## Usage
 Refer to the Wiki!

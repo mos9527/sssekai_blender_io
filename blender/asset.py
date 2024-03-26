@@ -203,14 +203,17 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
             color = [data.m_Colors[vtx * colorFloats + i] for i in range(colorFloats)]
             vertex_color.data[vtx].color = color
     # Assign vertex normals
-    mesh.create_normals_split()
+    try:
+        mesh.create_normals_split()
+        mesh.use_auto_smooth = True   
+    except:
+        pass # 4.2.0 Alpha removed these somehow
     normals = [(0,0,0) for l in mesh.loops]
     for i, loop in enumerate(mesh.loops):
         normal = bm.verts[loop.vertex_index].normal
         normal.normalize()
         normals[i] = normal
     mesh.normals_split_custom_set(normals)
-    mesh.use_auto_smooth = True   
     # Blend Shape / Shape Keys
     if data.m_Shapes.channels:
         obj.shape_key_add(name="Basis")
