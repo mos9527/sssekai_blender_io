@@ -337,7 +337,7 @@ def import_armature_physics_constraints(armature, data : Armature):
                     if '_offset' in parent_bone.name and not bone.name in springbone_chains: # Keep the fisrt bone's parent. The rest are connected
                         armature.data.edit_bones.remove(armature.data.edit_bones[parent_bone.name])   
                         ebone.parent = armature.data.edit_bones[parent_bone.parent.name]
-                    ebone.use_connect = True
+                    # ebone.use_connect = True
                     scaled_segments = BBONE_SEGMENTS if ebone.length > 0.03 else 1 # XXX: Is there a better way to do this?
                     ebone.bbone_segments = scaled_segments
                     if bone.physics:
