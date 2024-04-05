@@ -573,31 +573,43 @@ def load_sssekai_shader_blend():
             data_to.materials = data_from.materials
             print('! Loaded shader blend file.')
 
-def make_material_texture_node(material , ppTexture, texture_cache = None):
-    texCoord = material.node_tree.nodes.new('ShaderNodeTexCoord')
-    uvRemap = material.node_tree.nodes.new('ShaderNodeMapping')
-    uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X
-    uvRemap.inputs[1].default_value[1] = ppTexture.m_Offset.Y
-    uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.X
-    uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.Y
-    texNode = material.node_tree.nodes.new('ShaderNodeTexImage')
+def make_material_texture_node(material, ppTexture, texture_cache=None):
+    texNode = None  # Initialize texNode variable outside the try-except block
+
     try:
-        texture : Texture2D = ppTexture.m_Texture.read()
+        texture: Texture2D = ppTexture.m_Texture.read()
         if texture_cache:
-            if not texture.name in texture_cache:
+            if texture.name not in texture_cache:
                 texture_cache[texture.name] = import_texture(texture.name, texture)
+            texNode = material.node_tree.nodes.new('ShaderNodeTexImage')
             texNode.image = texture_cache[texture.name]
         else:
+            texNode = material.node_tree.nodes.new('ShaderNodeTexImage')
             texNode.image = import_texture(texture.name, texture)
+        if texture.name == "faceSdf":
+            uvmap_node = material.node_tree.nodes.new('ShaderNodeUVMap')
+            uvmap_node.uv_map = "UVMap.001"
+            texNode.image.colorspace_settings.name = "Non-Color"
+            material.node_tree.links.new(uvmap_node.outputs[0], texNode.inputs['Vector'])
+        else:
+            texCoord = material.node_tree.nodes.new('ShaderNodeTexCoord')
+            uvRemap = material.node_tree.nodes.new('ShaderNodeMapping')
+            uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X
+            uvRemap.inputs[1].default_value[1] = ppTexture.m_Offset.Y
+            uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.X
+            uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.Y
+            material.node_tree.links.new(texCoord.outputs['UV'], uvRemap.inputs['Vector'])
+            material.node_tree.links.new(uvRemap.outputs['Vector'], texNode.inputs['Vector'])
     except Exception as e:
-        print('! Failed to load texture. Discarding.',e)        
-    material.node_tree.links.new(texCoord.outputs['UV'], uvRemap.inputs['Vector'])
-    material.node_tree.links.new(uvRemap.outputs['Vector'], texNode.inputs['Vector'])
+        print('! Failed to load texture. Discarding.', e)
+
     return texNode
+
 
 def create_principled_bsdf_material(name : str):
     material = bpy.data.materials.new(name)
     material.use_nodes = True
+    material.blend_method = ("BLEND")
     return material
 
 def import_character_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None):
@@ -612,7 +624,12 @@ def import_character_material(name : str,data : Material, use_principled_bsdf = 
     '''
     load_sssekai_shader_blend()
     if not use_principled_bsdf:
-        material = bpy.data.materials["SekaiShaderChara"].copy()
+        if "ehl_00" in name:
+            material = bpy.data.materials["SekaiShaderEyelight"].copy()
+        elif name == "mtl_chr_00":
+            material = bpy.data.materials["SekaiShaderFace"].copy()
+        else:
+            material = bpy.data.materials["SekaiShaderChara"].copy()
         material.name = name
     else:
         material = create_principled_bsdf_material(name)
@@ -623,15 +640,19 @@ def import_character_material(name : str,data : Material, use_principled_bsdf = 
         if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[0])
-            material.node_tree.links.new(mainTex.outputs['Alpha'], sekaiShader.inputs[6])
+            if "ehl_00" in name:
+                material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs[1])
         if '_ShadowTex' in textures:
             shadowTex = make_material_texture_node(material, textures['_ShadowTex'], texture_cache)
             material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs[1])
         if '_ValueTex' in textures:
             valueTex = make_material_texture_node(material, textures['_ValueTex'], texture_cache)
             material.node_tree.links.new(valueTex.outputs['Color'], sekaiShader.inputs[2])
+        if '_FaceShadowTex' in textures and name == "mtl_chr_00":
+            FaceShadow = make_material_texture_node(material, textures['_FaceShadowTex'], texture_cache)
+            material.node_tree.links.new(FaceShadow.outputs['Color'], sekaiShader.inputs[7])            
     else:
-        if '_MainTex' in textures:
+        if '_MainTex' in textures and name == "mtl_chr_00":
             mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
     return material
