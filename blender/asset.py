@@ -139,6 +139,8 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
     vtxFloats = int(len(data.m_Vertices) / data.m_VertexCount)
     normalFloats = int(len(data.m_Normals) / data.m_VertexCount)
     uvFloats = int(len(data.m_UV0) / data.m_VertexCount)
+    if data.m_UV1:
+        uv1Floats = int(len(data.m_UV1) / data.m_VertexCount)
     colorFloats = int(len(data.m_Colors) / data.m_VertexCount)
     # Bone Indices + Bone Weights
     deform_layer = None
@@ -196,6 +198,15 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
                 data.m_UV0[vtx * uvFloats], 
                 data.m_UV0[vtx * uvFloats + 1]
             )
+    if data.m_UV1:
+        uv_layer1 = mesh.uv_layers.new()
+        mesh.uv_layers.active = uv_layer1
+        for face in mesh.polygons:
+            for vtx, loop in zip(face.vertices, face.loop_indices):
+                uv_layer1.data[loop].uv = (
+                    data.m_UV1[vtx * uv1Floats], 
+                    data.m_UV1[vtx * uv1Floats + 1]
+                )
     # Vertex Color
     if colorFloats:
         vertex_color = mesh.color_attributes.new(name='Vertex Color',type='FLOAT_COLOR',domain='POINT')
