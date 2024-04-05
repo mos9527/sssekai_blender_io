@@ -5,7 +5,7 @@ Tested on Blender `4.0.3`, `4.2.0 Alpha`
 
 Currently supports:  
   * Textures
-  * Character NPR Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/master/assets/SekaiShaderStandalone.blend))
+  * Character Toon Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/master/assets/SekaiShaderStandalone.blend))
   * Static Mesh
   * Skinned Mesh
   * Armatures (built through GameObject hierarchy)
@@ -25,8 +25,7 @@ python -m pip install sssekai
 - The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
 
 ## Usage
-Refer to the Wiki!
-https://github.com/mos9527/sssekai_blender_io/wiki （附带简中）
+TODO
 
 ## References
 https://github.com/KhronosGroup/glTF-Blender-IO
@@ -38,3 +37,9 @@ https://github.com/SutandoTsukai181/yakuza-gmt-blender
 https://github.com/UuuNyaa/blender_mmd_tools
 
 https://github.com/Pauan/blender-rigid-body-bones
+
+https://zhuanlan.zhihu.com/p/411188212
+
+https://zhuanlan.zhihu.com/p/337944099
+
+https://zhuanlan.zhihu.com/p/670837192
