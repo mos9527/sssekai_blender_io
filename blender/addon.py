@@ -175,6 +175,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     # Set the fps. Otherwise keys may get lost!
                     bpy.context.scene.render.fps = int(clip.Framerate)
                     bpy.context.scene.frame_end = max(bpy.context.scene.frame_end,int(clip.Framerate * clip.Duration + 0.5 + wm.sssekai_animation_import_offset))
+                    bpy.context.scene.rigidbody_world.point_cache.frame_end = max(bpy.context.scene.rigidbody_world.point_cache.frame_end, bpy.context.scene.frame_end)
                     print('* Duration', clip.Duration)
                     print('* Framerate', clip.Framerate)
                     print('* Frames', bpy.context.scene.frame_end)

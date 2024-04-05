@@ -637,7 +637,7 @@ def setup_sdfValue_driver(obj: bpy.types.Object):
     var_z.targets[0].id = joint
     var_z.targets[0].transform_space = 'TRANSFORM_SPACE'
     var_z.targets[0].transform_type = 'LOC_Z'
-    driver.driver.expression = 'y/sqrt(z*z+ y*y) * (-1 if z > 0 else 1)'
+    driver.driver.expression = 'y/sqrt(z*z+ y*y) * (-1 if z > 0 else 1) * (0 if y > 0 else 1)'
 
 def import_chara_face_v2_material(name : str, data : Material, use_principled_bsdf = False, texture_cache = None):
     '''Set up Material assets for V2 Mesh Face w/ SDF Shadow into blender.
