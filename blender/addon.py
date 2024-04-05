@@ -61,15 +61,29 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
 
             texture_cache = dict()
             material_cache = dict()
-            def add_material(m_Materials : Material, obj : bpy.types.Object, materialParser : callable , meshData : Mesh): 
+            def add_material(m_Materials : Material, obj : bpy.types.Object, meshData : Mesh, defaultParser = None): 
                 for ppmat in m_Materials:
                     if ppmat:                    
                         material : Material = ppmat.read()
+                        parser = defaultParser                    
+                        # Override parser by name when not using blender's Principled BSDF
+                        # These are introduced by v2 meshes     
+                        if not wm.sssekai_materials_use_principled_bsdf:                   
+                            if 'ehl_00' in material.name: 
+                                parser = import_eyelight_material
+                            if 'mtl_chr_00' in material.name and '_FaceShadowTex' in material.m_SavedProperties.m_TexEnvs:   
+                                setup_sdfValue_driver(obj)
+                                parser = import_chara_face_v2_material
                         if material.name in material_cache:
                             asset = material_cache[material.name]
                             print('* Reusing Material', material.name)
                         else:
-                            asset = materialParser(material.name, material, use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf, texture_cache=texture_cache)
+                            asset = parser(
+                                material.name, 
+                                material, 
+                                use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf,
+                                texture_cache=texture_cache
+                            )
                             material_cache[material.name] = asset
                             print('* Imported new Material', material.name)
                         obj.data.materials.append(asset)
@@ -107,7 +121,10 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         mesh_rnd : MeshRenderer = bone.gameObject.m_MeshRenderer.read()
                         mesh_data = mesh_filter.m_Mesh.read()
                         mesh, obj = import_mesh(mesh_data.name, mesh_data, False)
-                        add_material(mesh_rnd.m_Materials, obj, import_scene_material, mesh_data)    
+                        try:
+                            add_material(mesh_rnd.m_Materials, obj, mesh_data, import_scene_material)    
+                        except Exception:
+                            pass
                         obj.parent = joint
                         print('* Imported Static Mesh', mesh_data.name)
                 print('* Imported Static Mesh Articulation', articulation.name)        
@@ -119,7 +136,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             
             # XXX: Skinned meshes are expected to have identity transforms 
             # maybe this would change in the future but for now, it's a safe assumption
-            def add_armature(armature):
+            def add_armature(armature : Armature):
                 armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
                 for parent,bone,depth in armature.root.dfs_generator():
                     if bone.gameObject and getattr(bone.gameObject,'m_SkinnedMeshRenderer',None):
@@ -130,7 +147,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             mesh, obj = import_mesh(bone.name, mesh_data,True, armature.bone_path_hash_tbl,bone_order)
                             obj.parent = armObj
                             obj.modifiers.new('Armature', 'ARMATURE').object = armObj
-                            add_material(mesh_rnd.m_Materials, obj, import_character_material, mesh_data)    
+                            add_material(mesh_rnd.m_Materials, obj, mesh_data, import_character_material)    
                             print('* Imported Skinned Mesh', mesh_data.name)
                 print('* Imported Armature', armature.name)
 

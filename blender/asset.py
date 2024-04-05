@@ -249,9 +249,6 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
     bm.free()      
     return mesh, obj
 
-def import_articulation(name : str, data : Armature):
-    pass
-
 def import_armature(name : str, data : Armature):
     '''Imports the Armature data generated into blender
 
@@ -571,21 +568,24 @@ def import_texture(name : str, data : Texture2D):
         print('* Imported Texture', name)
         return img
 
-def load_sssekai_shader_blend():
+def ensure_sssekai_shader_blend():
     if not 'SekaiShaderChara' in bpy.data.materials or not 'SekaiShaderScene' in bpy.data.materials:
         print('! SekaiShader not loaded. Importing from source.')
         with bpy.data.libraries.load(SHADER_BLEND_FILE, link=False) as (data_from, data_to):
             data_to.materials = data_from.materials
             print('! Loaded shader blend file.')
 
-def make_material_texture_node(material , ppTexture, texture_cache = None, uv_layer = 'UV0'):
+def make_material_texture_node(material , ppTexture, texture_cache = None, uv_layer = 'UV0', uv_remap_override_node = None):
     uvMap = material.node_tree.nodes.new('ShaderNodeUVMap')
-    uvMap.uv_map = uv_layer        
-    uvRemap = material.node_tree.nodes.new('ShaderNodeMapping')
-    uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X
-    uvRemap.inputs[1].default_value[1] = ppTexture.m_Offset.Y
-    uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.X
-    uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.Y
+    uvMap.uv_map = uv_layer
+    if uv_remap_override_node:
+        uvRemap = uv_remap_override_node
+    else:
+        uvRemap = material.node_tree.nodes.new('ShaderNodeMapping')
+        uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X
+        uvRemap.inputs[1].default_value[1] = ppTexture.m_Offset.Y
+        uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.X
+        uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.Y
     texNode = material.node_tree.nodes.new('ShaderNodeTexImage')
     try:
         texture : Texture2D = ppTexture.m_Texture.read()
@@ -598,10 +598,9 @@ def make_material_texture_node(material , ppTexture, texture_cache = None, uv_la
     except Exception as e:
         print('! Failed to load texture. Discarding.',e) 
         return None       
-    material.node_tree.links.new(uvMap.outputs['UV'], uvRemap.inputs['Vector'])
-    material.node_tree.links.new(uvRemap.outputs['Vector'], texNode.inputs['Vector'])
+    material.node_tree.links.new(uvMap.outputs['UV'], uvRemap.inputs[0])
+    material.node_tree.links.new(uvRemap.outputs[0], texNode.inputs['Vector'])
     return texNode
-
 
 def create_principled_bsdf_material(name : str):
     material = bpy.data.materials.new(name)
@@ -609,7 +608,126 @@ def create_principled_bsdf_material(name : str):
     material.blend_method = ("BLEND")
     return material
 
-def import_character_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None):
+def setup_sdfValue_driver(obj: bpy.types.Object):
+    obj['sdfValue'] = 0.0
+    # A joint providing the basis axis for the SDF shadow
+    joint = bpy.data.objects.new('SdfFaceLight', None)
+    joint.empty_display_size = 0.1
+    joint.empty_display_type = 'ARROWS'                
+    bpy.context.collection.objects.link(joint)    
+    bpy.context.view_layer.objects.active = obj.parent
+    bpy.ops.object.mode_set(mode='EDIT')
+    joint.parent = obj.parent
+    joint.parent_type = 'BONE'
+    joint.parent_bone = 'Head' # This allows us to perform the calculations in the local space of the head 
+    # And now the (normalized) local position of the joint can act as the light vector...
+    # With identity (0,0,1) as the (quite literally) face normal vector.    
+    bpy.ops.object.mode_set(mode='OBJECT')
+    joint.location = Vector((.1,-.1,.1))
+    driver = obj.driver_add('["sdfValue"]')
+    var_y = driver.driver.variables.new()
+    var_y.name = 'y'
+    var_y.type = 'TRANSFORMS'
+    var_y.targets[0].id = joint
+    var_y.targets[0].transform_space = 'TRANSFORM_SPACE' # the nomeclature is surely confusing..
+    var_y.targets[0].transform_type = 'LOC_Y'
+    var_z = driver.driver.variables.new()
+    var_z.name = 'z'
+    var_z.type = 'TRANSFORMS'
+    var_z.targets[0].id = joint
+    var_z.targets[0].transform_space = 'TRANSFORM_SPACE'
+    var_z.targets[0].transform_type = 'LOC_Z'
+    driver.driver.expression = 'y/sqrt(z*z+ y*y) * (-1 if z > 0 else 1)'
+
+def import_chara_face_v2_material(name : str, data : Material, use_principled_bsdf = False, texture_cache = None):
+    '''Set up Material assets for V2 Mesh Face w/ SDF Shadow into blender.
+    
+    Adapted from https://zhuanlan.zhihu.com/p/411188212
+
+    Bare with me, this is a bit... unintuitive.
+
+    Args:
+        name (str): material name
+        data (Material): UnityPy Material
+
+    Returns:
+        bpy.types.Material: Created material    
+    '''
+    ensure_sssekai_shader_blend()
+    textures = data.m_SavedProperties.m_TexEnvs
+    if not use_principled_bsdf:
+        material = bpy.data.materials["SekaiShaderFace"].copy()
+        material.name = name
+        sekaiShader = material.node_tree.nodes['Group']
+        # Usual texture setup
+        mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
+        material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs['Sekai C'])
+        shadowTex = make_material_texture_node(material, textures['_ShadowTex'], texture_cache)
+        material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs['Sekai S'])
+        # We only need NdotL for the shadow clamped to [0,1]
+        # The direction is encoded into the sign of the value. See below.
+        valueNode = material.node_tree.nodes.new('ShaderNodeAttribute')
+        valueNode.attribute_type = 'OBJECT'
+        valueNode.attribute_name = 'sdfValue' # <-- This is the magic word. Not setup here though.
+        # Texture mapping may need to be flipped horizontally
+        signNode = material.node_tree.nodes.new('ShaderNodeMath')
+        signNode.operation = 'SIGN'
+        material.node_tree.links.new(valueNode.outputs['Fac'], signNode.inputs['Value'])
+        uvFlip = material.node_tree.nodes.new('ShaderNodeVectorMath')
+        uvFlip.operation = 'MULTIPLY'
+        valueXYZ = material.node_tree.nodes.new('ShaderNodeCombineXYZ')
+        material.node_tree.links.new(signNode.outputs['Value'], valueXYZ.inputs['X'])
+        valueXYZ.inputs['Y'].default_value = 1
+        valueXYZ.inputs['Z'].default_value = 1
+        material.node_tree.links.new(valueXYZ.outputs[0], uvFlip.inputs[1])
+        # Finally, the threshold
+        sdfTex = make_material_texture_node(material, textures['_FaceShadowTex'], texture_cache, 'UV1', uvFlip)
+        absNode = material.node_tree.nodes.new('ShaderNodeMath')
+        absNode.operation = 'ABSOLUTE'
+        compareNode = material.node_tree.nodes.new('ShaderNodeMath')
+        compareNode.operation = 'GREATER_THAN'
+        material.node_tree.links.new(valueNode.outputs['Fac'], absNode.inputs[0])
+        material.node_tree.links.new(absNode.outputs[0], compareNode.inputs[0])
+        material.node_tree.links.new(sdfTex.outputs['Color'], compareNode.inputs[1])
+        material.node_tree.links.new(compareNode.outputs[0], sekaiShader.inputs['SDF Post Threshold'])   
+    else:
+        material = create_principled_bsdf_material(name)    
+        if '_MainTex' in textures:
+            mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
+            if mainTex:
+                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])        
+    return material
+
+def import_eyelight_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None, **kwargs):
+    '''Imports Material assets for V2 Mesh Eye Highlight into blender. 
+    
+    Args:
+        name (str): material name
+        data (Material): UnityPy Material
+
+    Returns:
+        bpy.types.Material: Created material        
+    '''
+    ensure_sssekai_shader_blend()
+    textures = data.m_SavedProperties.m_TexEnvs
+    if not use_principled_bsdf:
+        material = bpy.data.materials["SekaiShaderEyelight"].copy()
+        material.name = name
+        sekaiShader = material.node_tree.nodes['Group']
+        if '_MainTex' in textures:
+            mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
+            if mainTex:
+                material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs['Sekai C'])
+                material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs['Alpha'])
+    else:
+        material = create_principled_bsdf_material(name)    
+        if '_MainTex' in textures:
+            mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
+            if mainTex:
+                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])        
+    return material
+
+def import_character_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None, **kwargs):
     '''Imports Material assets for Characters into blender. 
     
     Args:
@@ -619,14 +737,9 @@ def import_character_material(name : str,data : Material, use_principled_bsdf = 
     Returns:
         bpy.types.Material: Created material        
     '''
-    load_sssekai_shader_blend()
+    ensure_sssekai_shader_blend()
     if not use_principled_bsdf:
-        if "ehl_00" in name:
-            material = bpy.data.materials["SekaiShaderEyelight"].copy()
-        elif name == "mtl_chr_00":
-            material = bpy.data.materials["SekaiShaderFace"].copy()
-        else:
-            material = bpy.data.materials["SekaiShaderChara"].copy()
+        material = bpy.data.materials["SekaiShaderChara"].copy()
         material.name = name
     else:
         material = create_principled_bsdf_material(name)
@@ -636,27 +749,24 @@ def import_character_material(name : str,data : Material, use_principled_bsdf = 
         sekaiShader = material.node_tree.nodes['Group']
         if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
-            material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs['Sekai C'])
-            if "ehl_00" in name:
-                material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs['Alpha'])
+            if mainTex:
+                material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs['Sekai C'])
         if '_ShadowTex' in textures:
             shadowTex = make_material_texture_node(material, textures['_ShadowTex'], texture_cache)
             if shadowTex:
                 material.node_tree.links.new(shadowTex.outputs['Color'], sekaiShader.inputs['Sekai S'])
         if '_ValueTex' in textures:
             valueTex = make_material_texture_node(material, textures['_ValueTex'], texture_cache)
-            material.node_tree.links.new(valueTex.outputs['Color'], sekaiShader.inputs['Sekai H'])
-        if '_FaceShadowTex' in textures and name == "mtl_chr_00":
-            FaceShadow = make_material_texture_node(material, textures['_FaceShadowTex'], texture_cache, 'UV1')
-            material.node_tree.links.new(FaceShadow.outputs['Color'], sekaiShader.inputs['Faceshadow'])            
+            if valueTex:
+                material.node_tree.links.new(valueTex.outputs['Color'], sekaiShader.inputs['Sekai H'])          
     else:
-        if '_MainTex' in textures and name == "mtl_chr_00":
+        if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             if mainTex:
                 material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
     return material
 
-def import_scene_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None):
+def import_scene_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None, **kwargs):
     '''Imports Material assets for Non-Character (i.e. Stage) into blender. 
     
     Args:
@@ -666,7 +776,7 @@ def import_scene_material(name : str,data : Material, use_principled_bsdf = Fals
     Returns:
         bpy.types.Material: Created material        
     '''
-    load_sssekai_shader_blend()
+    ensure_sssekai_shader_blend()
     if not use_principled_bsdf:
         material = bpy.data.materials["SekaiShaderScene"].copy()
         material.name = name
