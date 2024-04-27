@@ -606,7 +606,9 @@ def make_material_texture_node(material , ppTexture, texture_cache = None, uv_la
 def create_principled_bsdf_material(name : str):
     material = bpy.data.materials.new(name)
     material.use_nodes = True
-    material.blend_method = ("BLEND")
+    # material.blend_method = ("BLEND")
+    # Alpha blending is always costly. This should be opt-in when there's alpha channel in the texture
+    # TODO: Can we know in advance if the texture has alpha?
     return material
 
 def setup_sdfValue_driver(obj: bpy.types.Object):
