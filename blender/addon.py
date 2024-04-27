@@ -274,6 +274,26 @@ class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
                 cchild.hide_set(display)
                 cchild.hide_render = display
         return {'FINISHED'}
+    
+class SSSekaiBlenderApplyOutlineOperator(bpy.types.Operator):
+    bl_idname = "sssekai.apply_outline_op"
+    bl_label = "Add Outline to Selected"
+    bl_description = "Add outline to the selected object"
+    def execute(self, context):
+        ensure_sssekai_shader_blend()
+        outline_material = bpy.data.materials["SekaiShaderOutline"].copy()
+        for pa in bpy.context.selected_objects:
+            for obj in [pa] + pa.children_recursive:
+                if obj.type == 'MESH':                    
+                    bpy.context.view_layer.objects.active = obj
+                    bpy.ops.object.mode_set(mode='OBJECT')
+                    obj.data.materials.append(outline_material)
+                    modifier = obj.modifiers.new(name="SekaiShellOutline", type='NODES')
+                    modifier.node_group = bpy.data.node_groups["SekaiShellOutline"].copy()
+                    index = len(obj.data.materials) - 1
+                    modifier['Socket_4'] = index # XXX: Any other way to assign this attribute?
+        return {'FINISHED'}
+
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
     bl_label = "Importer"
@@ -294,6 +314,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.label(text="Material Options")
         row = layout.row()
         row.prop(wm, "sssekai_materials_use_principled_bsdf")
+        row = layout.row()
+        row.operator(SSSekaiBlenderApplyOutlineOperator.bl_idname)
         row = layout.row()
         row.label(text="Armature Options")
         row = layout.row()
@@ -401,6 +423,7 @@ def register():
     bpy.types.Scene.sssekai_util_neck_attach_obj_body = bpy.props.PointerProperty(name="Body",type=bpy.types.Armature)
     bpy.utils.register_class(SSSekaiBlenderUtilNeckAttachOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilNeckAttach)
+    bpy.utils.register_class(SSSekaiBlenderApplyOutlineOperator)
     bpy.utils.register_class(SSSekaiBlenderImportPhysicsOperator)
     bpy.utils.register_class(SSSekaiBlenderRemovePhysicsOperator)
     bpy.utils.register_class(SSSekaiBlenderPhysicsDisplayOperator)
@@ -416,6 +439,7 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderImportPanel)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttachOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttach)
+    bpy.utils.unregister_class(SSSekaiBlenderApplyOutlineOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportPhysicsOperator)
     bpy.utils.unregister_class(SSSekaiBlenderRemovePhysicsOperator)
     bpy.utils.unregister_class(SSSekaiBlenderPhysicsDisplayOperator)

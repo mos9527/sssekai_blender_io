@@ -573,6 +573,7 @@ def ensure_sssekai_shader_blend():
         print('! SekaiShader not loaded. Importing from source.')
         with bpy.data.libraries.load(SHADER_BLEND_FILE, link=False) as (data_from, data_to):
             data_to.materials = data_from.materials
+            data_to.node_groups = data_from.node_groups
             print('! Loaded shader blend file.')
 
 def make_material_texture_node(material , ppTexture, texture_cache = None, uv_layer = 'UV0', uv_remap_override_node = None):
