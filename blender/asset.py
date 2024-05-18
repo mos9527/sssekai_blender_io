@@ -314,8 +314,8 @@ def import_armature_physics_constraints(armature, data : Armature):
     SPHERE_RADIUS_FACTOR = 1
     CAPSULE_RADIUS_FACTOR = 1
     CAPSULE_HEIGHT_FACTOR = 1
-    SPRINGBONE_RADIUS_FACTOR = 0.25
-    BBONE_SEGMENTS = 4
+    SPRINGBONE_RADIUS_FACTOR = 0.15
+    # These are totally empirical
     bpy.context.view_layer.objects.active = armature    
     root_bone = data.root.recursive_locate_by_name('Position')
 
@@ -328,11 +328,6 @@ def import_armature_physics_constraints(armature, data : Armature):
             begin : object = None
             end : object = None
         springbone_chains : Dict[str,SpringBoneChain] = dict()
-        # armature.data.display_type = 'BBONE'
-        for parent, child, _ in root_bone.dfs_generator():
-            if child.name in armature.data.edit_bones:
-                ebone = armature.data.edit_bones[child.name]
-                ebone.bbone_x = ebone.bbone_z = PIVOT_SIZE
         def connect_spring_bones(bone : Bone, parent = None):
             if not parent:
                 if bone.physics and bone.physics.type == BonePhysicsType.SpringBone:
@@ -350,17 +345,18 @@ def import_armature_physics_constraints(armature, data : Armature):
                     if '_offset' in parent_bone.name and not bone.name in springbone_chains: # Keep the fisrt bone's parent. The rest are connected
                         armature.data.edit_bones.remove(armature.data.edit_bones[parent_bone.name])   
                         ebone.parent = armature.data.edit_bones[parent_bone.parent.name]
-                    # ebone.use_connect = True
-                    scaled_segments = BBONE_SEGMENTS if ebone.length > 0.03 else 1 # XXX: Is there a better way to do this?
-                    ebone.bbone_segments = scaled_segments
-                    if bone.physics:
-                        ebone.bbone_x = ebone.bbone_z = bone.physics.radius * SPRINGBONE_RADIUS_FACTOR
-                    elif bone.parent.physics:
-                        ebone.bbone_x = ebone.bbone_z = bone.parent.physics.radius * SPRINGBONE_RADIUS_FACTOR
+                    ebone.use_connect = True
                 if not bone.children:
                     springbone_chains[parent.name].end = bone
             for child in bone.children:
-                connect_spring_bones(child, parent)
+                if not '_end' in child.name:
+                    connect_spring_bones(child, parent)
+                else:
+                    # _end bones have no weight in the mesh. We'll merge them with the parent
+                    ebone = armature.data.edit_bones[child.name]
+                    parent = ebone.parent
+                    parent.tail = ebone.head
+                    armature.data.edit_bones.remove(armature.data.edit_bones[child.name])
         connect_spring_bones(root_bone)
         # The following strategy is inspired by https://github.com/Pauan/blender-rigid-body-bones
         # TL;DR
@@ -474,16 +470,8 @@ def import_armature_physics_constraints(armature, data : Armature):
                     bpy.ops.rigidbody.constraint_add(type='GENERIC_SPRING')
                     ct = joint.rigid_body_constraint
                     ct.use_limit_lin_x = True
-                    # For good mesaure...
-                    ct.limit_lin_x_lower = math.radians(-10)
-                    ct.limit_lin_x_upper = math.radians(10)
                     ct.use_limit_lin_y = True
                     ct.use_limit_lin_z = True
-                    if phys_data:
-                        ct.limit_ang_y_lower = math.radians(phys_data.zAngleLimits.min)
-                        ct.limit_ang_y_upper = math.radians(phys_data.zAngleLimits.max)
-                        ct.limit_ang_z_lower = math.radians(phys_data.yAngleLimits.min)
-                        ct.limit_ang_z_upper = math.radians(phys_data.yAngleLimits.max)                        
                     # No linear movement
                     ct.limit_lin_x_lower = 0
                     ct.limit_lin_x_upper = 0
@@ -496,6 +484,13 @@ def import_armature_physics_constraints(armature, data : Armature):
                     ct.use_limit_ang_x = True
                     ct.use_limit_ang_y = True
                     ct.use_limit_ang_z = True
+                    if phys_data:
+                        ct.limit_ang_x_lower = math.radians(-15) / 2
+                        ct.limit_ang_x_upper = math.radians(15) / 2
+                        ct.limit_ang_y_lower = math.radians(phys_data.zAngleLimits.min) / 2
+                        ct.limit_ang_y_upper = math.radians(phys_data.zAngleLimits.max) / 2
+                        ct.limit_ang_z_lower = math.radians(phys_data.yAngleLimits.min) / 2
+                        ct.limit_ang_z_upper = math.radians(phys_data.yAngleLimits.max) / 2                        
                     # Spring damping effect
                     # XXX: These are not going to be accurate
                     ct.use_spring_ang_x = True
@@ -722,6 +717,34 @@ def import_eyelight_material(name : str,data : Material, use_principled_bsdf = F
             if mainTex:
                 material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs['Sekai C'])
                 material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs['Alpha'])
+    else:
+        material = create_principled_bsdf_material(name)    
+        if '_MainTex' in textures:
+            mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
+            if mainTex:
+                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])        
+    return material
+
+def import_eye_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None, **kwargs):
+    '''Imports Material assets for V2 Mesh Eye into blender. 
+    
+    Args:
+        name (str): material name
+        data (Material): UnityPy Material
+
+    Returns:
+        bpy.types.Material: Created material        
+    '''
+    ensure_sssekai_shader_blend()
+    textures = data.m_SavedProperties.m_TexEnvs
+    if not use_principled_bsdf:
+        material = bpy.data.materials["SekaiShaderEye"].copy()
+        material.name = name
+        sekaiShader = material.node_tree.nodes['Group']
+        if '_MainTex' in textures:
+            mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
+            if mainTex:
+                material.node_tree.links.new(mainTex.outputs['Color'], sekaiShader.inputs['Sekai C'])
     else:
         material = create_principled_bsdf_material(name)    
         if '_MainTex' in textures:
