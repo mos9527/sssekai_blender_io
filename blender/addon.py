@@ -306,6 +306,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         wm = context.window_manager
+        layout.prop(wm, "sssekai_unity_version_override")
+        row = layout.row()
         layout.label(text="Select Asset")
         row = layout.row()
         row.prop(wm, "sssekai_assetbundle_file")
@@ -412,6 +414,14 @@ def register():
         name="Offset",
         description="Animation Offset in frames",
         default=0
+    )
+    def sssekai_on_unity_version_change(self, context):
+        sssekai_set_unity_version(context.window_manager.sssekai_unity_version_override)
+    WindowManager.sssekai_unity_version_override = StringProperty(
+        name="Unity Version",
+        description="Override Unity Version",
+        default=sssekai_get_unity_version(),
+        update=sssekai_on_unity_version_change
     )
     pcoll = bpy.utils.previews.new()
     pcoll.sssekai_assetbundle_file = ""

@@ -70,6 +70,7 @@ from UnityPy.math import Vector3, Quaternion as UnityQuaternion
 # SSSekai deps
 from sssekai.unity.AnimationClip import read_animation, Animation, TransformType, KeyFrame
 from sssekai.unity.AssetBundle import load_assetbundle
+from sssekai.unity import sssekai_get_unity_version, sssekai_set_unity_version
 class BonePhysicsType(IntEnum):
     NoPhysics = 0x00
 

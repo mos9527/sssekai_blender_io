@@ -12,13 +12,13 @@ Currently supports:
   * Physics (Rigidbodies, Colliders, Spring Bones)
   * Animations (Skeletal, BlendShape, Camera)
 
-## Installation:
-- Install depedencies in your Blender Python
+## Installing & Updating
+- Install/Update depedencies in your Blender Python
     - Navigate to your Blender installation path, and find the Python interperter of your version. (e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`)
-    - Run the following
+    - In its working directory (i.e. `...\python\bin`), run the following (in a command prompt)
 ```bash
 python -m ensurepip
-python -m pip install sssekai
+python -m pip install -U sssekai
 ```
 - Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master)
 - In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just downloaded.
