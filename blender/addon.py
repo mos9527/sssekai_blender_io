@@ -309,51 +309,9 @@ class SSSekaiBlenderApplyOutlineOperator(bpy.types.Operator):
                     modifier['Socket_4'] = index # XXX: Any other way to assign this attribute?
         return {'FINISHED'}
 
-class SSSekaiBlenderImportPanel(bpy.types.Panel):
-    bl_idname = "OBJ_PT_sssekai_import"
-    bl_label = "Importer"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_category = "SSSekai"
-
-    def draw(self, context):
-        layout = self.layout
-        wm = context.window_manager
-        layout.prop(wm, "sssekai_unity_version_override")
-        row = layout.row()
-        layout.label(text="Select Asset")
-        row = layout.row()
-        row.prop(wm, "sssekai_assetbundle_file")
-        row = layout.row()
-        row.prop(wm, "sssekai_assetbundle_selected")
-        layout.separator()
-        row = layout.row()
-        row.label(text="Material Options")
-        row = layout.row()
-        row.prop(wm, "sssekai_materials_use_principled_bsdf")
-        row = layout.row()
-        row.operator(SSSekaiBlenderApplyOutlineOperator.bl_idname)
-        row = layout.row()
-        row.label(text="Armature Options")
-        row = layout.row()
-        row.prop(wm, "sssekai_armatures_as_articulations")
-        row = layout.row()
-        row.operator(SSSekaiBlenderImportPhysicsOperator.bl_idname)
-        row = layout.row()
-        row.operator(SSSekaiBlenderRemovePhysicsOperator.bl_idname)
-        row = layout.row()
-        row.prop(wm, "sssekai_armature_display_physics", toggle=True)
-        row = layout.row()
-        row.label(text="Animation Options")
-        row = layout.row()
-        row.prop(wm, "sssekai_animation_import_offset")
-        row.prop(wm, "sssekai_animation_append_exisiting")
-        row = layout.row()
-        row.operator(SSSekaiBlenderImportOperator.bl_idname)
 
 def enumerate_assets(self, context):
     global sssekai_global
-    """EnumProperty callback"""
     enum_items = []
 
     if context is None:
@@ -396,15 +354,76 @@ def enumerate_assets(self, context):
     sssekai_global.current_dir = dirname
     return sssekai_global.current_enum_entries
 
+class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
+    bl_idname = "sssekai.asset_search_op"
+    bl_label = "Asset Search"
+    bl_property = "selected"
+    bl_description = "Search for assets with object name and/or container name"
+
+    selected: EnumProperty(name="Asset",description="Selected Asset",items=enumerate_assets)
+    def execute(self, context):
+        wm = context.window_manager
+        wm.sssekai_assetbundle_selected = self.selected
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        wm.invoke_search_popup(self)
+        return {'FINISHED'}    
+    
+class SSSekaiBlenderImportPanel(bpy.types.Panel):
+    bl_idname = "OBJ_PT_sssekai_import"
+    bl_label = "Importer"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "SSSekai"
+
+    def draw(self, context):
+        layout = self.layout
+        wm = context.window_manager
+        layout.prop(wm, "sssekai_unity_version_override")
+        row = layout.row()
+        layout.label(text="Select Asset")
+        row = layout.row()
+        row.prop(wm, "sssekai_assetbundle_file")
+        row = layout.row()
+        row.prop(wm, "sssekai_assetbundle_selected")
+        row = layout.row()
+        row.operator(SSSekaiBlenderAssetSearchOperator.bl_idname)
+        layout.separator()
+        row = layout.row()
+        row.label(text="Material Options")
+        row = layout.row()
+        row.prop(wm, "sssekai_materials_use_principled_bsdf")
+        row = layout.row()
+        row.operator(SSSekaiBlenderApplyOutlineOperator.bl_idname)
+        row = layout.row()
+        row.label(text="Armature Options")
+        row = layout.row()
+        row.prop(wm, "sssekai_armatures_as_articulations")
+        row = layout.row()
+        row.operator(SSSekaiBlenderImportPhysicsOperator.bl_idname)
+        row = layout.row()
+        row.operator(SSSekaiBlenderRemovePhysicsOperator.bl_idname)
+        row = layout.row()
+        row.prop(wm, "sssekai_armature_display_physics", toggle=True)
+        row = layout.row()
+        row.label(text="Animation Options")
+        row = layout.row()
+        row.prop(wm, "sssekai_animation_import_offset")
+        row.prop(wm, "sssekai_animation_append_exisiting")
+        row = layout.row()
+        row.operator(SSSekaiBlenderImportOperator.bl_idname)
+
 def register():
     WindowManager.sssekai_assetbundle_file = StringProperty(
-        name="Bundle Directory",
+        name="Directory",
         description="Where the asset bundle(s) is located. Every AssetBundle in this directory will be loaded (if possible).",
         subtype='DIR_PATH',
     )
     WindowManager.sssekai_assetbundle_selected = EnumProperty(
         name="Asset",
-        description="Asset",
+        description="Selected Asset",
         items=enumerate_assets,
     )
     WindowManager.sssekai_armatures_as_articulations = BoolProperty(
@@ -444,7 +463,7 @@ def register():
 
     bpy.utils.register_class(SSSekaiBlenderImportOperator)
     bpy.utils.register_class(SSSekaiBlenderImportPanel)
-
+    bpy.utils.register_class(SSSekaiBlenderAssetSearchOperator)
     bpy.types.Scene.sssekai_util_neck_attach_obj_face = bpy.props.PointerProperty(name="Face",type=bpy.types.Armature)
     bpy.types.Scene.sssekai_util_neck_attach_obj_body = bpy.props.PointerProperty(name="Body",type=bpy.types.Armature)
     bpy.utils.register_class(SSSekaiBlenderUtilNeckAttachOperator)
@@ -455,9 +474,8 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderPhysicsDisplayOperator)
 
 
-def unregister():
-    del WindowManager.sssekai_assetbundle_selected
-
+def unregister():    
+    bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportPanel)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttachOperator)
