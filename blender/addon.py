@@ -16,12 +16,15 @@ from bpy.props import (
 def encode_name_and_container(name, container):
     return f'{name} | {container}'
 class SSSekaiGlobalEnvironment:
+    current_dir : str = None
+    current_enum_entries : list = None
+    # ---
     env : Environment
     articulations : Set[Armature]
     armatures : Set[Armature]
     animations : Set[Animation]
 sssekai_global = SSSekaiGlobalEnvironment()
-preview_collections = dict()
+
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_attach_op"
     bl_label = "Attach Selected"
@@ -140,7 +143,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
 
         for articulation in articulations:
             container = articulation.root.gameObject.container
-            if encode_name_and_container(articulation.name, container) == wm.sssekai_assetbundle_preview:
+            if encode_name_and_container(articulation.name, container) == wm.sssekai_assetbundle_selected:
                 add_articulation(articulation)
                 return {'FINISHED'}
         
@@ -164,7 +167,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
 
         for armature in armatures:
             container = armature.root.gameObject.container
-            if encode_name_and_container(armature.name, container) == wm.sssekai_assetbundle_preview:
+            if encode_name_and_container(armature.name, container) == wm.sssekai_assetbundle_selected:
                 if wm.sssekai_armatures_as_articulations:
                     add_articulation(armature)
                     return {'FINISHED'}
@@ -175,7 +178,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
         animations = sssekai_global.animations
         for animation in animations:
             container = animation.container
-            if encode_name_and_container(animation.name, container) == wm.sssekai_assetbundle_preview:
+            if encode_name_and_container(animation.name, container) == wm.sssekai_assetbundle_selected:
                 def check_is_active_armature():
                     assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature for this animation!"
                 def check_is_active_camera():
@@ -235,7 +238,7 @@ class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
         articulations, armatures = sssekai_global.articulations, sssekai_global.armatures
         for armature in armatures:
             container = armature.root.gameObject.container
-            if encode_name_and_container(armature.name, container) == wm.sssekai_assetbundle_preview:
+            if encode_name_and_container(armature.name, container) == wm.sssekai_assetbundle_selected:
                 bpy.context.scene.frame_current = 0
                 import_armature_physics_constraints(bpy.context.active_object, armature)
                 return {'FINISHED'}
@@ -322,7 +325,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(wm, "sssekai_assetbundle_file")
         row = layout.row()
-        row.prop(wm, "sssekai_assetbundle_preview")
+        row.prop(wm, "sssekai_assetbundle_selected")
         layout.separator()
         row = layout.row()
         row.label(text="Material Options")
@@ -357,21 +360,18 @@ def enumerate_assets(self, context):
         return enum_items
 
     wm = context.window_manager
-    fname = wm.sssekai_assetbundle_file
+    dirname = wm.sssekai_assetbundle_file
 
-    # Get the preview collection (defined in register func).
-    pcoll = preview_collections["main"]
+    if dirname == sssekai_global.current_dir:
+        return sssekai_global.current_enum_entries
 
-    if fname == pcoll.sssekai_assetbundle_file:
-        return pcoll.sssekai_assetbundle_preview
+    print("* Loading index for %s" % dirname)
 
-    print("* Loading index for %s" % fname)
-
-    if fname and os.path.exists(fname):
+    if dirname and os.path.exists(dirname):
         index = 0        
         UnityPy.config.FALLBACK_VERSION_WARNED = True
         UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()         
-        sssekai_global.env = UnityPy.load(fname)
+        sssekai_global.env = UnityPy.load(dirname)
         sssekai_global.articulations, sssekai_global.armatures = search_env_meshes(sssekai_global.env)
         for articulation in sssekai_global.articulations:
             container = articulation.root.gameObject.container
@@ -392,9 +392,9 @@ def enumerate_assets(self, context):
             enum_items.append((encoded,encoded,animation.name, 'ANIM_DATA',index))
             index+=1
 
-    pcoll.sssekai_assetbundle_preview = enum_items
-    pcoll.sssekai_assetbundle_file = fname
-    return pcoll.sssekai_assetbundle_preview
+    sssekai_global.current_enum_entries = enum_items
+    sssekai_global.current_dir = dirname
+    return sssekai_global.current_enum_entries
 
 def register():
     WindowManager.sssekai_assetbundle_file = StringProperty(
@@ -402,7 +402,7 @@ def register():
         description="Where the asset bundle(s) is located. Every AssetBundle in this directory will be loaded (if possible).",
         subtype='DIR_PATH',
     )
-    WindowManager.sssekai_assetbundle_preview = EnumProperty(
+    WindowManager.sssekai_assetbundle_selected = EnumProperty(
         name="Asset",
         description="Asset",
         items=enumerate_assets,
@@ -441,11 +441,7 @@ def register():
         default=sssekai_get_unity_version(),
         update=sssekai_on_unity_version_change
     )
-    pcoll = bpy.utils.previews.new()
-    pcoll.sssekai_assetbundle_file = ""
-    pcoll.sssekai_assetbundle_preview = ()
-    
-    preview_collections["main"] = pcoll
+
     bpy.utils.register_class(SSSekaiBlenderImportOperator)
     bpy.utils.register_class(SSSekaiBlenderImportPanel)
 
@@ -460,11 +456,8 @@ def register():
 
 
 def unregister():
-    del WindowManager.sssekai_assetbundle_preview
+    del WindowManager.sssekai_assetbundle_selected
 
-    for pcoll in preview_collections.values():
-        bpy.utils.previews.remove(pcoll)
-    preview_collections.clear()
     bpy.utils.unregister_class(SSSekaiBlenderImportOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportPanel)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttachOperator)
