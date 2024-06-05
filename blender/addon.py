@@ -13,6 +13,8 @@ from bpy.props import (
     BoolProperty,
     IntProperty
 )
+def encode_name_and_container(name, container):
+    return f'{name} | {container}'
 preview_collections = dict()
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_attach_op"
@@ -55,163 +57,167 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
     def execute(self, context):
         wm = context.window_manager
         print('* Loading from', wm.sssekai_assetbundle_file, 'for', wm.sssekai_assetbundle_preview)
-        with open(wm.sssekai_assetbundle_file, 'rb') as f:
-            env = load_assetbundle(f)
-            articulations, armatures = search_env_meshes(env)
-
-            texture_cache = dict()
-            material_cache = dict()
-            def add_material(m_Materials : Material, obj : bpy.types.Object, meshData : Mesh, defaultParser = None): 
-                for ppmat in m_Materials:
-                    if ppmat:                    
-                        material : Material = ppmat.read()
-                        parser = defaultParser                    
-                        # Override parser by name when not using blender's Principled BSDF
-                        # These are introduced by v2 meshes     
-                        if not wm.sssekai_materials_use_principled_bsdf:                   
-                            if '_eye' in material.name:
-                                parser = import_eye_material
-                            if '_ehl_' in material.name: 
-                                parser = import_eyelight_material
-                            if 'mtl_chr_00' in material.name and '_FaceShadowTex' in material.m_SavedProperties.m_TexEnvs:   
-                                setup_sdfValue_driver(obj)
-                                parser = import_chara_face_v2_material
-                        if material.name in material_cache:
-                            asset = material_cache[material.name]
-                            print('* Reusing Material', material.name)
-                        else:
-                            asset = parser(
-                                material.name, 
-                                material, 
-                                use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf,
-                                texture_cache=texture_cache
-                            )
-                            material_cache[material.name] = asset
-                            print('* Imported new Material', material.name)
-                        obj.data.materials.append(asset)
-                
-                bpy.context.view_layer.objects.active = obj
+        env = UnityPy.load(wm.sssekai_assetbundle_file)
+        articulations, armatures = search_env_meshes(env)
+        print('* Found %d articulations and %d armatures' % (len(articulations), len(armatures)))
+        texture_cache = dict()
+        material_cache = dict()
+        def add_material(m_Materials : Material, obj : bpy.types.Object, meshData : Mesh, defaultParser = None): 
+            for ppmat in m_Materials:
+                if ppmat:                    
+                    material : Material = ppmat.read()
+                    parser = defaultParser                    
+                    # Override parser by name when not using blender's Principled BSDF
+                    # These are introduced by v2 meshes     
+                    if not wm.sssekai_materials_use_principled_bsdf:                   
+                        if '_eye' in material.name:
+                            parser = import_eye_material
+                        if '_ehl_' in material.name: 
+                            parser = import_eyelight_material
+                        if 'mtl_chr_00' in material.name and '_FaceShadowTex' in material.m_SavedProperties.m_TexEnvs:   
+                            setup_sdfValue_driver(obj)
+                            parser = import_chara_face_v2_material
+                    if material.name in material_cache:
+                        asset = material_cache[material.name]
+                        print('* Reusing Material', material.name)
+                    else:
+                        asset = parser(
+                            material.name, 
+                            material, 
+                            use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf,
+                            texture_cache=texture_cache
+                        )
+                        material_cache[material.name] = asset
+                        print('* Imported new Material', material.name)
+                    obj.data.materials.append(asset)
+            
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.object.mode_set(mode='OBJECT')
+            mesh = obj.data
+            for index,sub in enumerate(meshData.m_SubMeshes):
+                start, count = sub.firstVertex, sub.vertexCount
+                for i in range(start, start + count):
+                    mesh.vertices[i].select = True
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.context.object.active_material_index = index
+                bpy.ops.object.material_slot_assign()
+                bpy.ops.mesh.select_all(action='DESELECT')
                 bpy.ops.object.mode_set(mode='OBJECT')
-                mesh = obj.data
-                for index,sub in enumerate(meshData.m_SubMeshes):
-                    start, count = sub.firstVertex, sub.vertexCount
-                    for i in range(start, start + count):
-                        mesh.vertices[i].select = True
-                    bpy.ops.object.mode_set(mode='EDIT')
-                    bpy.context.object.active_material_index = index
-                    bpy.ops.object.material_slot_assign()
-                    bpy.ops.mesh.select_all(action='DESELECT')
-                    bpy.ops.object.mode_set(mode='OBJECT')
-            
-            def add_articulation(articulation):                
-                joint_map = dict()
-                for parent,bone,depth in articulation.root.dfs_generator():
-                    joint = bpy.data.objects.new(bone.name, None)
-                    joint.empty_display_size = 0.1
-                    joint.empty_display_type = 'ARROWS'     
-                    joint_map[bone.name] = joint         
-                    bpy.context.collection.objects.link(joint)
-                    # Make the artiulation
-                    joint.parent = joint_map[parent.name] if parent else None
-                    joint.location = swizzle_vector(bone.localPosition)
-                    joint.rotation_mode = 'QUATERNION'
-                    joint.rotation_quaternion = swizzle_quaternion(bone.localRotation)
-                    joint.scale = swizzle_vector_scale(bone.localScale)
-                    # Add the meshes, if any
-                    if bone.gameObject and getattr(bone.gameObject,'m_MeshFilter',None):
-                        mesh_filter : MeshFilter = bone.gameObject.m_MeshFilter.read()
-                        mesh_rnd : MeshRenderer = bone.gameObject.m_MeshRenderer.read()
-                        mesh_data = mesh_filter.m_Mesh.read()
-                        mesh, obj = import_mesh(mesh_data.name, mesh_data, False)
-                        try:
-                            add_material(mesh_rnd.m_Materials, obj, mesh_data, import_scene_material)    
-                        except Exception:
-                            pass
-                        obj.parent = joint
-                        print('* Imported Static Mesh', mesh_data.name)
-                print('* Imported Static Mesh Articulation', articulation.name)        
+        
+        def add_articulation(articulation):                
+            joint_map = dict()
+            for parent,bone,depth in articulation.root.dfs_generator():
+                joint = bpy.data.objects.new(bone.name, None)
+                joint.empty_display_size = 0.1
+                joint.empty_display_type = 'ARROWS'     
+                joint_map[bone.name] = joint         
+                bpy.context.collection.objects.link(joint)
+                # Make the artiulation
+                joint.parent = joint_map[parent.name] if parent else None
+                joint.location = swizzle_vector(bone.localPosition)
+                joint.rotation_mode = 'QUATERNION'
+                joint.rotation_quaternion = swizzle_quaternion(bone.localRotation)
+                joint.scale = swizzle_vector_scale(bone.localScale)
+                # Add the meshes, if any
+                if bone.gameObject and getattr(bone.gameObject,'m_MeshFilter',None):
+                    print('* Found Static Mesh at', bone.name)
+                    mesh_filter : MeshFilter = bone.gameObject.m_MeshFilter.read()
+                    mesh_rnd : MeshRenderer = bone.gameObject.m_MeshRenderer.read()
+                    mesh_data = mesh_filter.m_Mesh.read(return_typetree_on_error=False)
+                    mesh, obj = import_mesh(mesh_data.name, mesh_data, False)
+                    try:
+                        add_material(mesh_rnd.m_Materials, obj, mesh_data, import_scene_material)    
+                    except Exception:
+                        pass
+                    obj.parent = joint
+                    print('* Imported Static Mesh', mesh_data.name)
+            print('* Imported Static Mesh Articulation', articulation.name)        
 
-            for articulation in articulations:
-                if articulation.name == wm.sssekai_assetbundle_preview:
-                    add_articulation(articulation)
+        for articulation in articulations:
+            container = articulation.root.gameObject.container
+            if encode_name_and_container(articulation.name, container) == wm.sssekai_assetbundle_preview:
+                add_articulation(articulation)
+                return {'FINISHED'}
+        
+        # XXX: Skinned meshes are expected to have identity transforms 
+        # maybe this would change in the future but for now, it's a safe assumption
+        def add_armature(armature : Armature):
+            armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
+            for parent,bone,depth in armature.root.dfs_generator():
+                if bone.gameObject and getattr(bone.gameObject,'m_SkinnedMeshRenderer',None):
+                    print('* Found Skinned Mesh at', bone.name)
+                    mesh_rnd : SkinnedMeshRenderer = bone.gameObject.m_SkinnedMeshRenderer.read()
+                    bone_order  = [b.read().m_GameObject.read().name for b in mesh_rnd.m_Bones]
+                    if getattr(mesh_rnd,'m_Mesh',None):
+                        mesh_data : Mesh = mesh_rnd.m_Mesh.read(return_typetree_on_error=False)                            
+                        mesh, obj = import_mesh(bone.name, mesh_data,True, armature.bone_path_hash_tbl,bone_order)
+                        obj.parent = armObj
+                        obj.modifiers.new('Armature', 'ARMATURE').object = armObj
+                        add_material(mesh_rnd.m_Materials, obj, mesh_data, import_character_material)    
+                        print('* Imported Skinned Mesh', mesh_data.name)
+            print('* Imported Armature', armature.name)
+
+        for armature in armatures:
+            container = armature.root.gameObject.container
+            if encode_name_and_container(armature.name, container) == wm.sssekai_assetbundle_preview:
+                if wm.sssekai_armatures_as_articulations:
+                    add_articulation(armature)
                     return {'FINISHED'}
-            
-            # XXX: Skinned meshes are expected to have identity transforms 
-            # maybe this would change in the future but for now, it's a safe assumption
-            def add_armature(armature : Armature):
-                armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
-                for parent,bone,depth in armature.root.dfs_generator():
-                    if bone.gameObject and getattr(bone.gameObject,'m_SkinnedMeshRenderer',None):
-                        mesh_rnd : SkinnedMeshRenderer = bone.gameObject.m_SkinnedMeshRenderer.read()
-                        bone_order  = [b.read().m_GameObject.read().name for b in mesh_rnd.m_Bones]
-                        if getattr(mesh_rnd,'m_Mesh',None):
-                            mesh_data : Mesh = mesh_rnd.m_Mesh.read()                            
-                            mesh, obj = import_mesh(bone.name, mesh_data,True, armature.bone_path_hash_tbl,bone_order)
-                            obj.parent = armObj
-                            obj.modifiers.new('Armature', 'ARMATURE').object = armObj
-                            add_material(mesh_rnd.m_Materials, obj, mesh_data, import_character_material)    
-                            print('* Imported Skinned Mesh', mesh_data.name)
-                print('* Imported Armature', armature.name)
-
-            for armature in armatures:
-                if armature.name == wm.sssekai_assetbundle_preview:
-                    if wm.sssekai_armatures_as_articulations:
-                        add_articulation(armature)
-                        return {'FINISHED'}
-                    else:
-                        add_armature(armature)
-                        return {'FINISHED'}
-
-            animations = search_env_animations(env)    
-            for animation in animations:
-                if animation.name == wm.sssekai_assetbundle_preview:
-                    def check_is_active_armature():
-                        assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature for this animation!"
-                    def check_is_active_camera():
-                        assert bpy.context.active_object and bpy.context.active_object.type == 'CAMERA', "Please select a camera for this animation!"
-                    print('* Reading AnimationClip:', animation.name)
-                    print('* Byte size:',animation.byte_size)
-                    print('* Loading...')
-                    clip = read_animation(animation)  
-                    print('* Importing...')
-                    # Set the fps. Otherwise keys may get lost!
-                    bpy.context.scene.render.fps = int(clip.Framerate)
-                    bpy.context.scene.frame_end = max(bpy.context.scene.frame_end,int(clip.Framerate * clip.Duration + 0.5 + wm.sssekai_animation_import_offset))
-                    bpy.context.scene.rigidbody_world.point_cache.frame_end = max(bpy.context.scene.rigidbody_world.point_cache.frame_end, bpy.context.scene.frame_end)
-                    print('* Duration', clip.Duration)
-                    print('* Framerate', clip.Framerate)
-                    print('* Frames', bpy.context.scene.frame_end)
-                    print('* Blender FPS set to:', bpy.context.scene.render.fps)
-                    if BLENDSHAPES_UNK_CRC in clip.FloatTracks:
-                        print('* Importing Keyshape animation', animation.name)
-                        check_is_active_armature()
-                        mesh_obj = None
-                        for obj in bpy.context.active_object.children:
-                            if KEY_SHAPEKEY_NAME_HASH_TBL in obj.data:
-                                mesh_obj = obj
-                                break
-                        assert mesh_obj, "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes! Invalid armature!" 
-                        print("* Importing into", mesh_obj.name)
-                        import_keyshape_animation(animation.name, clip, mesh_obj, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                        print('* Imported Keyshape animation', animation.name)
-                    elif CAMERA_UNK_CRC in clip.TransformTracks[TransformType.Translation]:
-                        print('* Importing Camera animation', animation.name)
-                        check_is_active_camera()
-                        import_camera_animation(animation.name, clip, bpy.context.active_object,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                        print('* Imported Camera animation', animation.name)
-                    elif CAMERA_DOF_UNK_CRC in clip.FloatTracks and CAMERA_DOF_FOV_UNK_CRC in clip.FloatTracks[CAMERA_DOF_UNK_CRC]:
-                        # depth_of_field animations
-                        # Don't know why FOV is here though...but it is!
-                        print('* Importing Camera FOV animation', animation.name)
-                        check_is_active_camera()
-                        import_camera_fov_animation(animation.name, clip.FloatTracks[CAMERA_DOF_UNK_CRC][CAMERA_DOF_FOV_UNK_CRC].Curve, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                        print('* Imported Camera FOV animation', animation.name)
-                    else:
-                        print('* Importing Armature animation', animation.name)
-                        check_is_active_armature()
-                        import_armature_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                        print('* Imported Armature animation', animation.name)
+                else:
+                    add_armature(armature)
                     return {'FINISHED'}
+
+        animations = search_env_animations(env)    
+        for animation in animations:
+            container = animation.container
+            if encode_name_and_container(animation.name, container) == wm.sssekai_assetbundle_preview:
+                def check_is_active_armature():
+                    assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature for this animation!"
+                def check_is_active_camera():
+                    assert bpy.context.active_object and bpy.context.active_object.type == 'CAMERA', "Please select a camera for this animation!"
+                print('* Reading AnimationClip:', animation.name)
+                print('* Byte size:',animation.byte_size)
+                print('* Loading...')
+                clip = read_animation(animation)  
+                print('* Importing...')
+                # Set the fps. Otherwise keys may get lost!
+                bpy.context.scene.render.fps = int(clip.Framerate)
+                bpy.context.scene.frame_end = max(bpy.context.scene.frame_end,int(clip.Framerate * clip.Duration + 0.5 + wm.sssekai_animation_import_offset))
+                bpy.context.scene.rigidbody_world.point_cache.frame_end = max(bpy.context.scene.rigidbody_world.point_cache.frame_end, bpy.context.scene.frame_end)
+                print('* Duration', clip.Duration)
+                print('* Framerate', clip.Framerate)
+                print('* Frames', bpy.context.scene.frame_end)
+                print('* Blender FPS set to:', bpy.context.scene.render.fps)
+                if BLENDSHAPES_UNK_CRC in clip.FloatTracks:
+                    print('* Importing Keyshape animation', animation.name)
+                    check_is_active_armature()
+                    mesh_obj = None
+                    for obj in bpy.context.active_object.children:
+                        if KEY_SHAPEKEY_NAME_HASH_TBL in obj.data:
+                            mesh_obj = obj
+                            break
+                    assert mesh_obj, "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes! Invalid armature!" 
+                    print("* Importing into", mesh_obj.name)
+                    import_keyshape_animation(animation.name, clip, mesh_obj, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                    print('* Imported Keyshape animation', animation.name)
+                elif CAMERA_UNK_CRC in clip.TransformTracks[TransformType.Translation]:
+                    print('* Importing Camera animation', animation.name)
+                    check_is_active_camera()
+                    import_camera_animation(animation.name, clip, bpy.context.active_object,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                    print('* Imported Camera animation', animation.name)
+                elif CAMERA_DOF_UNK_CRC in clip.FloatTracks and CAMERA_DOF_FOV_UNK_CRC in clip.FloatTracks[CAMERA_DOF_UNK_CRC]:
+                    # depth_of_field animations
+                    # Don't know why FOV is here though...but it is!
+                    print('* Importing Camera FOV animation', animation.name)
+                    check_is_active_camera()
+                    import_camera_fov_animation(animation.name, clip.FloatTracks[CAMERA_DOF_UNK_CRC][CAMERA_DOF_FOV_UNK_CRC].Curve, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                    print('* Imported Camera FOV animation', animation.name)
+                else:
+                    print('* Importing Armature animation', animation.name)
+                    check_is_active_armature()
+                    import_armature_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                    print('* Imported Armature animation', animation.name)
+                return {'FINISHED'}
         return {'CANCELLED'}
 class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_physics_op"
@@ -220,9 +226,8 @@ class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
     def execute(self, context):
         assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to import physics data to!"
         wm = context.window_manager
-        print('* Loading physics data from', wm.sssekai_assetbundle_file, 'for', wm.sssekai_assetbundle_preview)
         with open(wm.sssekai_assetbundle_file, 'rb') as f:
-            env = load_assetbundle(f)
+            env = UnityPy.load(wm.sssekai_assetbundle_file)
             static_mesh_gameobjects, armatures = search_env_meshes(env)
             for armature in armatures:
                 if armature.name == wm.sssekai_assetbundle_preview:
@@ -357,22 +362,29 @@ def enumerate_assets(self, context):
     print("* Loading index for %s" % fname)
 
     if fname and os.path.exists(fname):
-        index = 0
-        with open(fname, 'rb') as f:
-            env = load_assetbundle(f)
-            articulations, armatures = search_env_meshes(env)
-            for articulation in articulations:
-                enum_items.append((articulation.name,articulation.name,'Static Mesh %s' % articulation.name, 'MESH_DATA', index))
-                index+=1
+        index = 0        
+        UnityPy.config.FALLBACK_VERSION_WARNED = True
+        UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version() 
+        env = UnityPy.load(fname)
+        articulations, armatures = search_env_meshes(env)
+        for articulation in articulations:
+            container = articulation.root.gameObject.container
+            encoded = encode_name_and_container(articulation.name, container)
+            enum_items.append((encoded, encoded,articulation.name, 'MESH_DATA', index))
+            index+=1
 
-            for armature in armatures:
-                enum_items.append((armature.name,armature.name,'Armature %s' % armature.name, 'ARMATURE_DATA',index))
-                index+=1
+        for armature in armatures:
+            container = armature.root.gameObject.container
+            encoded = encode_name_and_container(armature.name, container)
+            enum_items.append((encoded,encoded,armature.name, 'ARMATURE_DATA',index))
+            index+=1
 
-            animations = search_env_animations(env)    
-            for animation in animations:
-                enum_items.append((animation.name,animation.name,'Animation %s' % animation.name, 'ANIM_DATA',index))
-                index+=1
+        animations = search_env_animations(env)    
+        for animation in animations:
+            container = animation.container
+            encoded = encode_name_and_container(animation.name, container)
+            enum_items.append((encoded,encoded,animation.name, 'ANIM_DATA',index))
+            index+=1
 
     pcoll.sssekai_assetbundle_preview = enum_items
     pcoll.sssekai_assetbundle_file = fname
@@ -380,9 +392,9 @@ def enumerate_assets(self, context):
 
 def register():
     WindowManager.sssekai_assetbundle_file = StringProperty(
-        name="File",
-        description="File",
-        subtype='FILE_PATH',
+        name="Bundle Directory",
+        description="Where the asset bundle(s) is located. Every AssetBundle in this directory will be loaded (if possible).",
+        subtype='DIR_PATH',
     )
     WindowManager.sssekai_assetbundle_preview = EnumProperty(
         name="Asset",

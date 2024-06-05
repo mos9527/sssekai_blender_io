@@ -63,6 +63,7 @@ CAMERA_ADJ_UNK_CRC = 3305885265
 CAMERA_DOF_UNK_CRC = 1331491074
 CAMERA_DOF_FOV_UNK_CRC = 2974389626
 # UnityPy deps
+import UnityPy
 from UnityPy import Environment
 from UnityPy.enums import ClassIDType
 from UnityPy.classes import Mesh, SkinnedMeshRenderer, MeshRenderer, MeshFilter, GameObject, Transform, Texture2D, Material

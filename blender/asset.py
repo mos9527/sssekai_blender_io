@@ -13,8 +13,8 @@ def search_env_meshes(env : Environment):
     # UnityPy does not construct the Bone Hierarchy so we have to do it ourselves
     transform_roots = []
     for obj in env.objects:
-        data = obj.read()
         if obj.type == ClassIDType.Transform:
+            data = obj.read(return_typetree_on_error=False)
             if hasattr(data,'m_Children') and not data.m_Father.path_id:
                 transform_roots.append(data)
     # Collect all skinned meshes as Armature[s], otherwise build articulations for
@@ -27,7 +27,7 @@ def search_env_meshes(env : Environment):
         armature.bone_name_tbl = dict()
         path_id_tbl = dict() # Only used locally
         def dfs(root : Transform, parent : Bone = None):            
-            gameObject = root.m_GameObject.read()
+            gameObject = root.m_GameObject.read(return_typetree_on_error=False)
             name = gameObject.m_Name
             # Addtional properties
             # Skinned Mesh Renderer
@@ -107,8 +107,8 @@ def search_env_animations(env : Environment):
     animations = []
     for asset in env.assets:
         for obj in asset.get_objects():
-            data = obj.read()
             if obj.type == ClassIDType.AnimationClip:
+                data = obj.read(return_typetree_on_error=False)
                 animations.append(data)
     return animations
 
@@ -606,7 +606,7 @@ def create_principled_bsdf_material(name : str):
     # TODO: Can we know in advance if the texture has alpha?
     return material
 
-def setup_sdfValue_driver(obj: bpy.types.Object):
+def setup_sdfValue_driver(obj: object):
     obj['sdfValue'] = 0.0
     # A joint providing the basis axis for the SDF shadow
     joint = bpy.data.objects.new('SdfFaceLight', None)
