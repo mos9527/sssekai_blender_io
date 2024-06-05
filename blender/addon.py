@@ -226,14 +226,14 @@ class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
     def execute(self, context):
         assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to import physics data to!"
         wm = context.window_manager
-        with open(wm.sssekai_assetbundle_file, 'rb') as f:
-            env = UnityPy.load(wm.sssekai_assetbundle_file)
-            static_mesh_gameobjects, armatures = search_env_meshes(env)
-            for armature in armatures:
-                if armature.name == wm.sssekai_assetbundle_preview:
-                    bpy.context.scene.frame_current = 0
-                    import_armature_physics_constraints(bpy.context.active_object, armature)
-                    return {'FINISHED'}
+        env = UnityPy.load(wm.sssekai_assetbundle_file)
+        articulations, armatures = search_env_meshes(env)
+        for armature in armatures:
+            container = armature.root.gameObject.container
+            if encode_name_and_container(armature.name, container) == wm.sssekai_assetbundle_preview:
+                bpy.context.scene.frame_current = 0
+                import_armature_physics_constraints(bpy.context.active_object, armature)
+                return {'FINISHED'}
         return {'CANCELLED'}
 
 def get_rigidbodies_from_arma(arma : bpy.types.Object):
