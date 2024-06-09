@@ -1,9 +1,9 @@
 # sssekai_blender_io
 Blender I/O for the game's assets. (actually it's imports only)
 
-Tested on Blender `4.0.3`, `4.2.0 Alpha`
+Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.3.0 Alpha`
 
-Currently supports:  
+### Importer Features
   * Textures
   * Character Toon Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/master/assets/SekaiShaderStandalone.blend))
   * Static Mesh
@@ -11,6 +11,14 @@ Currently supports:
   * Armatures (built through GameObject hierarchy)
   * Physics (Rigidbodies, Colliders, Spring Bones)
   * Animations (Skeletal, BlendShape, Camera)
+
+### Supported Languages:
+PRs are welcome for additions. You can find the translation files [here](https://github.com/mos9527/sssekai_blender_io/tree/master/blender/i18n), which can be edited with [POEdit](https://poedit.net/). You can start by copying the `en-US.po` file and renaming it to your language code (e.g. `zh-HANS.po` for Simplified Chinese).
+
+You can find your language code by entering `bpy.app.translations.locale` in the Blender Python console.
+
+- English (en-US)
+- 简体中文 (zh-HANS)
 
 ## Installing & Updating
 - Install/Update depedencies in your Blender Python

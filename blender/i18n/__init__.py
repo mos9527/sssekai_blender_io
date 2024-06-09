@@ -12,4 +12,4 @@ for src in os.listdir(path):
 from bpy.app.translations import locale
 print('* Locale:', locale)
 def get_text(id_str : str):
-    return translations_dict.get(locale, {}).get(id_str, id_str)
+    return translations_dict.get(locale, {}).get(id_str, id_str) or id_str
