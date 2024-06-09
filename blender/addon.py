@@ -13,7 +13,7 @@ from bpy.props import (
     BoolProperty,
     IntProperty
 )
-from i18n import get_text as T
+from .i18n import get_text as T
 
 def encode_name_and_container(name, container):
     return f'{name} | {container}'
@@ -385,7 +385,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_animation_import_offset",icon='TIME')
         row.prop(wm, "sssekai_animation_append_exisiting",icon='OVERLAY')
         row = layout.row()
-        row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_CLIP')
+        layout.separator()
+        row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_BLEND')
 
 def register():
     WindowManager.sssekai_assetbundle_file = StringProperty(
@@ -436,8 +437,8 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderImportOperator)
     bpy.utils.register_class(SSSekaiBlenderImportPanel)
     bpy.utils.register_class(SSSekaiBlenderAssetSearchOperator)
-    bpy.types.Scene.sssekai_util_neck_attach_obj_face = bpy.props.PointerProperty(name="Face",type=bpy.types.Armature)
-    bpy.types.Scene.sssekai_util_neck_attach_obj_body = bpy.props.PointerProperty(name="Body",type=bpy.types.Armature)
+    bpy.types.Scene.sssekai_util_neck_attach_obj_face = bpy.props.PointerProperty(name=T("Face"),type=bpy.types.Armature)
+    bpy.types.Scene.sssekai_util_neck_attach_obj_body = bpy.props.PointerProperty(name=T("Body"),type=bpy.types.Armature)
     bpy.utils.register_class(SSSekaiBlenderUtilNeckAttachOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilNeckAttach)
     bpy.utils.register_class(SSSekaiBlenderApplyOutlineOperator)

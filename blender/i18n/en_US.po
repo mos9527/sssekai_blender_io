@@ -1,0 +1,159 @@
+# mos9527 <greats3an@gmail.com>, 2024.
+"Project-Id-Version: SSSekai Blender IO i18n\n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: mos9527\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. :src: addon.py#L32
+msgid "Attach"
+msgstr ""
+
+#. :src: addon.py#L33
+msgid "Attach the selected face armature to the selected body armature"
+msgstr ""
+
+#. :src: addon.py#L51
+msgid "Attach Neck"
+msgstr ""
+
+#. :src: addon.py#L66
+msgid "Import Selected"
+msgstr ""
+
+#. :src: addon.py#L67
+msgid "Import the selected asset from the selected asset bundle"
+msgstr ""
+
+#. :src: addon.py#L235
+msgid "Import Physics"
+msgstr ""
+
+#. :src: addon.py#L236
+msgid "Import physics data from the selected asset bundle. NOTE: This operation is irreversible!"
+msgstr ""
+
+#. :src: addon.py#L252
+msgid "Show Physics Objects"
+msgstr ""
+
+#. :src: addon.py#L253
+msgid "Show or hide physics objects"
+msgstr ""
+
+#. :src: addon.py#L269
+msgid "Add Outline to Selected"
+msgstr ""
+
+#. :src: addon.py#L270
+msgid "Add outline to selected objects"
+msgstr ""
+
+#. :src: addon.py#L333
+msgid "Search"
+msgstr ""
+
+#. :src: addon.py#L335
+msgid "Search for assets with their object name and/or container name"
+msgstr ""
+
+#. :src: addon.py#L350
+msgid "Import"
+msgstr ""
+
+#. :src: addon.py#L393
+msgid "Directory"
+msgstr ""
+
+#. :src: addon.py#L394
+msgid "Where the asset bundle(s) are located. Every AssetBundle in this directory will be loaded (if possible)"
+msgstr ""
+
+#. :src: addon.py#L398
+msgid "Asset"
+msgstr ""
+
+#. :src: addon.py#L399
+msgid "Selected Asset"
+msgstr ""
+
+#. :src: addon.py#L403
+msgid "Armatures as Articulations"
+msgstr ""
+
+#. :src: addon.py#L404
+msgid "Treating armatures as articulations instead of skinned meshes. Useful for importing stages, etc"
+msgstr ""
+
+#. :src: addon.py#L408
+msgid "Use Principled BSDF"
+msgstr ""
+
+#. :src: addon.py#L409
+msgid "Use Principled BSDF instead of SekaiShader for imported materials"
+msgstr ""
+
+#. :src: addon.py#L413
+msgid "Display Physics"
+msgstr ""
+
+#. :src: addon.py#L414
+msgid "Display Physics Objects"
+msgstr ""
+
+#. :src: addon.py#L419
+msgid "Append"
+msgstr ""
+
+#. :src: addon.py#L420
+msgid "Append Animations to the existing Action, instead of overwriting it"
+msgstr ""
+
+#. :src: addon.py#L424
+msgid "Offset"
+msgstr ""
+
+#. :src: addon.py#L425
+msgid "Animation Offset in frames"
+msgstr ""
+
+#. :src: addon.py#L431
+msgid "Unity"
+msgstr ""
+
+#. :src: addon.py#L432
+msgid "Override Unity Version"
+msgstr ""
+
+#. :src: addon.py#L440
+msgid "Face"
+msgstr ""
+
+#. :src: addon.py#L441
+msgid "Body"
+msgstr ""
+
+#. :src: addon.py#L59
+msgid "Select Targets"
+msgstr ""
+
+#. :src: addon.py#L360
+msgid "Select Asset"
+msgstr ""
+
+#. :src: addon.py#L369
+msgid "Material Options"
+msgstr ""
+
+#. :src: addon.py#L375
+msgid "Armature Options"
+msgstr ""
+
+#. :src: addon.py#L383
+msgid "Animation Options"
+msgstr ""
+

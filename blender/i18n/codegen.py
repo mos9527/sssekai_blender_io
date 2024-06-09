@@ -14,6 +14,7 @@ with open('i18n/en_US.po', 'w', encoding='utf-8') as po:
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+
 ''')
     def parse_ast(filename):
         with open(filename, 'r', encoding='utf-8') as f:
@@ -21,9 +22,9 @@ with open('i18n/en_US.po', 'w', encoding='utf-8') as po:
             for node in ast.walk(src):
                 if isinstance(node, ast.Call) and getattr(node.func,'id', None) == 'T':
                     po.writelines([
-                        '#. :src: {filename}#L{node.lineno}',
-                        'msgid "{node.args[0].value}"',
-                        'msgstr ""\n'
+                        f'#. :src: {filename}#L{node.lineno}\n',
+                        f'msgid "{node.args[0].value}"\n',
+                        f'msgstr ""\n\n'
                     ])
             pass
     for source in SOURCES:
