@@ -13,6 +13,8 @@ from bpy.props import (
     BoolProperty,
     IntProperty
 )
+from i18n import get_text as T
+
 def encode_name_and_container(name, container):
     return f'{name} | {container}'
 class SSSekaiGlobalEnvironment:
@@ -27,8 +29,8 @@ sssekai_global = SSSekaiGlobalEnvironment()
 
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_attach_op"
-    bl_label = "Attach Selected"
-    bl_description = "Attach the selected face armature to the selected body armature"
+    bl_label = T("Attach")
+    bl_description = T("Attach the selected face armature to the selected body armature")
     def execute(self, context):
         scene = context.scene
         face_arma = scene.sssekai_util_neck_attach_obj_face
@@ -46,7 +48,7 @@ class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
 
 class SSSekaiBlenderUtilNeckAttach(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_util_neck_attach"
-    bl_label = "Utility :: Neck Attach"
+    bl_label = T("Attach Neck")
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "SSSekai"
@@ -54,15 +56,15 @@ class SSSekaiBlenderUtilNeckAttach(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        layout.label(text='Select Targets')
+        layout.label(text=T('Select Targets'))
         layout.prop(scene, 'sssekai_util_neck_attach_obj_face')
         layout.prop(scene, 'sssekai_util_neck_attach_obj_body')
         layout.operator(SSSekaiBlenderUtilNeckAttachOperator.bl_idname)       
 
 class SSSekaiBlenderImportOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_op"
-    bl_label = "Import Selected"
-    bl_description = "Import the selected asset from the selected asset bundle"
+    bl_label = T("Import Selected")
+    bl_description = T("Import the selected asset from the selected asset bundle")
     def execute(self, context):
         global sssekai_global
         wm = context.window_manager        
@@ -230,8 +232,8 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
         return {'CANCELLED'}
 class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_physics_op"
-    bl_label = "Import Physics"
-    bl_description = "Import physics data from the selected asset bundle. NOTE: This operation is irreversible!"
+    bl_label = T("Import Physics")
+    bl_description = T("Import physics data from the selected asset bundle. NOTE: This operation is irreversible!")
     def execute(self, context):
         global sssekai_global
         assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to import physics data to!"
@@ -245,45 +247,16 @@ class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
                 return {'FINISHED'}
         return {'CANCELLED'}
 
-def get_rigidbodies_from_arma(arma : bpy.types.Object):
-    for child in arma.children:
-        if '_rigidbody' in child.name:
-            yield child
-class SSSekaiBlenderRemovePhysicsOperator(bpy.types.Operator):
-    bl_idname = "sssekai.remove_physics_op"
-    bl_label = "Remove Physics"
-    bl_description = "Remove physics data from the selected armature. NOTE: This operation is irreversible!"
-    def execute(self, context):
-        assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature to remove physics data from!"
-        arma = bpy.context.active_object
-        # Removes all rigidbodies, and, consequently, all constraints
-        for child in get_rigidbodies_from_arma(arma):
-            child.select_set(True)            
-            for cchild in child.children_recursive:
-                cchild.select_set(True)
-        arma.select_set(False)
-        bpy.ops.object.delete()
-        # For all bones, restore the original hierarchy and transform
-        bpy.ops.object.mode_set(mode='EDIT')
-        for bone in arma.data.edit_bones:
-            if KEY_ORIGINAL_PARENT in bone:
-                bone.parent = arma.data.edit_bones[bone[KEY_ORIGINAL_PARENT]]
-                del bone[KEY_ORIGINAL_PARENT]
-        for bone in arma.data.edit_bones:        
-            if KEY_ORIGINAL_WORLD_MATRIX in bone:
-                bone.matrix = unpack_matrix(bone[KEY_ORIGINAL_WORLD_MATRIX])
-                del bone[KEY_ORIGINAL_WORLD_MATRIX]
-        return {'FINISHED'}
 class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
     bl_idname = "sssekai.display_physics_op"
-    bl_label = "Show Physics Objects"
-    bl_description = "Show or hide physics objects"          
+    bl_label = T("Show Physics Objects")
+    bl_description = T("Show or hide physics objects")
     def execute(self, context):
         assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature!"
         arma = bpy.context.active_object
         wm = context.window_manager
         display = not wm.sssekai_armature_display_physics
-        for child in get_rigidbodies_from_arma(arma):
+        for child in (child for child in arma.children if '_rigidbody' in child.name):
             child.hide_set(display)
             child.hide_render = display
             for cchild in child.children_recursive:
@@ -293,14 +266,14 @@ class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
     
 class SSSekaiBlenderApplyOutlineOperator(bpy.types.Operator):
     bl_idname = "sssekai.apply_outline_op"
-    bl_label = "Add Outline to Selected"
-    bl_description = "Add outline to the selected object"
+    bl_label = T("Add Outline to Selected")
+    bl_description = T("Add outline to selected objects")
     def execute(self, context):
         ensure_sssekai_shader_blend()
         outline_material = bpy.data.materials["SekaiShaderOutline"].copy()
         for pa in bpy.context.selected_objects:
             for obj in [pa] + pa.children_recursive:
-                if obj.type == 'MESH':                    
+                if obj.type == 'MESH' and obj.hide_get() == False:                    
                     bpy.context.view_layer.objects.active = obj
                     bpy.ops.object.mode_set(mode='OBJECT')
                     obj.data.materials.append(outline_material)
@@ -357,9 +330,9 @@ def enumerate_assets(self, context):
 
 class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
     bl_idname = "sssekai.asset_search_op"
-    bl_label = "Asset Search"
+    bl_label = T("Search")
     bl_property = "selected"
-    bl_description = "Search for assets with object name and/or container name"
+    bl_description = T("Search for assets with their object name and/or container name")
 
     selected: EnumProperty(name="Asset",description="Selected Asset",items=enumerate_assets)
     def execute(self, context):
@@ -374,7 +347,7 @@ class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
     
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
-    bl_label = "Importer"
+    bl_label = T("Import")
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "SSSekai"
@@ -382,82 +355,80 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         wm = context.window_manager
-        layout.prop(wm, "sssekai_unity_version_override")
+        layout.prop(wm, "sssekai_unity_version_override",icon='SETTINGS')
         row = layout.row()
-        layout.label(text="Select Asset")
+        layout.label(text=T("Select Asset"))
         row = layout.row()
-        row.prop(wm, "sssekai_assetbundle_file")
+        row.prop(wm, "sssekai_assetbundle_file",icon='FILE_FOLDER')
         row = layout.row()
-        row.prop(wm, "sssekai_assetbundle_selected")
+        row.prop(wm, "sssekai_assetbundle_selected",icon='SCENE_DATA')
         row = layout.row()
-        row.operator(SSSekaiBlenderAssetSearchOperator.bl_idname)
+        row.operator(SSSekaiBlenderAssetSearchOperator.bl_idname,icon='VIEWZOOM')
         layout.separator()
         row = layout.row()
-        row.label(text="Material Options")
+        row.label(text=T("Material Options"))
         row = layout.row()
-        row.prop(wm, "sssekai_materials_use_principled_bsdf")
+        row.prop(wm, "sssekai_materials_use_principled_bsdf",icon='MATERIAL')
         row = layout.row()
-        row.operator(SSSekaiBlenderApplyOutlineOperator.bl_idname)
+        row.operator(SSSekaiBlenderApplyOutlineOperator.bl_idname,icon='META_CUBE')
         row = layout.row()
-        row.label(text="Armature Options")
+        row.label(text=T("Armature Options"))
         row = layout.row()
-        row.prop(wm, "sssekai_armatures_as_articulations")
+        row.prop(wm, "sssekai_armatures_as_articulations", icon='OUTLINER_OB_EMPTY')
         row = layout.row()
-        row.operator(SSSekaiBlenderImportPhysicsOperator.bl_idname)
+        row.operator(SSSekaiBlenderImportPhysicsOperator.bl_idname, icon='RIGID_BODY_CONSTRAINT')
         row = layout.row()
-        row.operator(SSSekaiBlenderRemovePhysicsOperator.bl_idname)
+        row.prop(wm, "sssekai_armature_display_physics", toggle=True, icon='HIDE_OFF')
         row = layout.row()
-        row.prop(wm, "sssekai_armature_display_physics", toggle=True)
+        row.label(text=T("Animation Options"))
         row = layout.row()
-        row.label(text="Animation Options")
+        row.prop(wm, "sssekai_animation_import_offset",icon='TIME')
+        row.prop(wm, "sssekai_animation_append_exisiting",icon='OVERLAY')
         row = layout.row()
-        row.prop(wm, "sssekai_animation_import_offset")
-        row.prop(wm, "sssekai_animation_append_exisiting")
-        row = layout.row()
-        row.operator(SSSekaiBlenderImportOperator.bl_idname)
+        row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_CLIP')
 
 def register():
     WindowManager.sssekai_assetbundle_file = StringProperty(
-        name="Directory",
-        description="Where the asset bundle(s) is located. Every AssetBundle in this directory will be loaded (if possible).",
+        name=T("Directory"),
+        description=T("Where the asset bundle(s) are located. Every AssetBundle in this directory will be loaded (if possible)"),
         subtype='DIR_PATH',
     )
     WindowManager.sssekai_assetbundle_selected = EnumProperty(
-        name="Asset",
-        description="Selected Asset",
+        name=T("Asset"),
+        description=T("Selected Asset"),
         items=enumerate_assets,
     )
     WindowManager.sssekai_armatures_as_articulations = BoolProperty(
-        name="Armatures as Articulations",
-        description="Treating armatures as articulations instead of skinned meshes. This is useful for importing stages.",
+        name=T("Armatures as Articulations"),
+        description=T("Treating armatures as articulations instead of skinned meshes. Useful for importing stages, etc"),
         default=False        
     )        
     WindowManager.sssekai_materials_use_principled_bsdf = BoolProperty(
-        name="Use Principled BSDF",
-        description="Use Principled BSDF instead of SekaiShader for imported materials",
+        name=T("Use Principled BSDF"),
+        description=T("Use Principled BSDF instead of SekaiShader for imported materials"),
         default=False        
     )    
     WindowManager.sssekai_armature_display_physics = BoolProperty(
-        name="Display Physics",
-        description="Display Physics Objects",
+        name=T("Display Physics"),
+        description=T("Display Physics Objects"),
         default=True,
         update=SSSekaiBlenderPhysicsDisplayOperator.execute
     )
     WindowManager.sssekai_animation_append_exisiting = BoolProperty(
-        name="Append",
-        description="Append Animations to the existing Action, instead of overwriting it",
+        name=T("Append"),
+        description=T("Append Animations to the existing Action, instead of overwriting it"),
         default=False
     )
     WindowManager.sssekai_animation_import_offset = IntProperty(
-        name="Offset",
-        description="Animation Offset in frames",
+        name=T("Offset"),
+        description=T("Animation Offset in frames"),
         default=0
     )
     def sssekai_on_unity_version_change(self, context):
         sssekai_set_unity_version(context.window_manager.sssekai_unity_version_override)
     WindowManager.sssekai_unity_version_override = StringProperty(
-        name="Unity Version",
-        description="Override Unity Version",
+        name=T("Unity"),
+        description=T("Override Unity Version"),
         default=sssekai_get_unity_version(),
         update=sssekai_on_unity_version_change
     )
@@ -471,7 +442,6 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderUtilNeckAttach)
     bpy.utils.register_class(SSSekaiBlenderApplyOutlineOperator)
     bpy.utils.register_class(SSSekaiBlenderImportPhysicsOperator)
-    bpy.utils.register_class(SSSekaiBlenderRemovePhysicsOperator)
     bpy.utils.register_class(SSSekaiBlenderPhysicsDisplayOperator)
 
 
@@ -483,5 +453,4 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttach)
     bpy.utils.unregister_class(SSSekaiBlenderApplyOutlineOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportPhysicsOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderRemovePhysicsOperator)
     bpy.utils.unregister_class(SSSekaiBlenderPhysicsDisplayOperator)
