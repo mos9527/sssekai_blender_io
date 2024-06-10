@@ -693,7 +693,7 @@ def import_chara_face_v2_material(name : str, data : Material, use_principled_bs
         if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             if mainTex:
-                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])        
+                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes[0].inputs['Base Color'])        
     return material
 
 def import_eyelight_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None, **kwargs):
@@ -722,7 +722,7 @@ def import_eyelight_material(name : str,data : Material, use_principled_bsdf = F
         if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             if mainTex:
-                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])        
+                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes[0].inputs['Base Color'])        
     return material
 
 def import_eye_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None, **kwargs):
@@ -750,7 +750,7 @@ def import_eye_material(name : str,data : Material, use_principled_bsdf = False,
         if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             if mainTex:
-                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])        
+                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes[0].inputs['Base Color'])        
     return material
 
 def import_character_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None, **kwargs):
@@ -789,7 +789,7 @@ def import_character_material(name : str,data : Material, use_principled_bsdf = 
         if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             if mainTex:
-                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
+                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes[0].inputs['Base Color'])
     return material
 
 def import_scene_material(name : str,data : Material, use_principled_bsdf = False, texture_cache = None, **kwargs):
@@ -824,5 +824,5 @@ def import_scene_material(name : str,data : Material, use_principled_bsdf = Fals
         if '_MainTex' in textures:
             mainTex = make_material_texture_node(material, textures['_MainTex'], texture_cache)
             if mainTex:
-                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
+                material.node_tree.links.new(mainTex.outputs['Color'], material.node_tree.nodes[0].inputs['Base Color'])
     return material
