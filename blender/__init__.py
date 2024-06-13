@@ -97,7 +97,7 @@ class BonePhysics:
     height : float = 0
     
     # SpringBones only
-    pivot : str = '' # Bone name
+    pivot : str = '' # Bone name. Could be None
     springForce : float = 0
     dragForce : float = 0 
     angularStiffness : float = 0

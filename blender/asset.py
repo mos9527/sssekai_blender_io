@@ -62,7 +62,8 @@ def search_env_meshes(env : Environment):
                             bonePhysics = BonePhysics.from_dict(physics)                            
                             bonePhysics.type = phy_type
                             if 'pivotNode' in physics:
-                                bonePhysics.pivot = path_id_tbl[physics['pivotNode']['m_PathID']].name
+                                bonePhysics.pivot = path_id_tbl.get(physics['pivotNode']['m_PathID'], None)
+                                bonePhysics.pivot = getattr(bonePhysics.pivot,'name',None)                            
             bone = Bone(
                 name,
                 root.m_LocalPosition,
@@ -325,8 +326,8 @@ def import_armature_physics_constraints(armature, data : Armature):
         # Connecting them will make our lives a lot eaiser
         bpy.ops.object.mode_set(mode='EDIT')
         class SpringBoneChain:
-            begin : object = None
-            end : object = None
+            begin : Bone = None
+            end : Bone = None
         springbone_chains : Dict[str,SpringBoneChain] = dict()
         def connect_spring_bones(bone : Bone, parent = None):
             if not parent:
@@ -433,7 +434,9 @@ def import_armature_physics_constraints(armature, data : Armature):
             for bone in chain_all: 
                 unparent_bone(bone)
             bpy.ops.object.mode_set(mode='OBJECT')
-            pivot_bone_name = chain.begin.parent.name                
+            pivot_bone_name = chain.begin.parent.name # chain.begin.physics.pivot 
+            # 'pivot' is not used since 'connect_spring_bones' process already connected the bones
+            # and the parent of the beginning of the chain would be the only usable pivot
             joints = dict()
             rigidbodies = dict()
             prev_radius = PIVOT_SIZE
