@@ -33,12 +33,14 @@ def search_env_meshes(env : Environment):
             # Skinned Mesh Renderer
             if getattr(gameObject,'m_SkinnedMeshRenderer',None):
                 armature.skinnedMeshGameObject = gameObject
-            # Complete path. Used for CRC hash later on
-            path_from_root = ''
-            if parent and parent.global_path:
-                path_from_root = parent.global_path + '/' + name
-            elif parent:
-                path_from_root = name
+            # Complete path. Used for CRC hash later on            
+            if parent:
+                if parent.global_path:
+                    path_from_root = parent.global_path + '/' + name
+                else:
+                    path_from_root = name
+            else:
+                path_from_root = ''            
             # Reads:
             # - Physics Rb + Collider
             # XXX: Some properties are not implemented yet
@@ -78,10 +80,10 @@ def search_env_meshes(env : Environment):
             )
             path_id_tbl[root.path_id] = bone
             armature.bone_name_tbl[name] = bone
-            armature.bone_path_hash_tbl[get_name_hash(path_from_root)] = bone
             if not parent:
                 armature.root = bone
             else:
+                armature.bone_path_hash_tbl[get_name_hash(path_from_root)] = bone
                 parent.children.append(bone)
             for child in root.m_Children:
                 dfs(child.read(), bone)
@@ -155,9 +157,6 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
             for boneName in bone_order:
                 obj.vertex_groups.new(name=boneName)
         deform_layer = bm.verts.layers.deform.new()
-        # Animations uses the hash to identify the bone
-        # so this has to be stored in the metadata as well
-        mesh[KEY_BONE_NAME_HASH_TBL] = json.dumps({k:v.name for k,v in bone_path_tbl.items()},ensure_ascii=False)
     # Vertex position & vertex normal (pre-assign)
     for vtx in range(0, data.m_VertexCount):        
         vert = bm.verts.new(swizzle_vector3(
@@ -268,7 +267,7 @@ def import_armature(name : str, data : Armature):
     armature = bpy.data.armatures.new(name)
     armature.display_type = 'OCTAHEDRAL'
     armature.relation_line_position = 'HEAD'
-
+    armature[KEY_BONE_NAME_HASH_TBL] = json.dumps({k:v.name for k,v in data.bone_path_hash_tbl.items()},ensure_ascii=False)
     obj = bpy.data.objects.new(name, armature)
     bpy.context.collection.objects.link(obj)
     bpy.context.view_layer.objects.active = obj

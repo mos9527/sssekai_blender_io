@@ -140,7 +140,7 @@ class Bone:
         return Matrix.LocRotScale(
             swizzle_vector(self.localPosition),
             swizzle_quaternion(self.localRotation),
-            Vector3(1,1,1)
+            swizzle_vector_scale(self.localScale)
         )
     def dfs_generator(self, root = None):
         def dfs(bone : Bone, parent : Bone = None, depth = 0):

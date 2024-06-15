@@ -42,14 +42,7 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
         fcurve[i].update()
 
 def import_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
-    mesh_obj = None
-    for obj in dest_arma.children:
-        if KEY_BONE_NAME_HASH_TBL in obj.data:
-            mesh_obj = obj
-            break
-    assert mesh_obj, "Bone table not found. Invalid armature!" 
-    mesh = mesh_obj.data   
-    bone_table = json.loads(mesh[KEY_BONE_NAME_HASH_TBL])
+    bone_table = json.loads(dest_arma.data[KEY_BONE_NAME_HASH_TBL])
     bpy.ops.object.mode_set(mode='EDIT')
     # Collect bone space <-> local space transforms
     local_space_trans_rot = dict() # i.e. parent space
@@ -124,8 +117,14 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
         bone = dest_arma.pose.bones[bone_name]
         values = [to_pose_translation(bone, swizzle_vector(keyframe.value)) for keyframe in track.Curve]
         frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
-        import_fcurve(action,'pose.bones["%s"].location' % bone_name, values, frames, 3)       
-    # No scale.
+        import_fcurve(action,'pose.bones["%s"].location' % bone_name, values, frames, 3)
+    for bone_hash, track in data.TransformTracks[TransformType.Scaling].items():
+        # Scale
+        bone_name = bone_table[str(bone_hash)]
+        bone = dest_arma.pose.bones[bone_name]
+        values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
+        frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
+        import_fcurve(action,'pose.bones["%s"].scale' % bone_name, values, frames, 3)        
 
 def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object, frame_offset : int, always_create_new : bool):
     mesh = dest_mesh.data

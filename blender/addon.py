@@ -26,7 +26,74 @@ class SSSekaiGlobalEnvironment:
     armatures : Set[Armature]
     animations : Set[Animation]
 sssekai_global = SSSekaiGlobalEnvironment()
+class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_misc_recalculate_bone_hash_table_op"
+    bl_label = T("Recalculate Bone Hash Table")
+    bl_description = T("Recalculate the bone hash table for the selected armature. You should do this after renaming bones or changing the hierarchy.")
+    def execute(self, context):
+        assert context.mode == 'OBJECT', 'Please select an armature in Object Mode!'
+        armature = bpy.context.active_object
+        assert armature.type == 'ARMATURE', 'Please select an armature!'
+        bone_path_hash_tbl = dict()
+        bone_path_tbl = dict()
+        def dfs(bone):
+            if bone.parent:
+                bone_path_tbl[bone.name] = bone_path_tbl[bone.parent.name] + '/' + bone.name
+            else:
+                bone_path_tbl[bone.name] = bone.name
+            bone_path_hash_tbl[str(get_name_hash(bone_path_tbl[bone.name]))] = bone.name
+            for child in bone.children:
+                dfs(child)
+        for bone in armature.data.bones:
+            dfs(bone)        
+        armature.data[KEY_BONE_NAME_HASH_TBL] = json.dumps(bone_path_hash_tbl,ensure_ascii=False)
+        return {'FINISHED'}
+class SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_misc_remove_bone_hierarchy_op"
+    bl_label = T("Remove Bone Hierarchy")
+    bl_description = T("Remove the hierarchy from the selected bones in Edit Mode")
+    def execute(self, context):
+        assert context.mode == 'EDIT_ARMATURE', 'Please select bones in Edit Mode!'
+        ebone = bpy.context.active_bone        
+        for bone in ebone.children_recursive + [ebone]:
+            bpy.context.active_object.data.edit_bones.remove(bone)
+        return {'FINISHED'}
+class SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_misc_rename_remove_numeric_suffix_op"
+    bl_label = T("Remove Numeric Suffix")
+    bl_description = T("Remove the suffix from the selected objects and edit bones (i.e. xxx.001 -> xxx)")
+    def execute(self, context):
+        def rename_one(obj):
+            names = obj.name.split('.')
+            if len(names) > 1 and names[-1].isnumeric():
+                obj.name = '.'.join(names[:-1])
 
+        for pa in bpy.context.selected_objects:
+            for obj in [pa] + pa.children_recursive:
+                rename_one(obj)
+  
+        ebone = bpy.context.active_bone
+        for bone in ebone.children_recursive + [ebone]:
+            rename_one(bone)
+        return {'FINISHED'}
+
+class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
+    bl_idname = "OBJ_PT_sssekai_misc"
+    bl_label = T("Misc")
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "SSSekai"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text=T("Armature"))
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator.bl_idname,icon='TOOL_SETTINGS')
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator.bl_idname,icon='TOOL_SETTINGS')
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator.bl_idname,icon='TOOL_SETTINGS')
+    
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_attach_op"
     bl_label = T("Attach")
@@ -444,6 +511,10 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderApplyOutlineOperator)
     bpy.utils.register_class(SSSekaiBlenderImportPhysicsOperator)
     bpy.utils.register_class(SSSekaiBlenderPhysicsDisplayOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilMiscPanel)
+    bpy.utils.register_class(SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
 
 
 def unregister():    
@@ -455,3 +526,7 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderApplyOutlineOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportPhysicsOperator)
     bpy.utils.unregister_class(SSSekaiBlenderPhysicsDisplayOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilMiscPanel)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
