@@ -135,8 +135,8 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
     def execute(self, context):
         global sssekai_global
         wm = context.window_manager        
-        articulations, armatures = sssekai_global.articulations, sssekai_global.armatures
-        print('* Found %d articulations and %d armatures' % (len(articulations), len(armatures)))
+        articulations, armatures = sssekai_global.articulations, sssekai_global.armatures        
+        print('* Loading selected asset:', wm.sssekai_assetbundle_selected)
         texture_cache = dict()
         material_cache = dict()
         def add_material(m_Materials : Material, obj : bpy.types.Object, meshData : Mesh, defaultParser = None): 
@@ -372,23 +372,27 @@ def enumerate_assets(self, context):
         UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()         
         sssekai_global.env = UnityPy.load(dirname)
         sssekai_global.articulations, sssekai_global.armatures = search_env_meshes(sssekai_global.env)
+        print('* Found %d articulations and %d armatures' % (len(sssekai_global.articulations), len(sssekai_global.armatures)))
+        # See https://docs.blender.org/api/current/bpy.props.html#bpy.props.EnumProperty
+        # enum_items = [(identifier, name, description, icon, number),...]
+        # Note that `identifier` is the value that will be stored (and read) in the property
         for articulation in sssekai_global.articulations:
             container = articulation.root.gameObject.container
             encoded = encode_name_and_container(articulation.name, container)
-            enum_items.append((encoded, encoded,articulation.name, 'MESH_DATA', index))
+            enum_items.append((encoded,articulation.name,str(container),'MESH_DATA', index))
             index+=1
 
         for armature in sssekai_global.armatures:
             container = armature.root.gameObject.container
             encoded = encode_name_and_container(armature.name, container)
-            enum_items.append((encoded,encoded,armature.name, 'ARMATURE_DATA',index))
+            enum_items.append((encoded,armature.name,str(container),'ARMATURE_DATA',index))
             index+=1
 
         sssekai_global.animations = search_env_animations(sssekai_global.env)    
         for animation in sssekai_global.animations:
             container = animation.container
             encoded = encode_name_and_container(animation.name, container)
-            enum_items.append((encoded,encoded,animation.name, 'ANIM_DATA',index))
+            enum_items.append((encoded,animation.name,str(container),'ANIM_DATA',index))
             index+=1
 
     sssekai_global.current_enum_entries = enum_items
