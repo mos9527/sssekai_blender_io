@@ -1,7 +1,7 @@
 # sssekai_blender_io
 Blender I/O for the game's assets. (actually it's imports only)
 
-Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.3.0 Alpha`
+Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
 
 ### Importer Features
   * Textures
@@ -25,8 +25,8 @@ You can find your language code by entering `bpy.app.translations.locale` in the
     - Navigate to your Blender installation path, and find the Python interperter of your version. (e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`)
     - In its working directory (i.e. `...\python\bin`), run the following (in a command prompt)
 ```bash
-python -m ensurepip
-python -m pip install -U sssekai
+.\python -m ensurepip
+.\python -m pip install -U sssekai
 ```
 - Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master)
 - In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just downloaded.
