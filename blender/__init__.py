@@ -51,8 +51,6 @@ def get_name_hash(name : str):
 # The tables stored in the mesh's Custom Properties. Used by the animation importer.
 KEY_BONE_NAME_HASH_TBL = 'sssekai_bone_name_hash_tbl' # Bone *full path hash* to bone name (Vertex Group name in blender lingo)
 KEY_SHAPEKEY_NAME_HASH_TBL = 'sssekai_shapekey_name_hash_tbl' # ShapeKey name hash to ShapeKey names
-KEY_BINDPOSE_TRANS = 'sssekai_bindpose_trans' # Bone name to bind pose translation
-KEY_BINDPOSE_QUAT = 'sssekai_bindpose_quat' # Bone name to bind pose quaternion
 KEY_ORIGINAL_PARENT = 'sssekai_original_parent' # Bone name to original parent bone name
 KEY_ORIGINAL_WORLD_MATRIX = 'sssekai_original_world_matrix' # Bone name to original world matrix
 # CRC Constants

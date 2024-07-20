@@ -283,8 +283,6 @@ def import_armature(name : str, data : Armature):
             ebone.use_relative_parent = False                
             ebone.use_connect = False
             ebone.use_deform = True
-            ebone[KEY_BINDPOSE_TRANS] = [v for v in child.get_blender_local_position()]
-            ebone[KEY_BINDPOSE_QUAT] = [v for v in child.get_blender_local_rotation()]
             child.edit_bone = ebone
             # Treat the joints as extremely small bones
             # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198

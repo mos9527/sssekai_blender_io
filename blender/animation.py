@@ -47,7 +47,8 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
     # Collect bone space <-> local space transforms
     local_space_trans_rot = dict() # i.e. parent space
     for bone in dest_arma.data.edit_bones: # Must be done in edit mode
-        local_space_trans_rot[bone.name] = (Vector(bone[KEY_BINDPOSE_TRANS]), BlenderQuaternion(bone[KEY_BINDPOSE_QUAT]))
+        local_mat = (bone.matrix @ bone.parent.matrix.inverted()) if bone.parent else Matrix()
+        local_space_trans_rot[bone.name] = (local_mat.to_translation(), local_mat.to_quaternion())
     # from glTF-Blender-IO:
     # ---
     # We have the final TRS of the bone in values. We need to give
