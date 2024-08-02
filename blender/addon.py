@@ -48,6 +48,7 @@ class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator)
             dfs(bone)        
         armature.data[KEY_BONE_NAME_HASH_TBL] = json.dumps(bone_path_hash_tbl,ensure_ascii=False)
         return {'FINISHED'}
+
 class SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_misc_remove_bone_hierarchy_op"
     bl_label = T("Remove Bone Hierarchy")
@@ -58,6 +59,7 @@ class SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator(bpy.types.Operator):
         for bone in ebone.children_recursive + [ebone]:
             bpy.context.active_object.data.edit_bones.remove(bone)
         return {'FINISHED'}
+
 class SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_misc_rename_remove_numeric_suffix_op"
     bl_label = T("Remove Numeric Suffix")
@@ -75,43 +77,6 @@ class SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator(bpy.types.Operator
         ebone = bpy.context.active_bone
         for bone in ebone.children_recursive + [ebone]:
             rename_one(bone)
-        return {'FINISHED'}
-
-class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
-    bl_idname = "OBJ_PT_sssekai_misc"
-    bl_label = T("Misc")
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_category = "SSSekai"
-
-    def draw(self, context):
-        layout = self.layout
-        layout.label(text=T("Armature"))
-        row = layout.row()
-        row.operator(SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator.bl_idname,icon='TOOL_SETTINGS')
-        row = layout.row()
-        row.operator(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator.bl_idname,icon='TOOL_SETTINGS')
-        row = layout.row()
-        row.operator(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator.bl_idname,icon='TOOL_SETTINGS')
-        row = layout.row()
-        row.operator(SSSekaiBlenderUtilApplyModifersOperator.bl_idname,icon='TOOL_SETTINGS')
-class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
-    bl_idname = "sssekai.util_neck_attach_op"
-    bl_label = T("Attach")
-    bl_description = T("Attach the selected face armature to the selected body armature")
-    def execute(self, context):
-        scene = context.scene
-        face_arma = scene.sssekai_util_neck_attach_obj_face
-        body_arma = scene.sssekai_util_neck_attach_obj_body
-        assert face_arma and body_arma, "Please select both face and body armatures"        
-        face_obj = scene.objects.get(face_arma.name)
-        body_obj = scene.objects.get(body_arma.name)
-        bpy.context.view_layer.objects.active = face_obj
-        bpy.ops.object.mode_set(mode='POSE')
-        neck_bone = face_obj.pose.bones['Neck']
-        constraint = neck_bone.constraints.new('COPY_TRANSFORMS')
-        constraint.target = body_obj
-        constraint.subtarget = 'Neck'
         return {'FINISHED'}
 
 class SSSekaiBlenderUtilApplyModifersOperator(bpy.types.Operator):
@@ -212,6 +177,126 @@ class SSSekaiBlenderUtilApplyModifersOperator(bpy.types.Operator):
     
         return {'FINISHED'}
 
+class SSSekaiBlenderUtilArmatureMergeOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_armature_merge_op"
+    bl_label = T("Merge Armatures")
+    bl_description = T("Merge one armature into another, taking constraints & modifed rest poses into consideration.  With the active one as the newly merged armature.")
+    def execute(self, context):
+        scene = context.scene
+        assert len(bpy.context.selected_objects) == 2, "Please select 2 and only 2 objects."        
+        child_obj = bpy.context.selected_objects[1]   
+        parent_obj = bpy.context.selected_objects[0]
+        if child_obj == bpy.context.active_object:
+            child_obj,parent_obj = parent_obj, child_obj            
+        assert child_obj.type == 'ARMATURE' and parent_obj.type == 'ARMATURE', "Please select 2 Armatures."
+        child_arma =  child_obj.data
+        parent_arma = parent_obj.data
+        # For the child armature, we:
+        # - Apply the modifier so the mesh matches the new rest pose
+        for child in child_obj.children:
+            if child.type == 'MESH':
+                bpy.context.view_layer.objects.active = child
+                bpy.ops.sssekai.util_apply_modifiers_op()
+        bpy.context.view_layer.objects.active = child_obj
+        bpy.ops.object.mode_set(mode='POSE')
+        # With the armature in pose mode, we:
+        # - Apply all bone constraints
+        for bone in child_obj.pose.bones:
+            child_arma.bones.active = bone.bone
+            for constraint in bone.constraints:
+                bpy.ops.constraint.apply(constraint=constraint.name, owner='BONE')
+        # - Set the pose to rest pose
+        bpy.ops.pose.armature_apply(selected=False)                
+        # For the parent armature, we:
+        # - Merge the child armature with the parent armature
+        # - Assign new modifers to the merged mesh
+        bpy.ops.object.mode_set(mode='OBJECT')
+        child_obj.select_set(True)
+        parent_obj.select_set(True)
+        bpy.context.view_layer.objects.active = parent_obj
+        bpy.ops.object.join()
+        for child in parent_obj.children:
+            if child.type == 'MESH' and len(child.modifiers) == 0:
+                child.modifiers.new('Armature', 'ARMATURE').object = parent_obj
+        return {'FINISHED'}
+
+class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
+    bl_idname = "OBJ_PT_sssekai_misc"
+    bl_label = T("Misc")
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "SSSekai"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text=T("Armature"))
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator.bl_idname,icon='TOOL_SETTINGS')
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator.bl_idname,icon='TOOL_SETTINGS')
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator.bl_idname,icon='TOOL_SETTINGS')
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilApplyModifersOperator.bl_idname,icon='TOOL_SETTINGS')
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilArmatureMergeOperator.bl_idname,icon='TOOL_SETTINGS')
+
+class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_neck_attach_op"
+    bl_label = T("Attach")
+    bl_description = T("Attach the selected face armature to the selected body armature")
+    def execute(self, context):
+        scene = context.scene
+        face_arma = scene.sssekai_util_neck_attach_obj_face
+        body_arma = scene.sssekai_util_neck_attach_obj_body
+        assert face_arma and body_arma, "Please select both face and body armatures"        
+        face_obj = scene.objects.get(face_arma.name)
+        body_obj = scene.objects.get(body_arma.name)
+        bpy.context.view_layer.objects.active = face_obj
+        bpy.ops.object.mode_set(mode='POSE')
+        neck_bone = face_obj.pose.bones['Neck']
+        constraint = neck_bone.constraints.new('COPY_TRANSFORMS')
+        constraint.target = body_obj
+        constraint.subtarget = 'Neck'
+        return {'FINISHED'}
+
+class SSSekaiBlenderUtilNeckMergeOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_neck_merge_op"
+    bl_label = T("Merge")
+    bl_description = T("Merge the selected face armature with the selected body armature")
+    def execute(self, context):
+        scene = context.scene
+        face_arma = scene.sssekai_util_neck_attach_obj_face
+        body_arma = scene.sssekai_util_neck_attach_obj_body
+        assert face_arma and body_arma, "Please select both face and body armatures"
+        bpy.ops.sssekai.util_neck_attach_op() # Attach nontheless
+        face_obj = scene.objects.get(face_arma.name)
+        body_obj = scene.objects.get(body_arma.name)
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        face_obj.select_set(True)
+        body_obj.select_set(True)
+        bpy.context.view_layer.objects.active = body_obj         
+        bpy.ops.sssekai.util_armature_merge_op()
+        # Clean up bone hierarchy
+        # We have made a lot of assumptions here...
+        # Priori:
+        # - The duped bones would be named as 'Bone.001', 'Bone.002', etc
+        # - The face armature and body armature (if chosen correctly) would share some bones, up until the 'Neck' bone
+        bpy.ops.object.mode_set(mode='EDIT')
+        # - Changing the bone hierarchy in EDIT mode would not affect the mesh or the bone's armature space transforms
+        # We will:
+        # - Replace the subtree of the Neck bone of the body armature with the subtree of the Neck bone of the face armature
+        # - Fix up the naming
+        body_arma = body_obj.data
+        for bone in body_arma.edit_bones['Head.001'].children:
+            bone.parent = body_arma.edit_bones['Head']       
+        # - Remove the now redundant bones
+        body_arma.edit_bones.active = body_arma.edit_bones['Position.001']
+        bpy.ops.sssekai.util_misc_remove_bone_hierarchy_op()
+        bpy.ops.object.mode_set(mode='OBJECT')
+        return {"FINISHED"}
+
 class SSSekaiBlenderUtilNeckAttach(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_util_neck_attach"
     bl_label = T("Attach Neck")
@@ -226,6 +311,7 @@ class SSSekaiBlenderUtilNeckAttach(bpy.types.Panel):
         layout.prop(scene, 'sssekai_util_neck_attach_obj_face')
         layout.prop(scene, 'sssekai_util_neck_attach_obj_body')
         layout.operator(SSSekaiBlenderUtilNeckAttachOperator.bl_idname)       
+        layout.operator(SSSekaiBlenderUtilNeckMergeOperator.bl_idname)
 
 class SSSekaiBlenderImportOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_op"
@@ -396,6 +482,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     print('* Imported Armature animation', animation.name)
                 return {'FINISHED'}
         return {'CANCELLED'}
+
 class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_physics_op"
     bl_label = T("Import Physics")
@@ -619,6 +706,8 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilApplyModifersOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilArmatureMergeOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilNeckMergeOperator)
 
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
@@ -634,3 +723,5 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilApplyModifersOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureMergeOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilNeckMergeOperator)
