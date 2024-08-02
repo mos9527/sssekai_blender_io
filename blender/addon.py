@@ -93,7 +93,8 @@ class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
         row.operator(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator.bl_idname,icon='TOOL_SETTINGS')
         row = layout.row()
         row.operator(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator.bl_idname,icon='TOOL_SETTINGS')
-    
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilApplyModifersOperator.bl_idname,icon='TOOL_SETTINGS')
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_attach_op"
     bl_label = T("Attach")
@@ -111,6 +112,104 @@ class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
         constraint = neck_bone.constraints.new('COPY_TRANSFORMS')
         constraint.target = body_obj
         constraint.subtarget = 'Neck'
+        return {'FINISHED'}
+
+class SSSekaiBlenderUtilApplyModifersOperator(bpy.types.Operator):
+    # From: https://github.com/przemir/ApplyModifierForObjectWithShapeKeys/blob/master/ApplyModifierForObjectWithShapeKeys.py
+    # NOTE: Only a subset of the original features are implemented here
+    bl_idname = "sssekai.util_apply_modifiers_op"
+    bl_label = T("Apply Modifiers")
+    bl_description = T("Apply all modifiers to the selected objects's meshes. Snippet from github.com/przemir/ApplyModifierForObjectWithShapeKeys")
+    def execute(self, context):        
+        PROPS = ["name", "interpolation", "mute", "slider_max", "slider_min", "value", "vertex_group"]
+
+        context = bpy.context
+        obj = context.object
+        modifiers = obj.modifiers
+
+        shapesCount = len(obj.data.shape_keys.key_blocks) if obj.data.shape_keys else 0
+        if obj.data.shape_keys:
+            shapesCount = len(obj.data.shape_keys.key_blocks)
+        
+        if(shapesCount == 0):
+            for modifier in modifiers:
+                bpy.ops.object.modifier_apply(modifier=modifier.name)
+            return {'FINISHED'}
+        
+        # We want to preserve original object, so all shapes will be joined to it.
+        originalObject = context.view_layer.objects.active
+        bpy.ops.object.select_all(action='DESELECT')
+        originalObject.select_set(True)
+        
+        # Copy object which will holds all shape keys.
+        bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(0, 0, 0), "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, False), "mirror":True, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False, "use_accurate":False})
+        copyObject = context.view_layer.objects.active
+        copyObject.select_set(False)
+        
+        # Return selection to originalObject.
+        context.view_layer.objects.active = originalObject
+        originalObject.select_set(True)
+        # Save key shape properties
+        shapekey_props = [{p : getattr(originalObject.data.shape_keys.key_blocks[i],p,None) for p in PROPS} for i in range(shapesCount)]
+        # Handle base shape in "originalObject"
+        bpy.ops.object.shape_key_remove(all=True)
+        for modifier in modifiers:
+            bpy.ops.object.modifier_apply(modifier=modifier.name)
+    
+        bpy.ops.object.shape_key_add(from_mix=False)
+        originalObject.select_set(False)
+        
+        # Handle other shape-keys: copy object, get right shape-key, apply modifiers and merge with originalObject.
+        # We handle one object at time here.
+        for i in range(1, shapesCount):
+            context.view_layer.objects.active = copyObject
+            copyObject.select_set(True)
+            
+            # Copy temp object.
+            bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(0, 0, 0), "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, False), "mirror":True, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False, "use_accurate":False})
+            tmpObject = context.view_layer.objects.active
+            bpy.ops.object.shape_key_remove(all=True)
+            copyObject.select_set(True)
+            copyObject.active_shape_key_index = i
+            
+            # Get right shape-key.
+            bpy.ops.object.shape_key_transfer()
+            context.object.active_shape_key_index = 0
+            bpy.ops.object.shape_key_remove()
+            bpy.ops.object.shape_key_remove(all=True)
+            
+            # Time to apply modifiers.
+            for modifier in modifiers:
+                bpy.ops.object.modifier_apply(modifier=modifier.name)
+            
+            # Join with originalObject
+            copyObject.select_set(False)
+            context.view_layer.objects.active = originalObject
+            originalObject.select_set(True)
+            bpy.ops.object.join_shapes()
+            originalObject.select_set(False)
+            context.view_layer.objects.active = tmpObject
+            
+            # Remove tmpObject
+            tmpMesh = tmpObject.data
+            bpy.ops.object.delete(use_global=False)
+            bpy.data.meshes.remove(tmpMesh)
+        context.view_layer.objects.active = originalObject
+        for i in range(shapesCount):
+            for p in PROPS:
+                setattr(originalObject.data.shape_keys.key_blocks[i],p,shapekey_props[i][p])
+        # Remove copyObject.
+        originalObject.select_set(False)
+        context.view_layer.objects.active = copyObject
+        copyObject.select_set(True)
+        tmpMesh = copyObject.data
+        bpy.ops.object.delete(use_global=False)
+        bpy.data.meshes.remove(tmpMesh)
+        
+        # Select originalObject.
+        context.view_layer.objects.active = originalObject
+        context.view_layer.objects.active.select_set(True)
+    
         return {'FINISHED'}
 
 class SSSekaiBlenderUtilNeckAttach(bpy.types.Panel):
@@ -519,7 +618,7 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
-
+    bpy.utils.register_class(SSSekaiBlenderUtilApplyModifersOperator)
 
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
@@ -534,3 +633,4 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilApplyModifersOperator)

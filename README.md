@@ -36,18 +36,12 @@ You can find your language code by entering `bpy.app.translations.locale` in the
 TODO
 
 ## References
-https://github.com/KhronosGroup/glTF-Blender-IO
-
-https://github.com/theturboturnip/yk_gmd_io
-
-https://github.com/SutandoTsukai181/yakuza-gmt-blender
-
-https://github.com/UuuNyaa/blender_mmd_tools
-
-https://github.com/Pauan/blender-rigid-body-bones
-
-https://zhuanlan.zhihu.com/p/411188212
-
-https://zhuanlan.zhihu.com/p/337944099
-
-https://zhuanlan.zhihu.com/p/670837192
+- https://github.com/KhronosGroup/glTF-Blender-IO
+- https://github.com/theturboturnip/yk_gmd_io
+- https://github.com/SutandoTsukai181/yakuza-gmt-blender
+- https://github.com/UuuNyaa/blender_mmd_tools
+- https://github.com/Pauan/blender-rigid-body-bones
+- https://zhuanlan.zhihu.com/p/411188212
+- https://zhuanlan.zhihu.com/p/337944099
+- https://zhuanlan.zhihu.com/p/670837192
+- https://github.com/przemir/ApplyModifierForObjectWithShapeKeys
