@@ -95,8 +95,11 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
     for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
         # Quaternion rotations
         if str(bone_hash) in bone_table:
-            bone_name = bone_table[str(bone_hash)]
-            bone = dest_arma.pose.bones[bone_name]
+            bone_name = bone_table[str(bone_hash)]            
+            bone = dest_arma.pose.bones.get(bone_name,None)
+            if not bone: 
+                print("* WARNING: [Rotation] Bone %s not found in pose bones" % bone_name)
+                continue
             bone.rotation_mode = 'QUATERNION'       
             values = [to_pose_quaternion(bone, swizzle_quaternion(keyframe.value)) for keyframe in track.Curve]
             # Ensure minimum rotation path (i.e. neighboring quats dots >= 0)
@@ -111,7 +114,10 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
         # Euler rotations
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
-            bone = dest_arma.pose.bones[bone_name]
+            bone = dest_arma.pose.bones.get(bone_name,None)
+            if not bone: 
+                print("* WARNING: [Rotation Euler] Bone %s not found in pose bones" % bone_name)
+                continue
             bone.rotation_mode = 'XZY'
             values = [to_pose_euler(bone, swizzle_euler(keyframe.value)) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
@@ -122,7 +128,10 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
         # Translations
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
-            bone = dest_arma.pose.bones[bone_name]
+            bone = dest_arma.pose.bones.get(bone_name,None)
+            if not bone: 
+                print("* WARNING: [Translation] Bone %s not found in pose bones" % bone_name)
+                continue
             values = [to_pose_translation(bone, swizzle_vector(keyframe.value)) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'pose.bones["%s"].location' % bone_name, values, frames, 3)
@@ -132,7 +141,10 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
         # Scale
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
-            bone = dest_arma.pose.bones[bone_name]
+            bone = dest_arma.pose.bones.get(bone_name,None)
+            if not bone: 
+                print("* WARNING: [Scale] Bone %s not found in pose bones" % bone_name)
+                continue
             values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'pose.bones["%s"].scale' % bone_name, values, frames, 3)        

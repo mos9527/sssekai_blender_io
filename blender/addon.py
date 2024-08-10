@@ -240,6 +240,8 @@ class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
         row.operator(SSSekaiBlenderUtilApplyModifersOperator.bl_idname,icon='TOOL_SETTINGS')
         row = layout.row()
         row.operator(SSSekaiBlenderUtilArmatureMergeOperator.bl_idname,icon='TOOL_SETTINGS')
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilArmatureSimplifyOperator.bl_idname,icon='TOOL_SETTINGS')
 
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_attach_op"
@@ -312,6 +314,22 @@ class SSSekaiBlenderUtilNeckAttach(bpy.types.Panel):
         layout.prop(scene, 'sssekai_util_neck_attach_obj_body')
         layout.operator(SSSekaiBlenderUtilNeckAttachOperator.bl_idname)       
         layout.operator(SSSekaiBlenderUtilNeckMergeOperator.bl_idname)
+
+class SSSekaiBlenderUtilArmatureSimplifyOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_armature_simplify_op"
+    bl_label = T("Simplify Armature")
+    bl_description = T("Simplify the bone hierachy of the selected armature. This operation is irreversible!")
+    
+    WHITELIST = {'Position', 'PositionOffset', 'Hip', 'Left_Thigh', 'Left_AssistHip', 'Left_Knee', 'Left_Ankle', 'Left_shw_back', 'Left_Toe', 'Left_shw_front', 'Right_Thigh', 'Right_AssistHip', 'Right_Knee', 'Right_Ankle', 'Right_shw_back', 'Right_Toe', 'Right_shw_front', 'Waist', 'Spine', 'Chest', 'Left_Shoulder', 'Left_Arm', 'Left_ArmRoll', 'Left_Elbow', 'Left_EllbowSupport', 'Left_EllbowSupport_End', 'Left_ForeArmRoll', 'Left_Wrist', 'Left_Hand_Attach', 'Left_Index_01', 'Left_Index_02', 'Left_Index_03', 'Left_Middle_01', 'Left_Middle_02', 'Left_Middle_03', 'Left_Pinky_01', 'Left_Pinky_02', 'Left_Pinky_03', 'Left_Ring_01', 'Left_Ring_02', 'Left_Ring_03', 'Left_Thumb_01', 'Left_Thumb_02', 'Left_Thumb_03', 'Neck', 'Head', 'Right_Shoulder', 'Right_Arm', 'Right_ArmRoll', 'Right_Elbow', 'Right_EllbowSupport', 'Right_EllbowSupport_End', 'Right_ForeArmRoll', 'Right_Wrist', 'Right_Hand_Attach', 'Right_Index_01', 'Right_Index_02', 'Right_Index_03', 'Right_Middle_01', 'Right_Middle_02', 'Right_Middle_03', 'Right_Pinky_01', 'Right_Pinky_02', 'Right_Pinky_03', 'Right_Ring_01', 'Right_Ring_02', 'Right_Ring_03', 'Right_Thumb_01', 'Right_Thumb_02', 'Right_Thumb_03', 'Chest_const', 'Thigh_Upv'}
+    def execute(self, context):
+        assert context.mode == 'EDIT_ARMATURE', 'Please select an armature in Edit Mode!'
+        armature = bpy.context.active_object
+        assert armature.type == 'ARMATURE', 'Please select an armature!'
+        for bone in armature.data.edit_bones:
+            if bone.name not in SSSekaiBlenderUtilArmatureSimplifyOperator.WHITELIST:
+                print('* Removing bone', bone.name)
+                armature.data.edit_bones.remove(bone)
+        return {'FINISHED'}
 
 class SSSekaiBlenderImportOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_op"
@@ -708,6 +726,7 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderUtilApplyModifersOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilArmatureMergeOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilNeckMergeOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
 
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
@@ -725,3 +744,5 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderUtilApplyModifersOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureMergeOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckMergeOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
+
