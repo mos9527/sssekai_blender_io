@@ -15,8 +15,9 @@ from bpy.props import (
 )
 from .i18n import get_text as T
 
-def encode_name_and_container(name, container):
-    return f'{name} | {container}'
+def encode_asset_id(obj):
+    prop = lambda x: '<%s %s>' % (x,getattr(obj,x,'<unk>'))
+    return f"""{prop('name')},{prop('path_id')},{prop('file_id')}"""
 class SSSekaiGlobalEnvironment:
     current_dir : str = None
     current_enum_entries : list = None
@@ -413,9 +414,8 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     print('* Imported Static Mesh', mesh_data.name)
             print('* Imported Static Mesh Articulation', articulation.name)        
 
-        for articulation in articulations:
-            container = articulation.root.gameObject.container
-            if encode_name_and_container(articulation.name, container) == wm.sssekai_assetbundle_selected:
+        for articulation in articulations:            
+            if encode_asset_id(articulation.root.gameObject) == wm.sssekai_assetbundle_selected:
                 add_articulation(articulation)
                 return {'FINISHED'}
         
@@ -438,8 +438,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             print('* Imported Armature', armature.name)
 
         for armature in armatures:
-            container = armature.root.gameObject.container
-            if encode_name_and_container(armature.name, container) == wm.sssekai_assetbundle_selected:
+            if encode_asset_id(armature.root.gameObject) == wm.sssekai_assetbundle_selected:
                 if wm.sssekai_armatures_as_articulations:
                     add_articulation(armature)
                     return {'FINISHED'}
@@ -449,8 +448,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
 
         animations = sssekai_global.animations
         for animation in animations:
-            container = animation.container
-            if encode_name_and_container(animation.name, container) == wm.sssekai_assetbundle_selected:
+            if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
                 def check_is_active_armature():
                     assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature for this animation!"
                 def check_is_active_camera():
@@ -511,8 +509,7 @@ class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
         wm = context.window_manager        
         articulations, armatures = sssekai_global.articulations, sssekai_global.armatures
         for armature in armatures:
-            container = armature.root.gameObject.container
-            if encode_name_and_container(armature.name, container) == wm.sssekai_assetbundle_selected:
+            if encode_asset_id(armature.root.gameObject) == wm.sssekai_assetbundle_selected:
                 bpy.context.scene.frame_current = 0
                 import_armature_physics_constraints(bpy.context.active_object, armature)
                 return {'FINISHED'}
@@ -581,23 +578,22 @@ def enumerate_assets(self, context):
         # enum_items = [(identifier, name, description, icon, number),...]
         # Note that `identifier` is the value that will be stored (and read) in the property
         for articulation in sssekai_global.articulations:
-            container = articulation.root.gameObject.container
-            encoded = encode_name_and_container(articulation.name, container)
-            enum_items.append((encoded,articulation.name,str(container),'MESH_DATA', index))
+            encoded = encode_asset_id(articulation.root.gameObject)
+            enum_items.append((encoded,articulation.name,encoded,'MESH_DATA', index))
             index+=1
 
         for armature in sssekai_global.armatures:
-            container = armature.root.gameObject.container
-            encoded = encode_name_and_container(armature.name, container)
-            enum_items.append((encoded,armature.name,str(container),'ARMATURE_DATA',index))
+            encoded = encode_asset_id(armature.root.gameObject)
+            enum_items.append((encoded,armature.name,encoded,'ARMATURE_DATA',index))
             index+=1
 
         sssekai_global.animations = search_env_animations(sssekai_global.env)    
-        for animation in sssekai_global.animations:
-            container = animation.container
-            encoded = encode_name_and_container(animation.name, container)
-            enum_items.append((encoded,animation.name,str(container),'ANIM_DATA',index))
+        for animation in sssekai_global.animations:            
+            encoded = encode_asset_id(animation)
+            enum_items.append((encoded,animation.name,encoded,'ANIM_DATA',index))
             index+=1
+
+        enum_items.sort(key=lambda x: x[0])
 
     sssekai_global.current_enum_entries = enum_items
     sssekai_global.current_dir = dirname
