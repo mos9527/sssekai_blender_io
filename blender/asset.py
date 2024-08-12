@@ -343,7 +343,7 @@ def import_armature_physics_constraints(armature, data : Armature):
                     if '_offset' in parent_bone.name and not bone.name in springbone_chains: # Keep the fisrt bone's parent. The rest are connected
                         armature.data.edit_bones.remove(armature.data.edit_bones[parent_bone.name])   
                         ebone.parent = armature.data.edit_bones[parent_bone.parent.name]
-                    ebone.use_connect = True
+                    # ebone.use_connect = True
                 if not bone.children:
                     springbone_chains[parent.name].end = bone
             for child in bone.children:
@@ -366,12 +366,16 @@ def import_armature_physics_constraints(armature, data : Armature):
         # * Disable self-collisions for the active rigidbodies
         # * Apply constraints to the bones
         # * Profit(?) lmao copilot added this
-        def create_bone_rigidbody(name : str, radius : float, passive = False, has_collison = True, length=-1):
+        def create_bone_rigidbody(name : str, radius : float, passive = False, has_collison = True, length=-1):            
             bpy.ops.mesh.primitive_cylinder_add(radius=radius, depth=length if length > 0 else radius * 2)
             obj = bpy.context.object
             obj.name = name + '_rigidbody'
+            # Align the cylinder to the bone
+            obj.rotation_euler.rotate_axis("X", math.radians(-90))
+            obj.location += Vector((0, length / 2,0))
+            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
             bpy.ops.rigidbody.object_add()
-            obj.rigid_body.collision_shape = 'CAPSULE'                            
+            obj.rigid_body.collision_shape = 'CONVEX_HULL'                            
             obj.rigid_body.type = 'PASSIVE' if passive else 'ACTIVE'       
             obj.rigid_body.kinematic = True if passive else False
             obj.rigid_body.collision_collections[0] = has_collison
@@ -389,13 +393,13 @@ def import_armature_physics_constraints(armature, data : Armature):
             object.parent_bone = bone_name
         def set_bone_constraint(bone_name : str, target):
             pbone : bpy.types.PoseBone = armature.pose.bones[bone_name]
-            ct = pbone.constraints.new('CHILD_OF')                       
+            ct = pbone.constraints.new('COPY_TRANSFORMS')                       
             ct.target = target
-            ct.use_scale_x = ct.use_scale_y = ct.use_scale_z = False
-            bpy.context.active_object.data.bones.active = pbone.bone
-            context_override = bpy.context.copy()
-            with bpy.context.temp_override(**context_override):
-                bpy.ops.constraint.childof_set_inverse(constraint=ct.name, owner='BONE')
+            # ct.use_scale_x = ct.use_scale_y = ct.use_scale_z = False
+            # bpy.context.active_object.data.bones.active = pbone.bone
+            # context_override = bpy.context.copy()
+            # with bpy.context.temp_override(**context_override):
+            #     bpy.ops.constraint.childof_set_inverse(constraint=ct.name, owner='BONE')
         def unparent_bone(bone_name):
             bpy.ops.object.mode_set(mode='EDIT')
             ebone = armature.data.edit_bones[bone_name] 
@@ -458,9 +462,7 @@ def import_armature_physics_constraints(armature, data : Armature):
                     )
                     target.parent = joint
                     target.matrix_local = Matrix.Identity(4)
-                    # Correct pose in local space
-                    target.rotation_euler.rotate_axis("X", math.radians(-90))
-                    target.location += Vector((0, bonesize_all[bone_name] / 2,0))
+
                     rigidbodies[bone_name] = target
                     parent = rigidbodies[parent_all[bone_name]]
 
@@ -542,7 +544,9 @@ def import_armature_physics_constraints(armature, data : Armature):
                         obj.parent = armature
                         obj.parent_bone = child.name
                         obj.parent_type = 'BONE'  
-                        obj.display_type = 'BOUNDS'           
+                        obj.display_type = 'BOUNDS'     
+                        bpy.ops.object.parent_clear(type='CLEAR_INVERSE')
+      
 
 def import_texture(name : str, data : Texture2D):
     '''Imports Texture2D assets into blender
