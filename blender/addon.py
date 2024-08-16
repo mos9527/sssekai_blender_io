@@ -1,4 +1,7 @@
 from typing import Set
+
+import UnityPy.classes
+import UnityPy.classes
 from . import *
 from .asset import *
 from .animation import *
@@ -569,6 +572,44 @@ class SSSekaiBlenderApplyOutlineOperator(bpy.types.Operator):
                     modifier['Socket_4'] = index # XXX: Any other way to assign this attribute?
         return {'FINISHED'}
 
+class SSSekaiBlenderExportAnimationTypeTree(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
+    bl_idname = "sssekai.export_typetree_op"
+    bl_label = T("Export Animation TypeTree")
+    bl_description = T("Export the TypeTree of the selected animation")
+
+    filename_ext = ".anim"
+    filter_glob: bpy.props.StringProperty(default='*.anim;', options={'HIDDEN'})
+
+    def execute(self, context):
+        global sssekai_global
+        wm = context.window_manager
+        articulations, armatures, animations = sssekai_global.articulations, sssekai_global.armatures, sssekai_global.animations
+        from UnityPy.classes import GameObject
+        def export_typetree(gameObject : GameObject):
+            assert gameObject.type == ClassIDType.AnimationClip, "Only AnimationClip is supported for exporting TypeTree"
+            filename = self.filepath
+            import yaml
+            with open(filename, 'w', encoding='utf-8') as f:
+                print('* Exporting TypeTree to', filename)
+                f.write('''%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!74 &7400000
+''') 
+                yaml.dump({'AnimationClip':gameObject.read_typetree()}, f, indent=4, ensure_ascii=False)
+                print('* Exported TypeTree to', filename)                
+        for articulation in articulations:
+            if encode_asset_id(articulation.root.gameObject) == wm.sssekai_assetbundle_selected:
+                export_typetree(articulation.root.gameObject)
+                return {'FINISHED'}
+        for armature in armatures:
+            if encode_asset_id(armature.root.gameObject) == wm.sssekai_assetbundle_selected:
+                export_typetree(armature.root.gameObject)
+                return {'FINISHED'}
+        for animation in animations:
+            if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
+                export_typetree(animation)
+                return {'FINISHED'}
+        return {'CANCELLED'}
 
 def enumerate_assets(self, context):
     global sssekai_global
@@ -674,7 +715,9 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_animation_import_offset",icon='TIME')
         row.prop(wm, "sssekai_animation_append_exisiting",icon='OVERLAY')
         row = layout.row()
-        layout.separator()
+        row.operator(SSSekaiBlenderExportAnimationTypeTree.bl_idname,icon='EXPORT')
+        row = layout.row()        
+        row.label(text=T("Import"))
         row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_BLEND')
 
 def register():
@@ -741,6 +784,7 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderUtilArmatureMergeOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilNeckMergeOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
+    bpy.utils.register_class(SSSekaiBlenderExportAnimationTypeTree)
 
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
@@ -759,4 +803,5 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureMergeOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckMergeOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderExportAnimationTypeTree)
 
