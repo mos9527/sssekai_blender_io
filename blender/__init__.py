@@ -50,9 +50,9 @@ def get_name_hash(name : str):
     return zlib.crc32(name.encode('utf-8'))
 # The tables stored in the mesh's Custom Properties. Used by the animation importer.
 KEY_BONE_NAME_HASH_TBL = 'sssekai_bone_name_hash_tbl' # Bone *full path hash* to bone name (Vertex Group name in blender lingo)
+KEY_ARTICULATION_NAME_HASH_TBL = 'sssekai_articulation_name_hash_tbl' # GameObject hierarchy path hash to parent GameObject name
 KEY_SHAPEKEY_NAME_HASH_TBL = 'sssekai_shapekey_name_hash_tbl' # ShapeKey name hash to ShapeKey names
-KEY_ORIGINAL_PARENT = 'sssekai_original_parent' # Bone name to original parent bone name
-KEY_ORIGINAL_WORLD_MATRIX = 'sssekai_original_world_matrix' # Bone name to original world matrix
+KEY_JOINT_BONE_NAME = 'sssekai_joint_bone_name' # Bone name of the joint
 # CRC Constants
 NULL_CRC = 0
 BLENDSHAPES_UNK_CRC = 2770785369

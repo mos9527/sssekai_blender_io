@@ -67,24 +67,20 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
     #     pr = er^{-1} fr
     #     ps = fs 
     # ---
-    def to_pose_quaternion(bone : bpy.types.PoseBone, quat : BlenderQuaternion):
-        etrans, erot = local_space_trans_rot[bone.name]
+    def to_pose_quaternion(name, quat : BlenderQuaternion):
+        etrans, erot = local_space_trans_rot[name]
         erot_inv = erot.conjugated()
         return erot_inv @ quat
-    def to_pose_translation(bone : bpy.types.PoseBone, vec : Vector):
-        etrans, erot = local_space_trans_rot[bone.name]
+    def to_pose_translation(name : bpy.types.PoseBone, vec : Vector):
+        etrans, erot = local_space_trans_rot[name]
         erot_inv = erot.conjugated()
         return erot_inv @ (vec - etrans)
-    # Note for Eulers
-    # The angles are modified in XYZ rotation mode here
-    # but the rotation order is set to XZY when it's finally applied to the objects
-    # as per the coordinate system conversion
-    def to_pose_euler(bone : bpy.types.PoseBone, euler : Euler):
-        etrans, erot = local_space_trans_rot[bone.name]
+    def to_pose_euler(name : bpy.types.PoseBone, euler : Euler):
+        etrans, erot = local_space_trans_rot[name]
         erot_inv = erot.conjugated()
         result = erot_inv @ euler.to_quaternion()
         result = result.to_euler('XYZ')
-        return result    
+        return result
     # Reset the pose 
     bpy.ops.object.mode_set(mode='POSE')
     bpy.ops.pose.select_all(action='SELECT')
@@ -101,7 +97,7 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
                 print("* WARNING: [Rotation] Bone %s not found in pose bones" % bone_name)
                 continue
             bone.rotation_mode = 'QUATERNION'       
-            values = [to_pose_quaternion(bone, swizzle_quaternion(keyframe.value)) for keyframe in track.Curve]
+            values = [to_pose_quaternion(bone_name, swizzle_quaternion(keyframe.value)) for keyframe in track.Curve]
             # Ensure minimum rotation path (i.e. neighboring quats dots >= 0)
             for i in range(0,len(values) - 1):
                 if values[i].dot(values[i+1]) < 0:
@@ -119,7 +115,7 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
                 print("* WARNING: [Rotation Euler] Bone %s not found in pose bones" % bone_name)
                 continue
             bone.rotation_mode = 'XZY'
-            values = [to_pose_euler(bone, swizzle_euler(keyframe.value)) for keyframe in track.Curve]
+            values = [to_pose_euler(bone_name, swizzle_euler(keyframe.value)) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'pose.bones["%s"].rotation_euler' % bone_name, values, frames, 3)            
         else:
@@ -132,7 +128,7 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
             if not bone: 
                 print("* WARNING: [Translation] Bone %s not found in pose bones" % bone_name)
                 continue
-            values = [to_pose_translation(bone, swizzle_vector(keyframe.value)) for keyframe in track.Curve]
+            values = [to_pose_translation(bone_name, swizzle_vector(keyframe.value)) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'pose.bones["%s"].location' % bone_name, values, frames, 3)
         else:
@@ -150,6 +146,56 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
             import_fcurve(action,'pose.bones["%s"].scale' % bone_name, values, frames, 3)        
         else:
             print("* WARNING: [Scale] Bone hash %s not found in bone table" % bone_hash)
+
+def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
+    joint_table = json.loads(dest_arma[KEY_ARTICULATION_NAME_HASH_TBL])
+    joint_obj = {obj[KEY_JOINT_BONE_NAME]:obj for obj in dest_arma.children_recursive if obj.type == 'EMPTY' and KEY_JOINT_BONE_NAME in obj}
+    if always_create_new:
+        for obj in joint_obj.values():
+            obj.animation_data_clear()
+            obj.animation_data_create()
+    for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
+        bone_name = joint_table.get(str(bone_hash),None)
+        obj = joint_obj.get(bone_name,None)
+        if obj:
+            action = ensure_action(obj, name, False)
+            obj.rotation_mode = 'QUATERNION'
+            values = [swizzle_quaternion(keyframe.value) for keyframe in track.Curve]      
+            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
+            import_fcurve(action,'rotation_quaternion', values, frames, 4)
+        else:
+            print("* WARNING: [Rotation] Bone hash %s not found in joint table" % bone_hash)
+    for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
+        bone_name = joint_table.get(str(bone_hash),None)
+        obj = joint_obj.get(bone_name,None)
+        if obj:
+            action = ensure_action(obj, name, False)
+            obj.rotation_mode = 'XZY'
+            values = [swizzle_euler(keyframe.value) for keyframe in track.Curve]
+            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
+            import_fcurve(action,'rotation_euler', values, frames, 3)
+        else:
+            print("* WARNING: [Rotation Euler] Bone hash %s not found in joint table" % bone_hash)
+    for bone_hash, track in data.TransformTracks[TransformType.Translation].items():
+        bone_name = joint_table.get(str(bone_hash),None)
+        obj = joint_obj.get(bone_name,None)
+        if obj:
+            action = ensure_action(obj, name, False)
+            values = [swizzle_vector(keyframe.value) for keyframe in track.Curve]
+            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
+            import_fcurve(action,'location', values, frames, 3)
+        else:
+            print("* WARNING: [Translation] Bone hash %s not found in joint table" % bone_hash)
+    for bone_hash, track in data.TransformTracks[TransformType.Scaling].items():
+        bone_name = joint_table.get(str(bone_hash),None)
+        obj = joint_obj.get(joint_table[str(bone_hash)],None)
+        if obj:
+            action = ensure_action(obj, name, False)
+            values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
+            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
+            import_fcurve(action,'scale', values, frames, 3)
+        else:
+            print("* WARNING: [Scale] Bone hash %s not found in joint table" % bone_hash)
 
 def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object, frame_offset : int, always_create_new : bool):
     mesh = dest_mesh.data

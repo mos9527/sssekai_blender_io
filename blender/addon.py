@@ -17,7 +17,7 @@ from .i18n import get_text as T
 
 def encode_asset_id(obj):
     prop = lambda x: '<%s %s>' % (x,getattr(obj,x,'<unk>'))
-    return f"""{prop('name')},{prop('path_id')},{prop('file_id')}"""
+    return f"""{prop('name')},{prop('container')},{prop('path_id')},{prop('file_id')}"""
 class SSSekaiGlobalEnvironment:
     current_dir : str = None
     current_enum_entries : list = None
@@ -29,25 +29,43 @@ class SSSekaiGlobalEnvironment:
 sssekai_global = SSSekaiGlobalEnvironment()
 class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_misc_recalculate_bone_hash_table_op"
-    bl_label = T("Recalculate Bone Hash Table")
-    bl_description = T("Recalculate the bone hash table for the selected armature. You should do this after renaming bones or changing the hierarchy.")
+    bl_label = T("Recalculate Hash Table")
+    bl_description = T("Recalculate the animation hash table for the selected armature/articulation. You should do this after renaming bones or changing the hierarchy.")
     def execute(self, context):
         assert context.mode == 'OBJECT', 'Please select an armature in Object Mode!'
-        armature = bpy.context.active_object
-        assert armature.type == 'ARMATURE', 'Please select an armature!'
-        bone_path_hash_tbl = dict()
-        bone_path_tbl = dict()
-        def dfs(bone):
-            if bone.parent:
-                bone_path_tbl[bone.name] = bone_path_tbl[bone.parent.name] + '/' + bone.name
-            else:
-                bone_path_tbl[bone.name] = bone.name
-            bone_path_hash_tbl[str(get_name_hash(bone_path_tbl[bone.name]))] = bone.name
-            for child in bone.children:
+        obj = bpy.context.active_object
+        if obj.data and KEY_BONE_NAME_HASH_TBL in obj.data:
+            bone_path_hash_tbl = dict()
+            bone_path_tbl = dict()
+            def dfs(bone):
+                if bone.parent:
+                    bone_path_tbl[bone.name] = bone_path_tbl[bone.parent.name] + '/' + bone.name
+                else:
+                    bone_path_tbl[bone.name] = bone.name
+                bone_path_hash_tbl[str(get_name_hash(bone_path_tbl[bone.name]))] = bone.name
+                for child in bone.children:
+                    dfs(child)
+            for bone in obj.data.bones:
+                dfs(bone)        
+            obj.data[KEY_BONE_NAME_HASH_TBL] = json.dumps(bone_path_hash_tbl,ensure_ascii=False)
+        elif KEY_ARTICULATION_NAME_HASH_TBL in obj:
+            joint_path_hash_tbl = dict()
+            joint_path_tbl = dict()
+            def dfs(joint):
+                if not KEY_JOINT_BONE_NAME in joint: return
+                joint_name = joint[KEY_JOINT_BONE_NAME]
+                if joint.parent and KEY_JOINT_BONE_NAME in joint.parent:                    
+                    joint_path_tbl[joint_name] = joint_path_tbl[joint.parent[KEY_JOINT_BONE_NAME]] + '/' + joint_name
+                else:
+                    joint_path_tbl[joint_name] = joint_name
+                joint_path_hash_tbl[str(get_name_hash(joint_path_tbl[joint_name]))] = joint_name
+                for child in joint.children:
+                    dfs(child)
+            for child in obj.children:
                 dfs(child)
-        for bone in armature.data.bones:
-            dfs(bone)        
-        armature.data[KEY_BONE_NAME_HASH_TBL] = json.dumps(bone_path_hash_tbl,ensure_ascii=False)
+            obj[KEY_ARTICULATION_NAME_HASH_TBL] = json.dumps(joint_path_hash_tbl,ensure_ascii=False)
+        else:
+            assert False, 'Please select an armature/articulation imported by SSSekai first!'
         return {'FINISHED'}
 
 class SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator(bpy.types.Operator):
@@ -339,10 +357,38 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
     def execute(self, context):
         global sssekai_global
         wm = context.window_manager        
-        articulations, armatures = sssekai_global.articulations, sssekai_global.armatures        
+        articulations, armatures, animations = sssekai_global.articulations, sssekai_global.armatures, sssekai_global.animations
+        
         print('* Loading selected asset:', wm.sssekai_assetbundle_selected)
         texture_cache = dict()
         material_cache = dict()
+        def add_mesh(gameObject, name : str = None, parent_obj = None, bone_hash_tbl : dict = None):
+            name = name or gameObject.name
+            if getattr(gameObject,'m_SkinnedMeshRenderer',None):
+                print('* Found Skinned Mesh at', gameObject.name)
+                mesh_rnd : SkinnedMeshRenderer = gameObject.m_SkinnedMeshRenderer.read()
+                bone_order  = [b.read().m_GameObject.read().name for b in mesh_rnd.m_Bones]
+                if getattr(mesh_rnd,'m_Mesh',None):
+                    mesh_data : Mesh = mesh_rnd.m_Mesh.read(return_typetree_on_error=False)                            
+                    mesh, obj = import_mesh(name, mesh_data,True, bone_hash_tbl, bone_order)
+                    if parent_obj:
+                        obj.parent = parent_obj
+                    add_material(mesh_rnd.m_Materials, obj, mesh_data, import_character_material)    
+                    print('* Imported Skinned Mesh', mesh_data.name)
+                    return obj
+            elif getattr(gameObject,'m_MeshFilter',None):
+                print('* Found Static Mesh at', gameObject.name)
+                mesh_filter : MeshFilter = gameObject.m_MeshFilter.read()
+                mesh_rnd : MeshRenderer = gameObject.m_MeshRenderer.read()
+                mesh_data = mesh_filter.m_Mesh.read(return_typetree_on_error=False)
+                mesh, obj = import_mesh(mesh_data.name, mesh_data, False)
+                if parent_obj:
+                    obj.parent = parent_obj
+                add_material(mesh_rnd.m_Materials, obj, mesh_data, import_scene_material)    
+                print('* Imported Static Mesh', mesh_data.name)
+                return obj
+            return None
+        
         def add_material(m_Materials : Material, obj : bpy.types.Object, meshData : Mesh, defaultParser = None): 
             for ppmat in m_Materials:
                 if ppmat:                    
@@ -385,58 +431,26 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 bpy.ops.mesh.select_all(action='DESELECT')
                 bpy.ops.object.mode_set(mode='OBJECT')
         
-        def add_articulation(articulation):                
-            joint_map = dict()
-            for parent,bone,depth in articulation.root.dfs_generator():
-                joint = bpy.data.objects.new(bone.name, None)
-                joint.empty_display_size = 0.1
-                joint.empty_display_type = 'ARROWS'     
-                joint_map[bone.name] = joint         
-                bpy.context.collection.objects.link(joint)
-                # Make the artiulation
-                joint.parent = joint_map[parent.name] if parent else None
-                joint.location = swizzle_vector(bone.localPosition)
-                joint.rotation_mode = 'QUATERNION'
-                joint.rotation_quaternion = swizzle_quaternion(bone.localRotation)
-                joint.scale = swizzle_vector_scale(bone.localScale)
-                # Add the meshes, if any
-                if bone.gameObject and getattr(bone.gameObject,'m_MeshFilter',None):
-                    print('* Found Static Mesh at', bone.name)
-                    mesh_filter : MeshFilter = bone.gameObject.m_MeshFilter.read()
-                    mesh_rnd : MeshRenderer = bone.gameObject.m_MeshRenderer.read()
-                    mesh_data = mesh_filter.m_Mesh.read(return_typetree_on_error=False)
-                    mesh, obj = import_mesh(mesh_data.name, mesh_data, False)
-                    try:
-                        add_material(mesh_rnd.m_Materials, obj, mesh_data, import_scene_material)    
-                    except Exception:
-                        pass
-                    obj.parent = joint
-                    print('* Imported Static Mesh', mesh_data.name)
-            print('* Imported Static Mesh Articulation', articulation.name)        
-
+        def add_articulation(articulation : Armature):
+            joint_map, parent_object = import_articulation(articulation)
+            for bone_name, joint in joint_map.items():
+                bone = articulation.get_bone_by_name(bone_name)
+                mesh = add_mesh(bone.gameObject, bone_name, joint)             
+            print('* Imported Articulation', articulation.name)        
+        
+        def add_armature(armature : Armature):
+            armInst, armObj = import_armature(armature)
+            for parent,bone,depth in armature.root.dfs_generator():
+                mesh = add_mesh(bone.gameObject, bone.name, armObj, armature.bone_path_hash_tbl)
+                if mesh:                    
+                    mesh.modifiers.new('Armature', 'ARMATURE').object = armObj                        
+            print('* Imported Armature', armature.name)
+    
         for articulation in articulations:            
             if encode_asset_id(articulation.root.gameObject) == wm.sssekai_assetbundle_selected:
                 add_articulation(articulation)
                 return {'FINISHED'}
         
-        # XXX: Skinned meshes are expected to have identity transforms 
-        # maybe this would change in the future but for now, it's a safe assumption
-        def add_armature(armature : Armature):
-            armInst, armObj = import_armature('%s_Armature' % armature.name ,armature)
-            for parent,bone,depth in armature.root.dfs_generator():
-                if bone.gameObject and getattr(bone.gameObject,'m_SkinnedMeshRenderer',None):
-                    print('* Found Skinned Mesh at', bone.name)
-                    mesh_rnd : SkinnedMeshRenderer = bone.gameObject.m_SkinnedMeshRenderer.read()
-                    bone_order  = [b.read().m_GameObject.read().name for b in mesh_rnd.m_Bones]
-                    if getattr(mesh_rnd,'m_Mesh',None):
-                        mesh_data : Mesh = mesh_rnd.m_Mesh.read(return_typetree_on_error=False)                            
-                        mesh, obj = import_mesh(bone.name, mesh_data,True, armature.bone_path_hash_tbl,bone_order)
-                        obj.parent = armObj
-                        obj.modifiers.new('Armature', 'ARMATURE').object = armObj
-                        add_material(mesh_rnd.m_Materials, obj, mesh_data, import_character_material)    
-                        print('* Imported Skinned Mesh', mesh_data.name)
-            print('* Imported Armature', armature.name)
-
         for armature in armatures:
             if encode_asset_id(armature.root.gameObject) == wm.sssekai_assetbundle_selected:
                 if wm.sssekai_armatures_as_articulations:
@@ -445,12 +459,9 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 else:
                     add_armature(armature)
                     return {'FINISHED'}
-
-        animations = sssekai_global.animations
+        
         for animation in animations:
             if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
-                def check_is_active_armature():
-                    assert bpy.context.active_object and bpy.context.active_object.type == 'ARMATURE', "Please select an armature for this animation!"
                 def check_is_active_camera():
                     assert bpy.context.active_object and bpy.context.active_object.type == 'CAMERA', "Please select a camera for this animation!"
                 print('* Reading AnimationClip:', animation.name)
@@ -467,35 +478,42 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 print('* Framerate', clip.Framerate)
                 print('* Frames', bpy.context.scene.frame_end)
                 print('* Blender FPS set to:', bpy.context.scene.render.fps)
-                if BLENDSHAPES_UNK_CRC in clip.FloatTracks:
-                    print('* Importing Keyshape animation', animation.name)
-                    check_is_active_armature()
-                    mesh_obj = None
-                    for obj in bpy.context.active_object.children:
-                        if KEY_SHAPEKEY_NAME_HASH_TBL in obj.data:
-                            mesh_obj = obj
-                            break
-                    assert mesh_obj, "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes! Invalid armature!" 
-                    print("* Importing into", mesh_obj.name)
-                    import_keyshape_animation(animation.name, clip, mesh_obj, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                    print('* Imported Keyshape animation', animation.name)
-                elif CAMERA_UNK_CRC in clip.TransformTracks[TransformType.Translation]:
-                    print('* Importing Camera animation', animation.name)
-                    check_is_active_camera()
-                    import_camera_animation(animation.name, clip, bpy.context.active_object,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                    print('* Imported Camera animation', animation.name)
-                elif CAMERA_DOF_UNK_CRC in clip.FloatTracks and CAMERA_DOF_FOV_UNK_CRC in clip.FloatTracks[CAMERA_DOF_UNK_CRC]:
-                    # depth_of_field animations
-                    # Don't know why FOV is here though...but it is!
-                    print('* Importing Camera FOV animation', animation.name)
-                    check_is_active_camera()
-                    import_camera_fov_animation(animation.name, clip.FloatTracks[CAMERA_DOF_UNK_CRC][CAMERA_DOF_FOV_UNK_CRC].Curve, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                    print('* Imported Camera FOV animation', animation.name)
-                else:
-                    print('* Importing Armature animation', animation.name)
-                    check_is_active_armature()
-                    import_armature_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                    print('* Imported Armature animation', animation.name)
+                active_type = bpy.context.active_object.type
+                if active_type == 'CAMERA':
+                    if CAMERA_UNK_CRC in clip.TransformTracks[TransformType.Translation]:
+                        print('* Importing Camera animation', animation.name)
+                        check_is_active_camera()
+                        import_camera_animation(animation.name, clip, bpy.context.active_object,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                        print('* Imported Camera animation', animation.name)
+                    if CAMERA_DOF_UNK_CRC in clip.FloatTracks and CAMERA_DOF_FOV_UNK_CRC in clip.FloatTracks[CAMERA_DOF_UNK_CRC]:
+                        # depth_of_field animations
+                        # Don't know why FOV is here though...but it is!
+                        print('* Importing Camera FOV animation', animation.name)
+                        check_is_active_camera()
+                        import_camera_fov_animation(animation.name, clip.FloatTracks[CAMERA_DOF_UNK_CRC][CAMERA_DOF_FOV_UNK_CRC].Curve, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                        print('* Imported Camera FOV animation', animation.name)
+                elif active_type == 'ARMATURE':
+                    if BLENDSHAPES_UNK_CRC in clip.FloatTracks:
+                        print('* Importing Keyshape animation', animation.name)
+                        mesh_obj = None
+                        for obj in bpy.context.active_object.children:
+                            if KEY_SHAPEKEY_NAME_HASH_TBL in obj.data:
+                                mesh_obj = obj
+                                break
+                        assert mesh_obj, "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes!" 
+                        print("* Importing into", mesh_obj.name)
+                        import_keyshape_animation(animation.name, clip, mesh_obj, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                        print('* Imported Keyshape animation', animation.name)
+                    if clip.TransformTracks[TransformType.Translation] or clip.TransformTracks[TransformType.Rotation] or clip.TransformTracks[TransformType.EulerRotation] or clip.TransformTracks[TransformType.Scaling]:
+                        print('* Importing Armature animation', animation.name)
+                        import_armature_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                        print('* Imported Armature animation', animation.name)
+                elif active_type == 'EMPTY':
+                    if clip.TransformTracks[TransformType.Translation] or clip.TransformTracks[TransformType.Rotation] or clip.TransformTracks[TransformType.EulerRotation] or clip.TransformTracks[TransformType.Scaling]:
+                        print('* Importing Articulation animation', animation.name)
+                        import_articulation_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                        print('* Imported Articulation animation', animation.name)
+
                 return {'FINISHED'}
         return {'CANCELLED'}
 

@@ -175,10 +175,11 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
         if deform_layer:
             for i in range(4):
                 skin = data.m_Skin[vtx]
-                if skin.weight[i] <= 0:
-                    continue
-                vertex_group_index = skin.boneIndex[i]                
-                vert[deform_layer][vertex_group_index] = skin.weight[i]
+                # if skin.weight[i] <= 0: continue
+                vertex_group_index = skin.boneIndex[i]
+                if not vertex_group_index in vert[deform_layer]:
+                    vert[deform_layer][vertex_group_index] = skin.weight[i]            
+                vert[deform_layer][vertex_group_index] = max(vert[deform_layer][vertex_group_index],skin.weight[i])
     bm.verts.ensure_lookup_table()
     # Indices
     for idx in range(0, len(data.m_Indices), 3):
@@ -249,30 +250,62 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
     bm.free()      
     return mesh, obj
 
-def import_armature(name : str, data : Armature):
-    '''Imports the Armature data generated into blender
-
-    NOTE: Unused bones will not be imported since they have identity transforms and thus
-    cannot have their own head-tail vectors. It's worth noting though that they won't affect
-    the mesh anyway.
+def import_articulation(arma : Armature, name : str = None):
+    '''Imports the Articulation hierarchy described by the Armature data into Blender as a set of Empty objects
 
     Args:
+        arma (Armature): Armature as genereated by previous steps
+        arma_parent (object, optional): Parent of the generated Empty hierachry. Defaults to None.
+
+    Returns:
+        Tuple[Dict[str,bpy.types.Object], bpy.types.Object]: Created Empty objects and its parent object
+    '''
+    def create_empty(name : str, parent = None):
+        joint = bpy.data.objects.new(name, None)
+        joint.empty_display_size = 0.1
+        joint.empty_display_type = 'ARROWS'     
+        joint.parent = parent        
+        bpy.context.collection.objects.link(joint)
+        return joint
+    name = name or arma.name
+    joint_map = dict()
+    parent_joint = None
+    for parent,bone,depth in arma.root.dfs_generator():
+        joint = create_empty(bone.name, joint_map[parent.name] if parent else parent_joint)
+        # Set the global transform   
+        joint.location = swizzle_vector(bone.localPosition)
+        joint.rotation_mode = 'QUATERNION'
+        joint.rotation_quaternion = swizzle_quaternion(bone.localRotation)
+        joint.scale = swizzle_vector_scale(bone.localScale)
+        joint_map[bone.name] = joint    
+        if parent:
+            joint[KEY_JOINT_BONE_NAME] = bone.name
+        else:
+            parent_joint = joint
+            joint.name = name
+            joint[KEY_ARTICULATION_NAME_HASH_TBL] = json.dumps({k:v.name for k,v in arma.bone_path_hash_tbl.items()},ensure_ascii=False)
+    return joint_map, parent_joint
+
+def import_armature(arma : Armature, name : str = None):
+    '''Imports the Armature hierarcht described by the Armature data into Blender as an Armature object
+
+    Args:
+        arma (Armature): Armature as genereated by previous steps
         name (str): Armature Object name
-        data (Armature): Armature as genereated by previous steps
     
     Returns:
         Tuple[bpy.types.Armature, bpy.types.Object]: Created armature and its parent object
     '''
-    assert data.is_articulation == False, "Not an armature! Use import_articulation instead."
+    name = name or arma.name
     armature = bpy.data.armatures.new(name)
     armature.display_type = 'OCTAHEDRAL'
     armature.relation_line_position = 'HEAD'
-    armature[KEY_BONE_NAME_HASH_TBL] = json.dumps({k:v.name for k,v in data.bone_path_hash_tbl.items()},ensure_ascii=False)
+    armature[KEY_BONE_NAME_HASH_TBL] = json.dumps({k:v.name for k,v in arma.bone_path_hash_tbl.items()},ensure_ascii=False)
     obj = bpy.data.objects.new(name, armature)
     bpy.context.collection.objects.link(obj)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode='EDIT')
-    root = data.root
+    root = arma.root
     # Build global transforms           
     root.calculate_global_transforms()
     # Build bone hierarchy in blender
@@ -403,9 +436,7 @@ def import_armature_physics_constraints(armature, data : Armature):
         def unparent_bone(bone_name):
             bpy.ops.object.mode_set(mode='EDIT')
             ebone = armature.data.edit_bones[bone_name] 
-            arma_matrix = ebone.matrix          
-            ebone[KEY_ORIGINAL_PARENT] = ebone.parent.name
-            ebone[KEY_ORIGINAL_WORLD_MATRIX] = pack_matrix(arma_matrix)
+            arma_matrix = ebone.matrix
             ebone.parent = None
             ebone.matrix = arma_matrix
         def set_no_collision(obj, parent_obj):
@@ -487,8 +518,8 @@ def import_armature_physics_constraints(armature, data : Armature):
                     ct.use_limit_ang_y = True
                     ct.use_limit_ang_z = True
                     if phys_data:
-                        ct.limit_ang_x_lower = math.radians(-15) / 2
-                        ct.limit_ang_x_upper = math.radians(15) / 2
+                        ct.limit_ang_x_lower = 0
+                        ct.limit_ang_x_upper = 0
                         ct.limit_ang_y_lower = math.radians(phys_data.zAngleLimits.min) / 2
                         ct.limit_ang_y_upper = math.radians(phys_data.zAngleLimits.max) / 2
                         ct.limit_ang_z_lower = math.radians(phys_data.yAngleLimits.min) / 2
@@ -546,7 +577,6 @@ def import_armature_physics_constraints(armature, data : Armature):
                         obj.parent_type = 'BONE'  
                         obj.display_type = 'BOUNDS'     
                         bpy.ops.object.parent_clear(type='CLEAR_INVERSE')
-      
 
 def import_texture(name : str, data : Texture2D):
     '''Imports Texture2D assets into blender
@@ -618,8 +648,7 @@ def setup_sdfValue_driver(obj: object):
     joint.empty_display_size = 0.1
     joint.empty_display_type = 'ARROWS'                
     bpy.context.collection.objects.link(joint)    
-    bpy.context.view_layer.objects.active = obj.parent
-    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.context.view_layer.objects.active = obj.parent    
     joint.parent = obj.parent
     joint.parent_type = 'BONE'
     joint.parent_bone = 'Head' # This allows us to perform the calculations in the local space of the head 
