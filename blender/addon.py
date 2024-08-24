@@ -693,10 +693,13 @@ class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
         return {'FINISHED'}    
 
 class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
-    bl_idname = "sssekai.test_op"
+    bl_idname = "sssekai.rla_import_armature_animation_op"
     bl_label = T("Import Armature Animation")
     bl_description = T("Import Armature Animation for the selected character")
     def execute(self, context):        
+        obj = bpy.context.active_object
+        assert obj.type == 'ARMATURE', "Please select an armature to import the animation to!"
+
         wm = context.window_manager
         active_chara = wm.sssekai_rla_active_character
         chara_segments = list()
@@ -712,7 +715,6 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
                             has_boneData = True
         print('* Found %d segments for character %d' % (len(chara_segments), active_chara))
 
-        obj = bpy.context.active_object
         inv_hash_table = obj.data[KEY_BONE_NAME_HASH_TBL]
         inv_hash_table = json.loads(inv_hash_table)
         inv_hash_table = {v:k for k,v in inv_hash_table.items()}
@@ -723,7 +725,7 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
         else:
             anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_ROOT_BONE]] = Track()
         anim.TransformTracks[TransformType.Translation][inv_hash_table[RLA_ROOT_BONE]] = Track()
-        
+        # See swizzle_quaternion4. This is the inverse of that since we're reproducing Unity's quaternion
         inv_swizzle_quaternion = lambda quat: (quat.x, -quat.z, quat.y, quat.w)
         euler3_to_quat = lambda euler: swizzle_euler3(euler[0],euler[1],euler[2]).to_quaternion()
         euler3_to_quat_swizzled = lambda euler: inv_swizzle_quaternion(euler3_to_quat(euler))
@@ -741,10 +743,59 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
             anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_ROOT_BONE]].add_keyframe(
                 KeyFrame(timestamp, UnityQuaternion(*euler3_to_quat_swizzled(segment['pose']['bodyRotation'])), UnityQuaternion(), UnityQuaternion(), 0)
             )
-        import_armature_animation('TEST', anim, obj, 0, True)
+        import_armature_animation('RLA', anim, obj, 0, False)
         time_range = sssekai_global.rla_clip_tick_range
         bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(time_range[1] * bpy.context.scene.render.fps))
         bpy.context.scene.frame_current = int(time_range[0] * bpy.context.scene.render.fps)
+        return {'FINISHED'}
+
+class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
+    bl_idname = "sssekai.rla_import_shapekey_animation_op"
+    bl_label = T("Import Shapekey Animation")
+    bl_description = T("Import Shapekey Animation for the selected character")
+    def execute(self, context):        
+        obj = bpy.context.active_object
+        wm = context.window_manager
+        active_chara = wm.sssekai_rla_active_character
+
+        assert obj.type == 'ARMATURE', "Please select an armature to import the animation to!"
+        mesh_obj = None
+        for child in bpy.context.active_object.children:
+            if KEY_SHAPEKEY_NAME_HASH_TBL in child.data:
+                mesh_obj = child
+                break
+        assert mesh_obj, "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes!"
+        
+        shapekey_segments = list()
+        for tick, data in sssekai_global.rla_clip_data.items():
+            m_data = data.get('MotionCaptureData', None)
+            if m_data:
+                m_data = m_data[0]['data']
+                for pose in m_data:
+                    if pose['id'] == active_chara:   
+                        shapeData = pose['pose']['shapeDatas']                     
+                        if shapeData:
+                            shapekey_segments.append((pose['timestamp'], shapeData))
+        
+        inv_hash_table = mesh_obj.data[KEY_SHAPEKEY_NAME_HASH_TBL]
+        inv_hash_table = json.loads(inv_hash_table)
+        inv_hash_table = {v:k for k,v in inv_hash_table.items()}        
+        anim = Animation()
+        base_tick = sssekai_global.rla_header['baseTicks']
+        anim.FloatTracks[BLENDSHAPES_UNK_CRC] = dict()
+        if shapekey_segments:
+            for shape in RLA_VALID_BLENDSHAPES:
+                anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_hash_table[shape]] = Track()
+        for timestamp, segment in shapekey_segments:
+            timestamp = (timestamp - base_tick) / RLA_TIME_MAGNITUDE
+            for idx, value in enumerate(segment):
+                anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_hash_table[RLA_VALID_BLENDSHAPES[idx]]].add_keyframe(
+                    KeyFrame(timestamp, value, 0, 0, 0)
+                )
+        import_keyshape_animation('RLA', anim, mesh_obj, 0, False)
+        time_range = sssekai_global.rla_clip_tick_range
+        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(time_range[1] * bpy.context.scene.render.fps))
+        bpy.context.scene.frame_current = int(time_range[0] * bpy.context.scene.render.fps)        
         return {'FINISHED'}
 
 def enumerate_rla_assets(self, context):
@@ -833,7 +884,7 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_rla_active_character", icon='ARMATURE_DATA')
         row = layout.row()
         row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='OUTLINER_OB_ARMATURE')
-        row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='SHAPEKEY_DATA')
+        row.operator(SSSekaiBlenderImportRLAShapekeyAnimationOperator.bl_idname, icon='SHAPEKEY_DATA')
         
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
@@ -880,9 +931,6 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.label(text=T("Import"))
         row = layout.row()
         row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_BLEND')
-        # XXX: Testing
-        row = layout.row()
-        row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname)
 
 def register():
     WindowManager.sssekai_assetbundle_file = StringProperty(
@@ -966,6 +1014,7 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
     bpy.utils.register_class(SSSekaiBlenderExportAnimationTypeTree)
     bpy.utils.register_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
+    bpy.utils.register_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
 
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
@@ -987,4 +1036,4 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
     bpy.utils.unregister_class(SSSekaiBlenderExportAnimationTypeTree)
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
-
+    bpy.utils.unregister_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
