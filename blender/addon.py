@@ -5,6 +5,7 @@ import UnityPy.classes
 from . import *
 from .asset import *
 from .animation import *
+from sssekai.unity.AnimationClip import Animation, Track
 
 import bpy
 import bpy.utils.previews
@@ -674,7 +675,54 @@ class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
         wm = context.window_manager
         wm.invoke_search_popup(self)
         return {'FINISHED'}    
-    
+
+class SSSekaiBlenderTestOperator(bpy.types.Operator):
+    bl_idname = "sssekai.test_op"
+    bl_label = T("Test")
+    bl_description = T("Test")
+    def execute(self, context):
+        rla_data = json.load(open(r"H:\Sekai\streaming_live\archive\1st_live_vbs-1_src\sekai_30_00000013.json"))
+        pose_segments = dict()
+        for tick, data in rla_data.items():
+            m_data = data.get('MotionCaptureData', None)
+            if m_data:
+                m_data = m_data[0]['data']
+                for pose in m_data:
+                    pose_segments.setdefault(pose['id'],[]).append(pose)
+        print('* Found ids', len(pose_segments))
+        rootBone = "Hip"
+        validBones = ["Hip","Waist","Spine","Chest","Neck","Head","Left_Shoulder","Left_Arm","Left_Elbow","Left_Wrist","Left_Thumb_01","Left_Thumb_02","Left_Thumb_03","Left_Index_01","Left_Index_02","Left_Index_03","Left_Middle_01","Left_Middle_02","Left_Middle_03","Left_Ring_01","Left_Ring_02","Left_Ring_03","Left_Pinky_01","Left_Pinky_02","Left_Pinky_03","Left_ForeArmRoll","Left_ArmRoll","Left_Pectoralis_01","Right_Pectoralis_01","Right_Shoulder","Right_Arm","Right_Elbow","Right_Wrist","Right_Thumb_01","Right_Thumb_02","Right_Thumb_03","Right_Index_01","Right_Index_02","Right_Index_03","Right_Middle_01","Right_Middle_02","Right_Middle_03","Right_Ring_01","Right_Ring_02","Right_Ring_03","Right_Pinky_01","Right_Pinky_02","Right_Pinky_03","Right_ForeArmRoll","Right_ArmRoll","Left_Thigh","Left_Knee","Left_Ankle","Left_Toe","Left_AssistHip","Right_Thigh","Right_Knee","Right_Ankle","Right_Toe","Right_AssistHip"]
+        validBlendShapes = ["BS_look.look_up","BS_look.look_down","BS_look.look_left","BS_look.look_right","BS_mouth.mouth_a","BS_mouth.mouth_i","BS_mouth.mouth_u","BS_mouth.mouth_e","BS_mouth.mouth_o","BS_mouth.mouth_a2","BS_mouth.mouth_i2","BS_mouth.mouth_u2","BS_mouth.mouth_e2","BS_mouth.mouth_o2","BS_mouth.mouth_sad","BS_mouth.mouth_kime","BS_mouth.mouth_happy","BS_eye.eye_happy","BS_eye.eye_sad","BS_eye.eye_close","BS_eye.eye_wink_L","BS_eye.eye_wink_R","BS_eyeblow.eyeblow_happy","BS_eyeblow.eyeblow_sad","BS_eyeblow.eyeblow_kime","BS_eyeblow.eyeblow_smile"]
+        
+        obj = bpy.context.active_object
+        inv_hash_table = obj.data[KEY_BONE_NAME_HASH_TBL]
+        inv_hash_table = json.loads(inv_hash_table)
+        inv_hash_table = {v:k for k,v in inv_hash_table.items()}
+        # print(inv_hash_table)
+        # print(vertex_group_names)
+        anim = Animation()
+        start_tick = 1e18
+        for bone in validBones: anim.TransformTracks[TransformType.EulerRotation][inv_hash_table[bone]] = Track()
+        anim.TransformTracks[TransformType.Translation][inv_hash_table[rootBone]] = Track()
+        rad_to_deg = lambda vec: tuple([math.degrees(x) for x in vec])
+        for segment in pose_segments[0]:
+            start_tick = min(start_tick, segment['timestamp'])
+            anim_tick = segment['timestamp'] - start_tick
+            print('Animation @ tick', anim_tick)
+            for idx, boneEuler in enumerate(segment['pose']['boneDatas']):
+                if validBones[idx] != rootBone:
+                    anim.TransformTracks[TransformType.EulerRotation][inv_hash_table[validBones[idx]]].add_keyframe(
+                        KeyFrame(anim_tick / 1e7, Vector3(*rad_to_deg(boneEuler)), Vector3(0,0,0), Vector3(0,0,0), 0)
+                    )
+            anim.TransformTracks[TransformType.Translation][inv_hash_table[rootBone]].add_keyframe(
+                KeyFrame(anim_tick / 1e7, Vector3(*segment['pose']['bodyPosition']), Vector3(0,0,0), Vector3(0,0,0), 0)
+            )
+            anim.TransformTracks[TransformType.EulerRotation][inv_hash_table[rootBone]].add_keyframe(
+                KeyFrame(anim_tick / 1e7, Vector3(*rad_to_deg(segment['pose']['bodyRotation'])), Vector3(0,0,0), Vector3(0,0,0), 0)
+            )
+        import_armature_animation('TEST', anim, obj, 0, True)
+        return {'FINISHED'}
+
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
     bl_label = T("Import")
@@ -718,7 +766,11 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.operator(SSSekaiBlenderExportAnimationTypeTree.bl_idname,icon='EXPORT')
         row = layout.row()        
         row.label(text=T("Import"))
+        row = layout.row()
         row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_BLEND')
+        # XXX: Testing
+        row = layout.row()
+        row.operator(SSSekaiBlenderTestOperator.bl_idname)
 
 def register():
     WindowManager.sssekai_assetbundle_file = StringProperty(
@@ -785,6 +837,7 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderUtilNeckMergeOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
     bpy.utils.register_class(SSSekaiBlenderExportAnimationTypeTree)
+    bpy.utils.register_class(SSSekaiBlenderTestOperator)
 
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
@@ -804,4 +857,5 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckMergeOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
     bpy.utils.unregister_class(SSSekaiBlenderExportAnimationTypeTree)
+    bpy.utils.unregister_class(SSSekaiBlenderTestOperator)
 
