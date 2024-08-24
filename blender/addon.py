@@ -1,4 +1,5 @@
 from typing import Set
+from os import path
 
 import UnityPy.classes
 import UnityPy.classes
@@ -6,11 +7,12 @@ from . import *
 from .asset import *
 from .animation import *
 from sssekai.unity.AnimationClip import Animation, Track
+from sssekai.unity.AssetBundle import load_assetbundle
 
 import bpy
 import bpy.utils.previews
+import mathutils
 from bpy.types import Context, WindowManager
-import bpy
 from bpy.props import (
     StringProperty,
     EnumProperty,
@@ -25,12 +27,26 @@ def encode_asset_id(obj):
 class SSSekaiGlobalEnvironment:
     current_dir : str = None
     current_enum_entries : list = None
-    # ---
+    # --- SSSekai exclusive
     env : Environment
     articulations : Set[Armature]
     armatures : Set[Armature]
     animations : Set[Animation]
+    # --- RLA exclusive
+    rla_sekai_streaming_live_bundle_path : str = None
+    rla_header : dict = dict()  
+    rla_clip_data : dict = dict()   
+    rla_selected_raw_clip : str = 0
+    rla_raw_clips : dict = dict()  
+    rla_animations : dict = dict()  # character ID -> Animation
+    rla_clip_tick_range : tuple = (0,0)
+    rla_clip_charas : set = set()
+    rla_enum_entries : list = None
+    rla_enum_bookmarks : list = []
+    def rla_get_version(self):
+        return tuple(map(int, sssekai_global.rla_header['version'].split('.'))) if 'version' in sssekai_global.rla_header else (0,0)
 sssekai_global = SSSekaiGlobalEnvironment()
+
 class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_misc_recalculate_bone_hash_table_op"
     bl_label = T("Recalculate Hash Table")
@@ -623,7 +639,7 @@ def enumerate_assets(self, context):
     dirname = wm.sssekai_assetbundle_file
 
     if dirname == sssekai_global.current_dir:
-        return sssekai_global.current_enum_entries
+        return sssekai_global.current_enum_entries or [("NONE", "None", "", 0)]
 
     print("* Loading index for %s" % dirname)
 
@@ -676,53 +692,149 @@ class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
         wm.invoke_search_popup(self)
         return {'FINISHED'}    
 
-class SSSekaiBlenderTestOperator(bpy.types.Operator):
+class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
     bl_idname = "sssekai.test_op"
-    bl_label = T("Test")
-    bl_description = T("Test")
-    def execute(self, context):
-        rla_data = json.load(open(r"H:\Sekai\streaming_live\archive\1st_live_vbs-1_src\sekai_30_00000013.json"))
-        pose_segments = dict()
-        for tick, data in rla_data.items():
+    bl_label = T("Import Armature Animation")
+    bl_description = T("Import Armature Animation for the selected character")
+    def execute(self, context):        
+        wm = context.window_manager
+        active_chara = wm.sssekai_rla_active_character
+        chara_segments = list()
+        has_boneData = False
+        for tick, data in sssekai_global.rla_clip_data.items():
             m_data = data.get('MotionCaptureData', None)
             if m_data:
                 m_data = m_data[0]['data']
                 for pose in m_data:
-                    pose_segments.setdefault(pose['id'],[]).append(pose)
-        print('* Found ids', len(pose_segments))
-        rootBone = "Hip"
-        validBones = ["Hip","Waist","Spine","Chest","Neck","Head","Left_Shoulder","Left_Arm","Left_Elbow","Left_Wrist","Left_Thumb_01","Left_Thumb_02","Left_Thumb_03","Left_Index_01","Left_Index_02","Left_Index_03","Left_Middle_01","Left_Middle_02","Left_Middle_03","Left_Ring_01","Left_Ring_02","Left_Ring_03","Left_Pinky_01","Left_Pinky_02","Left_Pinky_03","Left_ForeArmRoll","Left_ArmRoll","Left_Pectoralis_01","Right_Pectoralis_01","Right_Shoulder","Right_Arm","Right_Elbow","Right_Wrist","Right_Thumb_01","Right_Thumb_02","Right_Thumb_03","Right_Index_01","Right_Index_02","Right_Index_03","Right_Middle_01","Right_Middle_02","Right_Middle_03","Right_Ring_01","Right_Ring_02","Right_Ring_03","Right_Pinky_01","Right_Pinky_02","Right_Pinky_03","Right_ForeArmRoll","Right_ArmRoll","Left_Thigh","Left_Knee","Left_Ankle","Left_Toe","Left_AssistHip","Right_Thigh","Right_Knee","Right_Ankle","Right_Toe","Right_AssistHip"]
-        validBlendShapes = ["BS_look.look_up","BS_look.look_down","BS_look.look_left","BS_look.look_right","BS_mouth.mouth_a","BS_mouth.mouth_i","BS_mouth.mouth_u","BS_mouth.mouth_e","BS_mouth.mouth_o","BS_mouth.mouth_a2","BS_mouth.mouth_i2","BS_mouth.mouth_u2","BS_mouth.mouth_e2","BS_mouth.mouth_o2","BS_mouth.mouth_sad","BS_mouth.mouth_kime","BS_mouth.mouth_happy","BS_eye.eye_happy","BS_eye.eye_sad","BS_eye.eye_close","BS_eye.eye_wink_L","BS_eye.eye_wink_R","BS_eyeblow.eyeblow_happy","BS_eyeblow.eyeblow_sad","BS_eyeblow.eyeblow_kime","BS_eyeblow.eyeblow_smile"]
-        
+                    if pose['id'] == active_chara:
+                        chara_segments.append(pose)
+                        if pose['pose']['boneDatas']:
+                            has_boneData = True
+        print('* Found %d segments for character %d' % (len(chara_segments), active_chara))
+
         obj = bpy.context.active_object
         inv_hash_table = obj.data[KEY_BONE_NAME_HASH_TBL]
         inv_hash_table = json.loads(inv_hash_table)
         inv_hash_table = {v:k for k,v in inv_hash_table.items()}
-        # print(inv_hash_table)
-        # print(vertex_group_names)
+
         anim = Animation()
-        start_tick = 1e18
-        for bone in validBones: anim.TransformTracks[TransformType.EulerRotation][inv_hash_table[bone]] = Track()
-        anim.TransformTracks[TransformType.Translation][inv_hash_table[rootBone]] = Track()
-        rad_to_deg = lambda vec: tuple([math.degrees(x) for x in vec])
-        for segment in pose_segments[0]:
-            start_tick = min(start_tick, segment['timestamp'])
-            anim_tick = segment['timestamp'] - start_tick
-            print('Animation @ tick', anim_tick)
+        if has_boneData:
+            for bone in RLA_VALID_BONES: anim.TransformTracks[TransformType.Rotation][inv_hash_table[bone]] = Track()
+        else:
+            anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_ROOT_BONE]] = Track()
+        anim.TransformTracks[TransformType.Translation][inv_hash_table[RLA_ROOT_BONE]] = Track()
+        
+        inv_swizzle_quaternion = lambda quat: (quat.x, -quat.z, quat.y, quat.w)
+        euler3_to_quat = lambda euler: swizzle_euler3(euler[0],euler[1],euler[2]).to_quaternion()
+        euler3_to_quat_swizzled = lambda euler: inv_swizzle_quaternion(euler3_to_quat(euler))
+        base_tick = sssekai_global.rla_header['baseTicks']
+        for segment in chara_segments:            
+            timestamp = (segment['timestamp'] - base_tick) / RLA_TIME_MAGNITUDE            
             for idx, boneEuler in enumerate(segment['pose']['boneDatas']):
-                if validBones[idx] != rootBone:
-                    anim.TransformTracks[TransformType.EulerRotation][inv_hash_table[validBones[idx]]].add_keyframe(
-                        KeyFrame(anim_tick / 1e7, Vector3(*rad_to_deg(boneEuler)), Vector3(0,0,0), Vector3(0,0,0), 0)
+                if RLA_VALID_BONES[idx] != RLA_ROOT_BONE:
+                    anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_VALID_BONES[idx]]].add_keyframe(
+                        KeyFrame(timestamp, UnityQuaternion(*euler3_to_quat_swizzled(boneEuler)), UnityQuaternion(), UnityQuaternion(), 0)
                     )
-            anim.TransformTracks[TransformType.Translation][inv_hash_table[rootBone]].add_keyframe(
-                KeyFrame(anim_tick / 1e7, Vector3(*segment['pose']['bodyPosition']), Vector3(0,0,0), Vector3(0,0,0), 0)
+            anim.TransformTracks[TransformType.Translation][inv_hash_table[RLA_ROOT_BONE]].add_keyframe(
+                KeyFrame(timestamp, Vector3(*segment['pose']['bodyPosition']), Vector3(), Vector3(), 0)
             )
-            anim.TransformTracks[TransformType.EulerRotation][inv_hash_table[rootBone]].add_keyframe(
-                KeyFrame(anim_tick / 1e7, Vector3(*rad_to_deg(segment['pose']['bodyRotation'])), Vector3(0,0,0), Vector3(0,0,0), 0)
+            anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_ROOT_BONE]].add_keyframe(
+                KeyFrame(timestamp, UnityQuaternion(*euler3_to_quat_swizzled(segment['pose']['bodyRotation'])), UnityQuaternion(), UnityQuaternion(), 0)
             )
         import_armature_animation('TEST', anim, obj, 0, True)
+        time_range = sssekai_global.rla_clip_tick_range
+        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(time_range[1] * bpy.context.scene.render.fps))
+        bpy.context.scene.frame_current = int(time_range[0] * bpy.context.scene.render.fps)
         return {'FINISHED'}
 
+def enumerate_rla_assets(self, context):
+    global sssekai_global
+
+    if context is None:
+        return []
+    
+    wm = context.window_manager
+
+    filename = wm.sssekai_streaming_live_archive_bundle
+    if not path.isfile(filename) or filename == sssekai_global.rla_sekai_streaming_live_bundle_path:
+        return sssekai_global.rla_enum_entries or [("NONE", "None", "", 0)]
+
+    try:
+        with open(filename, 'rb') as f:
+            rla_env = load_assetbundle(f)
+            datas = dict()
+            for obj in rla_env.objects:
+                if obj.type in {ClassIDType.TextAsset}:
+                    data = obj.read()
+                    datas[data.name] = data
+            header = sssekai_global.rla_header = json.loads(datas['sekai.rlh'].text)   
+            seconds = header['splitSeconds']
+            sssekai_global.rla_raw_clips.clear()
+            for sid in header['splitFileIds']:
+                sname = 'sekai_%2d_%08d' % (seconds, sid)
+                data = datas[sname + '.rla'].script.tobytes()
+                sssekai_global.rla_raw_clips[sname] = data
+            sssekai_global.rla_sekai_streaming_live_bundle_path = filename
+            sssekai_global.rla_enum_entries = [(sname, sname, '', 'ANIM_DATA', index) for index, sname in enumerate(sssekai_global.rla_raw_clips.keys())]
+    except Exception as e:
+        print('* Failed to load RLA bundle:', e)       
+    return sssekai_global.rla_enum_entries
+
+class SSSekaiRLAImportPanel(bpy.types.Panel):
+    bl_idname = "OBJ_PT_sssekai_rla_import"
+    bl_label = T("RLA Import")
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "SSSekai"
+    
+    @classmethod
+    def poll(self, context):
+        wm = context.window_manager
+        entry = wm.sssekai_rla_selected
+        if entry and entry != sssekai_global.rla_selected_raw_clip and entry in sssekai_global.rla_raw_clips:
+            print('* Loading RLA index', entry)
+            from sssekai.fmt.rla import read_rla
+            from io import BytesIO
+            version = sssekai_global.rla_get_version()            
+            sssekai_global.rla_clip_data = read_rla(BytesIO(sssekai_global.rla_raw_clips[entry]), version)
+            sssekai_global.rla_selected_raw_clip = entry
+            min_tick, max_tick = 1e18, 0
+            sssekai_global.rla_clip_charas.clear()
+            for tick, data in sssekai_global.rla_clip_data.items():
+                m_data = data.get('MotionCaptureData', None)
+                if m_data:
+                    min_tick = min(min_tick, tick)
+                    max_tick = max(max_tick, tick)
+                    m_data = m_data[0]['data']
+                    for pose in m_data:
+                        sssekai_global.rla_clip_charas.add(pose['id'])
+            base_tick = sssekai_global.rla_header['baseTicks']            
+            sssekai_global.rla_clip_tick_range = ((min_tick - base_tick) / RLA_TIME_MAGNITUDE, (max_tick - base_tick) / RLA_TIME_MAGNITUDE)
+        return True
+
+    def draw(self, context: Context):
+        layout = self.layout
+        wm = context.window_manager
+        row = layout.row()
+        row.label(text='Statistics')        
+        row = layout.row()
+        row.label(text='Version: %d.%d' % sssekai_global.rla_get_version())
+        row = layout.row()
+        row.label(text='Time %.2fs - %.2fs' % sssekai_global.rla_clip_tick_range)
+        row = layout.row()
+        row.label(text='Character IDs: %s' % ','.join(str(x) for x in sssekai_global.rla_clip_charas))
+        row = layout.row()
+        row.label(text='Number of segments: %d' % len(sssekai_global.rla_clip_data))
+        row = layout.row()
+        layout.prop(wm, "sssekai_streaming_live_archive_bundle", icon='FILE_FOLDER')
+        row = layout.row()
+        row.prop(wm, "sssekai_rla_selected", icon='SCENE_DATA')
+        row = layout.row()
+        row.prop(wm, "sssekai_rla_active_character", icon='ARMATURE_DATA')
+        row = layout.row()
+        row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='OUTLINER_OB_ARMATURE')
+        row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='SHAPEKEY_DATA')
+        
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
     bl_label = T("Import")
@@ -770,7 +882,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_BLEND')
         # XXX: Testing
         row = layout.row()
-        row.operator(SSSekaiBlenderTestOperator.bl_idname)
+        row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname)
 
 def register():
     WindowManager.sssekai_assetbundle_file = StringProperty(
@@ -782,6 +894,21 @@ def register():
         name=T("Asset"),
         description=T("Selected Asset"),
         items=enumerate_assets,
+    )
+    WindowManager.sssekai_streaming_live_archive_bundle = StringProperty(
+        name=T("RLA Bundle"),
+        description=T("The bundle file inside 'streaming_live/archive' directory"),
+        subtype='FILE_PATH',
+    )
+    WindowManager.sssekai_rla_selected = EnumProperty(
+        name=T("RLA Clip"),
+        description=T("Selected RLA Clip"),
+        items=enumerate_rla_assets,
+    )    
+    WindowManager.sssekai_rla_active_character = IntProperty(
+        name=T("Character ID"),
+        description=T("Active Character ID"),
+        default=0
     )
     WindowManager.sssekai_armatures_as_articulations = BoolProperty(
         name=T("Armatures as Articulations"),
@@ -820,6 +947,7 @@ def register():
 
     bpy.utils.register_class(SSSekaiBlenderImportOperator)
     bpy.utils.register_class(SSSekaiBlenderImportPanel)
+    bpy.utils.register_class(SSSekaiRLAImportPanel)
     bpy.utils.register_class(SSSekaiBlenderAssetSearchOperator)
     bpy.types.Scene.sssekai_util_neck_attach_obj_face = bpy.props.PointerProperty(name=T("Face"),type=bpy.types.Armature)
     bpy.types.Scene.sssekai_util_neck_attach_obj_body = bpy.props.PointerProperty(name=T("Body"),type=bpy.types.Armature)
@@ -837,12 +965,13 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderUtilNeckMergeOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
     bpy.utils.register_class(SSSekaiBlenderExportAnimationTypeTree)
-    bpy.utils.register_class(SSSekaiBlenderTestOperator)
+    bpy.utils.register_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
 
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportPanel)
+    bpy.utils.unregister_class(SSSekaiRLAImportPanel)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttachOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttach)
     bpy.utils.unregister_class(SSSekaiBlenderApplyOutlineOperator)
@@ -857,5 +986,5 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderUtilNeckMergeOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
     bpy.utils.unregister_class(SSSekaiBlenderExportAnimationTypeTree)
-    bpy.utils.unregister_class(SSSekaiBlenderTestOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
 
