@@ -10,7 +10,7 @@ Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
   * Skinned Mesh
   * Armatures (built through GameObject hierarchy)
   * Physics (Rigidbodies, Colliders, Spring Bones)
-  * Animations (Skeletal, BlendShape, Camera)
+  * Animations (Skeletal, Articulations, BlendShape, Camera)
 
 ### Supported Languages:
 PRs are welcome for additions. You can find the translation files [here](https://github.com/mos9527/sssekai_blender_io/tree/master/blender/i18n), which can be edited with [POEdit](https://poedit.net/). You can start by copying the `en-US.po` file and renaming it to your language code (e.g. `zh-HANS.po` for Simplified Chinese).
