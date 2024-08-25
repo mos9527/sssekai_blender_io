@@ -45,6 +45,10 @@ def swizzle_quaternion4(X,Y,Z,W):
     return BlenderQuaternion((W,X,Z,-Y)) # conjugate (W,-X,-Z,Y)
 def swizzle_quaternion(quat):
     return swizzle_quaternion4(quat.X, quat.Y, quat.Z, quat.W)
+def ensure_quaternion_lerpable(quat):
+    quat = quat.normalized()
+    if quat.w < 0: quat.negate()
+    return quat
 # Used for bone path (boneName) and blend shape name inverse hashing
 def get_name_hash(name : str):
     return zlib.crc32(name.encode('utf-8'))
