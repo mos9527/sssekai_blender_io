@@ -726,27 +726,32 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
             anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_ROOT_BONE]] = Track()
         anim.TransformTracks[TransformType.Translation][inv_hash_table[RLA_ROOT_BONE]] = Track()
         # See swizzle_quaternion4. This is the inverse of that since we're reproducing Unity's quaternion
-        inv_swizzle_quaternion = lambda quat: (quat.x, -quat.z, quat.y, quat.w)
-        euler3_to_quat = lambda euler: swizzle_euler3(euler[0],euler[1],euler[2]).to_quaternion()
-        euler3_to_quat_swizzled = lambda euler: inv_swizzle_quaternion(euler3_to_quat(euler))
+        def euler3_to_quat_swizzled(x,y,z):
+            # See https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html
+            # Unity uses ZXY rotation order            
+            quat = BlenderQuaternion((0,0,1), -y) @ BlenderQuaternion((1,0,0), x) @ BlenderQuaternion((0,1,0),z) # Blender's RH so read it backwards
+            return UnityQuaternion(quat.x, -quat.z, quat.y, quat.w)
         base_tick = sssekai_global.rla_header['baseTicks']
+        tick_min, tick_max = 1e18, 0
         for segment in chara_segments:            
-            timestamp = (segment['timestamp'] - base_tick) / RLA_TIME_MAGNITUDE            
+            timestamp = (segment['timestamp'] - base_tick) / RLA_TIME_MAGNITUDE       
+            tick_min = min(tick_min, timestamp)
+            tick_max = max(tick_max, timestamp)     
             for idx, boneEuler in enumerate(segment['pose']['boneDatas']):
                 if RLA_VALID_BONES[idx] != RLA_ROOT_BONE:
                     anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_VALID_BONES[idx]]].add_keyframe(
-                        KeyFrame(timestamp, UnityQuaternion(*euler3_to_quat_swizzled(boneEuler)), UnityQuaternion(), UnityQuaternion(), 0)
+                        KeyFrame(timestamp, euler3_to_quat_swizzled(*boneEuler), UnityQuaternion(), UnityQuaternion(), 0)
                     )
             anim.TransformTracks[TransformType.Translation][inv_hash_table[RLA_ROOT_BONE]].add_keyframe(
                 KeyFrame(timestamp, Vector3(*segment['pose']['bodyPosition']), Vector3(), Vector3(), 0)
             )
             anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_ROOT_BONE]].add_keyframe(
-                KeyFrame(timestamp, UnityQuaternion(*euler3_to_quat_swizzled(segment['pose']['bodyRotation'])), UnityQuaternion(), UnityQuaternion(), 0)
+                KeyFrame(timestamp, euler3_to_quat_swizzled(*segment['pose']['bodyRotation']), UnityQuaternion(), UnityQuaternion(), 0)
             )
         import_armature_animation('RLA', anim, obj, 0, False)
         time_range = sssekai_global.rla_clip_tick_range
-        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(time_range[1] * bpy.context.scene.render.fps))
-        bpy.context.scene.frame_current = int(time_range[0] * bpy.context.scene.render.fps)
+        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
+        bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
         return {'FINISHED'}
 
 class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
@@ -786,16 +791,18 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
         if shapekey_segments:
             for shape in RLA_VALID_BLENDSHAPES:
                 anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_hash_table[shape]] = Track()
+        tick_min, tick_max = 1e18, 0
         for timestamp, segment in shapekey_segments:
             timestamp = (timestamp - base_tick) / RLA_TIME_MAGNITUDE
+            tick_min = min(tick_min, timestamp)
+            tick_max = max(tick_max, timestamp)
             for idx, value in enumerate(segment):
                 anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_hash_table[RLA_VALID_BLENDSHAPES[idx]]].add_keyframe(
                     KeyFrame(timestamp, value, 0, 0, 0)
                 )
         import_keyshape_animation('RLA', anim, mesh_obj, 0, False)
-        time_range = sssekai_global.rla_clip_tick_range
-        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(time_range[1] * bpy.context.scene.render.fps))
-        bpy.context.scene.frame_current = int(time_range[0] * bpy.context.scene.render.fps)        
+        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
+        bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps)        
         return {'FINISHED'}
 
 def enumerate_rla_assets(self, context):
@@ -882,6 +889,8 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_rla_selected", icon='SCENE_DATA')
         row = layout.row()
         row.prop(wm, "sssekai_rla_active_character", icon='ARMATURE_DATA')
+        row = layout.row()
+        row.prop(bpy.context.scene.render, "fps", icon='TIME')
         row = layout.row()
         row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='OUTLINER_OB_ARMATURE')
         row.operator(SSSekaiBlenderImportRLAShapekeyAnimationOperator.bl_idname, icon='SHAPEKEY_DATA')

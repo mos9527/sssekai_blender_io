@@ -26,8 +26,8 @@ from typing import List, Dict
 from dataclasses import dataclass
 from enum import IntEnum
 # Coordinate System | Forward |  Up  |  Left
-# Unity:   LH, Y Up |   Z     |   Y  |   X
-# Blender: RH, Z Up |  -Y     |   Z  |  -X
+# Unity:   LH, Y Up |   Z     |   Y  |  -X
+# Blender: RH, Z Up |  -Y     |   Z  |   X
 def swizzle_vector_scale(vec):
     return Vector((vec.X,vec.Z,vec.Y))
 def swizzle_vector3(X,Y,Z):    
