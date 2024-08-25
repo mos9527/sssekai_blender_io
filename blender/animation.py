@@ -102,7 +102,13 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
             for i in range(0,len(values) - 1):
                 if values[i].dot(values[i+1]) < 0:
                     values[i+1] = -values[i+1]
-            for i in range(len(values)): values[i] = ensure_quaternion_lerpable(values[i])
+            # XXX: This doens't always work _between_ animation clips that are imported separately
+            # since we'd need the delta between two quats for 'make_compatible' to work                        
+            # TODO: Implement this in the FCurve importer as a post-process step
+            values[0] = ensure_quaternion_lerpable(values[0])
+            values[-1] = ensure_quaternion_lerpable(values[-1])
+            for i in range(1,len(values) - 1):
+                values[i].make_compatible(values[i-1])
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'pose.bones["%s"].rotation_quaternion' % bone_name, values, frames, 4)
         else:
@@ -165,8 +171,11 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
             # Ensure minimum rotation path (i.e. neighboring quats dots >= 0)
             for i in range(0,len(values) - 1):
                 if values[i].dot(values[i+1]) < 0:
-                    values[i+1] = -values[i+1]
-            for i in range(len(values)): values[i] = ensure_quaternion_lerpable(values[i])            
+                    values[i+1] = -values[i+1]                    
+            values[0] = ensure_quaternion_lerpable(values[0])
+            values[-1] = ensure_quaternion_lerpable(values[-1])
+            for i in range(1,len(values) - 1):
+                values[i].make_compatible(values[i-1])
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'rotation_quaternion', values, frames, 4)
         else:
