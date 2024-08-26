@@ -21,7 +21,7 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
         data_path (str): data path
         values (list): values. size must be that of frames
         frames (list): frame indices. size must be that of values
-        num_curves (int, optional): number of curves. e.g. with quaternion (W,X,Y,Z) you'd want 4. Defaults to 1.
+        num_curves (int, optional): number of curves. e.g. with translation (X,Y,Z) you'd want 3. Defaults to 1.
     '''
     valueIterable = type(values[0])
     valueIterable = valueIterable != float and valueIterable != int
@@ -40,6 +40,42 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
         fcurve[i].keyframe_points.add(len(curve_data) // 2)
         fcurve[i].keyframe_points.foreach_set('co', curve_data)
         fcurve[i].update()
+    return fcurve
+
+def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values : List[BlenderQuaternion], frames : list):
+    '''Imports an Fcurve into an action, specialized for quaternions
+    * The import function ensures that the quaternions in the curve are compatible with each other (i.e. lerping between them will not cause flips)
+
+    Args:
+        action (bpy.types.Action): target action
+        data_path (str): data path
+        values (List[BlenderQuaternion]): values. size must be that of frames
+        frames (list): frame indices. size must be that of values
+    '''
+    fcurve = [action.fcurves.find(data_path=data_path, index=i) or action.fcurves.new(data_path=data_path, index=i) for i in range(4)]
+    curve_datas = list()
+    for i in range(4):
+        curve_data = [0] * (len(frames) * 2)
+        curve_data[::2] = frames
+        curve_data[1::2] = [v[i] for v in values]
+        if len(fcurve[i].keyframe_points) > 0:
+            # Has existing data. Always append them
+            existing_data = [0] * (len(fcurve[i].keyframe_points) * 2)
+            fcurve[i].keyframe_points.foreach_get('co', existing_data)
+            curve_data = existing_data + curve_data
+        curve_datas.append(curve_data)
+    curve_quats = [BlenderQuaternion((curve_datas[0][i],curve_datas[1][i],curve_datas[2][i],curve_datas[3][i])) for i in range(1, len(curve_datas[i]), 2)]
+    for i in range(1,len(curve_quats)):
+        curve_quats[i].make_compatible(curve_quats[i-1])
+    for i in range(4):
+        curve_datas[i][1::2] = [v[i] for v in curve_quats]
+    for i in range(4):
+        fcurve[i].keyframe_points.clear()
+        fcurve[i].keyframe_points.add(len(curve_datas[i]) // 2)
+        fcurve[i].keyframe_points.foreach_set('co', curve_datas[i])
+        fcurve[i].update()
+    return fcurve
+
 
 def import_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
     bone_table = json.loads(dest_arma.data[KEY_BONE_NAME_HASH_TBL])
@@ -102,15 +138,8 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
             for i in range(0,len(values) - 1):
                 if values[i].dot(values[i+1]) < 0:
                     values[i+1] = -values[i+1]
-            # XXX: This doens't always work _between_ animation clips that are imported separately
-            # since we'd need the delta between two quats for 'make_compatible' to work                        
-            # TODO: Implement this in the FCurve importer as a post-process step
-            values[0] = ensure_quaternion_lerpable(values[0])
-            values[-1] = ensure_quaternion_lerpable(values[-1])
-            for i in range(1,len(values) - 1):
-                values[i].make_compatible(values[i-1])
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
-            import_fcurve(action,'pose.bones["%s"].rotation_quaternion' % bone_name, values, frames, 4)
+            import_fcurve_quatnerion(action,'pose.bones["%s"].rotation_quaternion' % bone_name, values, frames)
         else:
             print("* WARNING: [Rotation] Bone hash %s not found in bone table" % bone_hash)
     for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
@@ -172,12 +201,8 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
             for i in range(0,len(values) - 1):
                 if values[i].dot(values[i+1]) < 0:
                     values[i+1] = -values[i+1]                    
-            values[0] = ensure_quaternion_lerpable(values[0])
-            values[-1] = ensure_quaternion_lerpable(values[-1])
-            for i in range(1,len(values) - 1):
-                values[i].make_compatible(values[i-1])
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
-            import_fcurve(action,'rotation_quaternion', values, frames, 4)
+            import_fcurve_quatnerion(action,'rotation_quaternion', values, frames)
         else:
             print("* WARNING: [Rotation] Bone hash %s not found in joint table" % bone_hash)
     for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
