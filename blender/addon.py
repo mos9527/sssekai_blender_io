@@ -295,10 +295,13 @@ class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
         body_obj = scene.objects.get(body_arma.name)
         bpy.context.view_layer.objects.active = face_obj
         bpy.ops.object.mode_set(mode='POSE')
-        neck_bone = face_obj.pose.bones['Neck']
-        constraint = neck_bone.constraints.new('COPY_TRANSFORMS')
-        constraint.target = body_obj
-        constraint.subtarget = 'Neck'
+        def add_constraint(name):
+            bone = face_obj.pose.bones[name]
+            constraint = bone.constraints.new('COPY_TRANSFORMS')
+            constraint.target = body_obj
+            constraint.subtarget = name
+        add_constraint('Neck')
+        add_constraint('Head')
         return {'FINISHED'}
 
 class SSSekaiBlenderUtilNeckMergeOperator(bpy.types.Operator):
