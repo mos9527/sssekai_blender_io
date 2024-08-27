@@ -23,7 +23,7 @@ You can find your language code by entering `bpy.app.translations.locale` in the
 ## Installing & Updating
 - Install/Update depedencies in your Blender Python
     - Navigate to your Blender installation path, and find the Python interperter of your version. (e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`)
-    - In its working directory (i.e. `...\python\bin`), run the following (in a command prompt)
+    - In its working directory (i.e. `...\python\bin`), run the following (**in a command prompt**. In Windows you can press Shift+Mouse Right Click to open up a new Terminal/Powershell Prompt)
 ```bash
 .\python -m ensurepip
 .\python -m pip install -U sssekai
