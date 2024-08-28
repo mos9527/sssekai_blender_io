@@ -228,7 +228,7 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
             print("* WARNING: [Translation] Bone hash %s not found in joint table" % bone_hash)
     for bone_hash, track in data.TransformTracks[TransformType.Scaling].items():
         bone_name = joint_table.get(str(bone_hash),None)
-        obj = joint_obj.get(joint_table[str(bone_hash)],None)
+        obj = joint_obj.get(bone_name,None)
         if obj:
             action = ensure_action(obj, name, False)
             values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
