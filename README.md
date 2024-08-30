@@ -1,5 +1,5 @@
 # sssekai_blender_io
-Blender I/O for the game's assets. (actually it's imports only)
+Blender asset importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク) asset bundles.
 
 Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
 
@@ -12,7 +12,7 @@ Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
   * Physics (WIP. Limited support for Rigidbodies, Colliders, and Spring Bones)
   * Animations (Armatures, Articulations, BlendShape, Camera. From `live_pv` and `streaming_live` assets)
 
-### Supported Languages:
+### Supported Languages
 PRs are welcome for additions. You can find the auto-generated translation files [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations.py).
 
 You can find your language code by entering `bpy.app.translations.locale` in the Blender Python console.
@@ -36,13 +36,13 @@ You can find your language code by entering `bpy.app.translations.locale` in the
 TODO
 
 ## Notes
-- The plugin is observed to work with other Unity games as well. But such compatibility is not guaranteed, and WILL NOT receive support from the author in full capacity.
-- 
+The plugin is observed to work with other Unity games as well. But such compatibility is not guaranteed, and WILL NOT receive support from the author in full capacity.
 
 ## License
 MIT
 
 ## References
+- https://github.com/K0lb3/UnityPy
 - https://github.com/KhronosGroup/glTF-Blender-IO
 - https://github.com/theturboturnip/yk_gmd_io
 - https://github.com/SutandoTsukai181/yakuza-gmt-blender
