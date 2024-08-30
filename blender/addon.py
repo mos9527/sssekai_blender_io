@@ -19,7 +19,7 @@ from bpy.props import (
     BoolProperty,
     IntProperty
 )
-from .i18n import get_text as T
+from bpy.app.translations import pgettext as T
 
 def encode_asset_id(obj):
     prop = lambda x: '<%s %s>' % (x,getattr(obj,x,'<unk>'))
@@ -877,15 +877,15 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         layout = self.layout
         wm = context.window_manager
         row = layout.row()
-        row.label(text='Statistics')        
+        row.label(text=T('Statistics'))
         row = layout.row()
-        row.label(text='Version: %d.%d' % sssekai_global.rla_get_version())
+        row.label(text=T('Version: %d.%d') % sssekai_global.rla_get_version())
         row = layout.row()
-        row.label(text='Time %.2fs - %.2fs' % sssekai_global.rla_clip_tick_range)
+        row.label(text=T('Time %.2fs - %.2fs') % sssekai_global.rla_clip_tick_range)
         row = layout.row()
-        row.label(text='Character IDs: %s' % ','.join(str(x) for x in sssekai_global.rla_clip_charas))
+        row.label(text=T('Character IDs: %s') % ','.join(str(x) for x in sssekai_global.rla_clip_charas))
         row = layout.row()
-        row.label(text='Number of segments: %d' % len(sssekai_global.rla_clip_data))
+        row.label(text=T('Number of segments: %d') % len(sssekai_global.rla_clip_data))
         row = layout.row()
         layout.prop(wm, "sssekai_streaming_live_archive_bundle", icon='FILE_FOLDER')
         row = layout.row()

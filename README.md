@@ -6,19 +6,19 @@ Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
 ### Importer Features
   * Textures
   * Character Toon Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/master/assets/SekaiShaderStandalone.blend))
-  * Static Mesh
-  * Skinned Mesh
-  * Armatures (built through GameObject hierarchy)
-  * Physics (Rigidbodies, Colliders, Spring Bones)
-  * Animations (Skeletal, Articulations, BlendShape, Camera)
+  * Static/Skinned Meshes
+  * Armatures
+  * Articulations (Scene rebuilt with Empty object and static meshes)
+  * Physics (WIP. Limited support for Rigidbodies, Colliders, and Spring Bones)
+  * Animations (Armatures, Articulations, BlendShape, Camera. From `live_pv` and `streaming_live` assets)
 
 ### Supported Languages:
-PRs are welcome for additions. You can find the translation files [here](https://github.com/mos9527/sssekai_blender_io/tree/master/blender/i18n), which can be edited with [POEdit](https://poedit.net/). You can start by copying the `en-US.po` file and renaming it to your language code (e.g. `zh-HANS.po` for Simplified Chinese).
+PRs are welcome for additions. You can find the auto-generated translation files [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations.py).
 
 You can find your language code by entering `bpy.app.translations.locale` in the Blender Python console.
 
-- English (en-US)
-- 简体中文 (zh-HANS)
+- English (en_US)
+- 简体中文 (zh_HANS)
 
 ## Installing & Updating
 - Install/Update depedencies in your Blender Python
@@ -34,6 +34,13 @@ You can find your language code by entering `bpy.app.translations.locale` in the
 
 ## Usage
 TODO
+
+## Notes
+- The plugin is observed to work with other Unity games as well. But such compatibility is not guaranteed, and WILL NOT receive support from the author in full capacity.
+- 
+
+## License
+MIT
 
 ## References
 - https://github.com/KhronosGroup/glTF-Blender-IO

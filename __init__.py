@@ -20,7 +20,9 @@ except ImportError as e:
 try:
     import bpy
     from .blender.addon import register, unregister, SSSekaiBlenderImportPanel
+    from .translations import translations_dict
     BLENDER = True
+    bpy.app.translations.register(__package__, translations_dict)
 except Exception as e:
     print('* Running outside of Blender:',e)
     BLENDER = False
