@@ -3,7 +3,7 @@ Blender asset importer for Project SEKAI (JP: プロジェクトセカイ カラ
 
 Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
 
-### Importer Features
+# Importer Features
   * Textures
   * Character Toon Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/master/assets/SekaiShaderStandalone.blend))
   * Static/Skinned Meshes
@@ -12,7 +12,7 @@ Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
   * Physics (WIP. Limited support for Rigidbodies, Colliders, and Spring Bones)
   * Animations (Armatures, Articulations, BlendShape, Camera. From `live_pv` and `streaming_live` assets)
 
-### Supported Languages
+# Supported Languages
 PRs are welcome for additions. You can find the auto-generated translation files [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations.py).
 
 You can find your language code by entering `bpy.app.translations.locale` in the Blender Python console.
@@ -20,7 +20,7 @@ You can find your language code by entering `bpy.app.translations.locale` in the
 - English (en_US)
 - 简体中文 (zh_HANS)
 
-## Installing & Updating
+# Installing & Updating
 - Install/Update depedencies in your Blender Python
     - Navigate to your Blender installation path, and find the Python interperter of your version. (e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`)
     - In its working directory (i.e. `...\python\bin`), run the following (**in a command prompt**. In Windows you can press Shift+Mouse Right Click to open up a new Terminal/Powershell Prompt)
@@ -32,16 +32,16 @@ You can find your language code by entering `bpy.app.translations.locale` in the
 - In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just downloaded.
 - The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
 
-## Usage
-TODO
+# Usage
+TODO. Watch out for the [Wiki](https://github.com/mos9527/sssekai_blender_io/wiki) though!
 
-## Notes
+# Notes
 The plugin is observed to work with other Unity games as well. But such compatibility is not guaranteed, and WILL NOT receive support from the author in full capacity.
 
-## License
+# License
 MIT
 
-## References
+# References
 - https://github.com/K0lb3/UnityPy
 - https://github.com/KhronosGroup/glTF-Blender-IO
 - https://github.com/theturboturnip/yk_gmd_io
