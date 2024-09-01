@@ -32,7 +32,7 @@ You can find your language code by entering `bpy.app.translations.locale` in the
 - In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just downloaded.
 - The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
 
-# Usage
+# Documentation
 See the [wiki page!](https://github.com/mos9527/sssekai_blender_io/wiki)
 
 # Notes
