@@ -1,5 +1,6 @@
 from typing import Set
 from os import path
+import zipfile
 
 import UnityPy.classes
 import UnityPy.classes
@@ -808,6 +809,7 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
             )
         import_armature_animation('RLA', anim, obj, 0, False)
         time_range = sssekai_global.rla_clip_tick_range
+        print(base_tick, tick_min, tick_max)
         bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
         bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
         return {'FINISHED'}
@@ -877,18 +879,28 @@ def enumerate_rla_assets(self, context):
 
     try:
         with open(filename, 'rb') as f:
-            rla_env = load_assetbundle(f)
             datas = dict()
-            for obj in rla_env.objects:
-                if obj.type in {ClassIDType.TextAsset}:
-                    data = obj.read()
-                    datas[data.name] = data
-            header = sssekai_global.rla_header = json.loads(datas['sekai.rlh'].text)   
+            if f.read(2) == b'PK':
+                f.seek(0)
+                print('* Loaded RLA ZIP archive:', filename)
+                with zipfile.ZipFile(f, 'r') as z:
+                    for name in z.namelist():
+                        with z.open(name) as zf:
+                            datas[name] = zf.read()
+            else:
+                f.seek(0)
+                rla_env = load_assetbundle(f)
+                print('* Loaded RLA Unity bundle:', filename)
+                for obj in rla_env.objects:
+                    if obj.type in {ClassIDType.TextAsset}:
+                        data = obj.read()
+                        datas[data.name] = data.script.tobytes()
+            header = sssekai_global.rla_header = json.loads(datas['sekai.rlh'].decode('utf-8'))   
             seconds = header['splitSeconds']
             sssekai_global.rla_raw_clips.clear()
             for sid in header['splitFileIds']:
-                sname = 'sekai_%2d_%08d' % (seconds, sid)
-                data = datas[sname + '.rla'].script.tobytes()
+                sname = 'sekai_%02d_%08d' % (seconds, sid)
+                data = datas[sname + '.rla']
                 sssekai_global.rla_raw_clips[sname] = data
             sssekai_global.rla_sekai_streaming_live_bundle_path = filename
             sssekai_global.rla_enum_entries = [(sname, sname, '', 'ANIM_DATA', index) for index, sname in enumerate(sssekai_global.rla_raw_clips.keys())]
@@ -907,7 +919,7 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
     def poll(self, context):
         wm = context.window_manager
         entry = wm.sssekai_rla_selected
-        if entry and entry != sssekai_global.rla_selected_raw_clip and entry in sssekai_global.rla_raw_clips:
+        if entry and entry != sssekai_global.rla_selected_raw_clip and entry in sssekai_global.rla_raw_clips and sssekai_global.rla_raw_clips[entry]:
             print('* Loading RLA index', entry)
             from sssekai.fmt.rla import read_rla
             from io import BytesIO
@@ -1015,7 +1027,7 @@ def register():
     )
     WindowManager.sssekai_streaming_live_archive_bundle = StringProperty(
         name=T("RLA Bundle"),
-        description=T("The bundle file inside 'streaming_live/archive' directory"),
+        description=T("The bundle file inside 'streaming_live/archive' directory, or, alternatively, a ZIP file containing 'sekai.rlh' (json) and respective rla files"),
         subtype='FILE_PATH',
     )
     WindowManager.sssekai_rla_selected = EnumProperty(
