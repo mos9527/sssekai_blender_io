@@ -32,8 +32,8 @@ You can find your language code by entering `bpy.app.translations.locale` in the
 - In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just downloaded.
 - The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
 
-# Usage
-TODO. Watch out for the [Wiki](https://github.com/mos9527/sssekai_blender_io/wiki) though!
+# Documentation
+See the [wiki page!](https://github.com/mos9527/sssekai_blender_io/wiki)
 
 # Notes
 The plugin is observed to work with other Unity games as well. But such compatibility is not guaranteed, and WILL NOT receive support from the author in full capacity.
