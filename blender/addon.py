@@ -695,6 +695,31 @@ class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
         wm.invoke_search_popup(self)
         return {'FINISHED'}    
 
+class SSSekaiBlenderImportRLAArmaturePoseOperator(bpy.types.Operator):
+    bl_idname = "sssekai.rla_import_armature_pose_op"
+    bl_label = T("Import Armature Pose")
+    bl_description = T("Import Armature Pose for the selected character from a JSON array of bone eulers, into the first frame of the current animation")
+    def execute(self, context):
+        obj = bpy.context.active_object
+        assert obj.type == 'ARMATURE', "Please select an armature to import the animation to!"
+        wm = context.window_manager
+        bone_array = json.loads(wm.sssekai_rla_bone_array)
+        assert len(bone_array) <= len(RLA_VALID_BONES), "Too many bones!"
+        anim = Animation()
+        
+        inv_hash_table = obj.data[KEY_BONE_NAME_HASH_TBL]
+        inv_hash_table = json.loads(inv_hash_table)
+        inv_hash_table = {v:k for k,v in inv_hash_table.items()}
+
+        for bone in RLA_VALID_BONES: anim.TransformTracks[TransformType.Rotation][inv_hash_table[bone]] = Track()                
+        for idx, euler in enumerate(bone_array):
+            anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_VALID_BONES[idx]]].add_keyframe(
+                KeyFrame(0, euler3_to_quat_swizzled(*euler), UnityQuaternion(), UnityQuaternion(), 0)
+            )
+        import_armature_animation('RLA', anim, obj, 0, False)
+        bpy.context.scene.frame_current = 0
+        return {'FINISHED'}
+
 class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
     bl_idname = "sssekai.rla_import_armature_animation_op"
     bl_label = T("Import Armature Animation")
@@ -728,12 +753,6 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
         else:
             anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_ROOT_BONE]] = Track()
         anim.TransformTracks[TransformType.Translation][inv_hash_table[RLA_ROOT_BONE]] = Track()
-        # See swizzle_quaternion4. This is the inverse of that since we're reproducing Unity's quaternion
-        def euler3_to_quat_swizzled(x,y,z):
-            # See https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html
-            # Unity uses ZXY rotation order            
-            quat = BlenderQuaternion((0,0,1), -y) @ BlenderQuaternion((1,0,0), x) @ BlenderQuaternion((0,1,0),z) # Blender's RH so read it backwards
-            return UnityQuaternion(quat.x, -quat.z, quat.y, quat.w)
         base_tick = sssekai_global.rla_header['baseTicks']
         tick_min, tick_max = 1e18, 0
         for segment in chara_segments:            
@@ -897,6 +916,9 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row = layout.row()
         row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='OUTLINER_OB_ARMATURE')
         row.operator(SSSekaiBlenderImportRLAShapekeyAnimationOperator.bl_idname, icon='SHAPEKEY_DATA')
+        row = layout.row()
+        row.prop(wm, "sssekai_rla_bone_array", icon='OUTLINER_DATA_ARMATURE')
+        row.operator(SSSekaiBlenderImportRLAArmaturePoseOperator.bl_idname, icon='ARMATURE_DATA')
         
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
@@ -970,6 +992,11 @@ def register():
         description=T("Active Character ID"),
         default=0
     )
+    WindowManager.sssekai_rla_bone_array = StringProperty(
+        name=T("Bone Array"),
+        description=T("JSON array of bone eulers"),
+        default=""
+    )
     WindowManager.sssekai_armatures_as_articulations = BoolProperty(
         name=T("Armatures as Articulations"),
         description=T("Treating armatures as articulations instead of skinned meshes. Useful for importing stages, etc"),
@@ -1027,6 +1054,7 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderExportAnimationTypeTree)
     bpy.utils.register_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
     bpy.utils.register_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
+    bpy.utils.register_class(SSSekaiBlenderImportRLAArmaturePoseOperator)
 
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
@@ -1049,3 +1077,4 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderExportAnimationTypeTree)
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderImportRLAArmaturePoseOperator)

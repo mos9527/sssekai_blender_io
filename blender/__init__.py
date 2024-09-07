@@ -45,6 +45,12 @@ def swizzle_quaternion4(X,Y,Z,W):
     return BlenderQuaternion((W,X,Z,-Y)) # conjugate (W,-X,-Z,Y)
 def swizzle_quaternion(quat):
     return swizzle_quaternion4(quat.X, quat.Y, quat.Z, quat.W)
+# See swizzle_quaternion4. This is the inverse of that since we're reproducing Unity's quaternion
+def euler3_to_quat_swizzled(x,y,z):
+    # See https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html
+    # Unity uses ZXY rotation order            
+    quat = BlenderQuaternion((0,0,1), -y) @ BlenderQuaternion((1,0,0), x) @ BlenderQuaternion((0,1,0),z) # Blender's RH so read it backwards
+    return UnityQuaternion(quat.x, -quat.z, quat.y, quat.w)
 # Used for bone path (boneName) and blend shape name inverse hashing
 def get_name_hash(name : str):
     return zlib.crc32(name.encode('utf-8'))
