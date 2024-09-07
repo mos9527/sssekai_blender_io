@@ -912,7 +912,7 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
             from sssekai.fmt.rla import read_rla
             from io import BytesIO
             version = sssekai_global.rla_get_version()            
-            sssekai_global.rla_clip_data = read_rla(BytesIO(sssekai_global.rla_raw_clips[entry]), version)
+            sssekai_global.rla_clip_data = read_rla(BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=False)
             sssekai_global.rla_selected_raw_clip = entry
             min_tick, max_tick = 1e18, 0
             sssekai_global.rla_clip_charas.clear()
