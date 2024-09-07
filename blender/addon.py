@@ -695,10 +695,45 @@ class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
         wm.invoke_search_popup(self)
         return {'FINISHED'}    
 
+class SSSekaiBlenderImportRLAShapekeyPoseOperator(bpy.types.Operator):
+    bl_idname = "sssekai.rla_import_shapekey_pose_op"
+    bl_label = T("Import Shapekey Pose")
+    bl_description = T("Import Shapekey Pose for the selected character from a JSON array of blendshape weights")
+    def execute(self, context):
+        obj = bpy.context.active_object
+        wm = context.window_manager
+
+        assert obj.type == 'ARMATURE', "Please select an armature to import the animation to!"
+        mesh_obj = None
+        for child in bpy.context.active_object.children:
+            if KEY_SHAPEKEY_NAME_HASH_TBL in child.data:
+                mesh_obj = child
+                break
+        assert mesh_obj, "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes!"
+        
+        blendshape_weights = json.loads(wm.sssekai_rla_blendshape_weights)
+        assert len(blendshape_weights) <= len(RLA_VALID_BLENDSHAPES), "Too many shapekeys!"
+        anim = Animation() 
+        
+        inv_hash_table = mesh_obj.data[KEY_SHAPEKEY_NAME_HASH_TBL]
+        inv_hash_table = json.loads(inv_hash_table)
+        inv_hash_table = {v:k for k,v in inv_hash_table.items()}        
+        anim.FloatTracks[BLENDSHAPES_UNK_CRC] = dict()   
+        for shape in RLA_VALID_BLENDSHAPES:
+            anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_hash_table[shape]] = Track()        
+        for idx, value in enumerate(blendshape_weights):
+            anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_hash_table[RLA_VALID_BLENDSHAPES[idx]]].add_keyframe(
+                KeyFrame(0, value, 0, 0, 0)
+            )
+        import_keyshape_animation('RLA', anim, mesh_obj, wm.sssekai_animation_import_offset, False)   
+        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, wm.sssekai_animation_import_offset)     
+        bpy.context.scene.frame_current = wm.sssekai_animation_import_offset      
+        return {'FINISHED'}
+
 class SSSekaiBlenderImportRLAArmaturePoseOperator(bpy.types.Operator):
     bl_idname = "sssekai.rla_import_armature_pose_op"
     bl_label = T("Import Armature Pose")
-    bl_description = T("Import Armature Pose for the selected character from a JSON array of bone eulers, into the first frame of the current animation")
+    bl_description = T("Import Armature Pose for the selected character from a JSON array of bone eulers, into the offset frame set in Animation Options")
     def execute(self, context):
         obj = bpy.context.active_object
         assert obj.type == 'ARMATURE', "Please select an armature to import the animation to!"
@@ -716,8 +751,9 @@ class SSSekaiBlenderImportRLAArmaturePoseOperator(bpy.types.Operator):
             anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_VALID_BONES[idx]]].add_keyframe(
                 KeyFrame(0, euler3_to_quat_swizzled(*euler), UnityQuaternion(), UnityQuaternion(), 0)
             )
-        import_armature_animation('RLA', anim, obj, 0, False)
-        bpy.context.scene.frame_current = 0
+        import_armature_animation('RLA', anim, obj, wm.sssekai_animation_import_offset, False)
+        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, wm.sssekai_animation_import_offset)
+        bpy.context.scene.frame_current = wm.sssekai_animation_import_offset
         return {'FINISHED'}
 
 class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
@@ -914,12 +950,15 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(bpy.context.scene.render, "fps", icon='TIME')
         row = layout.row()
-        row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='OUTLINER_OB_ARMATURE')
+        row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='ARMATURE_DATA')
         row.operator(SSSekaiBlenderImportRLAShapekeyAnimationOperator.bl_idname, icon='SHAPEKEY_DATA')
         row = layout.row()
-        row.prop(wm, "sssekai_rla_bone_array", icon='OUTLINER_DATA_ARMATURE')
+        row.prop(wm, "sssekai_rla_bone_array", icon='ARMATURE_DATA')
+        row = layout.row()
+        row.prop(wm, "sssekai_rla_blendshape_weights", icon='SHAPEKEY_DATA')
+        row = layout.row()
         row.operator(SSSekaiBlenderImportRLAArmaturePoseOperator.bl_idname, icon='ARMATURE_DATA')
-        
+        row.operator(SSSekaiBlenderImportRLAShapekeyPoseOperator.bl_idname,icon='SHAPEKEY_DATA')
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
     bl_label = T("Import")
@@ -964,7 +1003,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row = layout.row()        
         row.label(text=T("Import"))
         row = layout.row()
-        row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_BLEND')
+        row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_BLEND')        
 
 def register():
     WindowManager.sssekai_assetbundle_file = StringProperty(
@@ -995,6 +1034,11 @@ def register():
     WindowManager.sssekai_rla_bone_array = StringProperty(
         name=T("Bone Array"),
         description=T("JSON array of bone eulers"),
+        default=""
+    )
+    WindowManager.sssekai_rla_blendshape_weights = StringProperty(
+        name=T("Blendshape Weights"),
+        description=T("JSON array of blendshape weights"),
         default=""
     )
     WindowManager.sssekai_armatures_as_articulations = BoolProperty(
@@ -1055,6 +1099,7 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
     bpy.utils.register_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
     bpy.utils.register_class(SSSekaiBlenderImportRLAArmaturePoseOperator)
+    bpy.utils.register_class(SSSekaiBlenderImportRLAShapekeyPoseOperator)
 
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
@@ -1078,3 +1123,4 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAArmaturePoseOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderImportRLAShapekeyPoseOperator)

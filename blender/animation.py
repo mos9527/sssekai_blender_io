@@ -44,7 +44,7 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
 
 def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values : List[BlenderQuaternion], frames : list):
     '''Imports an Fcurve into an action, specialized for quaternions
-    * The import function ensures that the quaternions in the curve are compatible with each other (i.e. lerping between them will not cause flips)
+    * The import function ensures that the quaternions in the curve are compatible with each other (i.e. lerping between them will not cause flips)    
 
     Args:
         action (bpy.types.Action): target action
@@ -238,6 +238,7 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
             print("* WARNING: [Scale] Bone hash %s not found in joint table" % bone_hash)
 
 def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object, frame_offset : int, always_create_new : bool):
+    '''NOTE: KeyShape value range [0,100]'''
     mesh = dest_mesh.data
     assert KEY_SHAPEKEY_NAME_HASH_TBL in mesh, "Shape Key table not found. You can only import blend shape animations on meshes with blend shapes!"
     assert BLENDSHAPES_UNK_CRC in data.FloatTracks, "No blend shape animation found!"
