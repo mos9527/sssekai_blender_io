@@ -13,12 +13,15 @@ Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
   * Animations (Armatures, Articulations, BlendShape, Camera. From `live_pv` and `streaming_live` assets)
 
 # Supported Languages
-PRs are welcome for additions. You can find the auto-generated translation files [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations.py).
+PRs are welcome for additions. 
+- You can find the translation file [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations.py).
+- The script used to generate the translation file is [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations_codegen.py). Run this anywhere to update the translation file. Exisiting translations will be preserved.
 
 You can find your language code by entering `bpy.app.translations.locale` in the Blender Python console.
 
-- English (en_US)
-- 简体中文 (zh_HANS)
+Currently supported languages and maintainers:
+- English (en_US, mos9527)
+- 简体中文 (zh_HANS, mos9527)
 
 # Installing & Updating
 - Install/Update depedencies in your Blender Python
