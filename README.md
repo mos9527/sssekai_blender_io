@@ -15,7 +15,7 @@ Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
 # Supported Languages
 PRs are welcome for additions. 
 - You can find the translation file [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations.py).
-- The script used to generate the translation file is [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations_codegen.py). Run this anywhere to update the translation file. Exisiting translations will be preserved.
+- The script used to generate the translation file is [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations_codegen.py). Run this in the root of this repo, with any Python 3.8+ interpreter to update the translation file. Exisiting translations will be preserved.
 
 You can find your language code by entering `bpy.app.translations.locale` in the Blender Python console.
 
