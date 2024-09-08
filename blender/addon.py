@@ -698,8 +698,8 @@ class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
 
 class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
     bl_idname = "sssekai.rla_import_armature_pose_op"
-    bl_label = T("Import Armature Pose")
-    bl_description = T("Import Armature Pose for the selected character from a JSON, into the offset frame set in Animation Options. NOTE: The face/body armature must be pre-processed with the Merge option!")
+    bl_label = T("Import RLA Pose")
+    bl_description = T("Import RLA Pose (armature/shapekey) for the selected object from a JSON, into the offset frame set in Animation Options. NOTE: The face/body armature must be pre-processed with the Merge option!")
     def execute(self, context):
         arma_obj = bpy.context.active_object
         assert arma_obj.type == 'ARMATURE', "Please select an armature to import the animation to!"
