@@ -808,9 +808,11 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
                 KeyFrame(timestamp, euler3_to_quat_swizzled(*segment['pose']['bodyRotation']), UnityQuaternion(), UnityQuaternion(), 0)
             )
         import_armature_animation('RLA', anim, obj, 0, False)
-        time_range = sssekai_global.rla_clip_tick_range
-        print(base_tick, tick_min, tick_max)
-        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
+        # TODO: Figure out why the frame_end is not being set correctly sometimes
+        try:
+            bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
+        except Exception as e:
+            print('* Failed to set frame_end:', e)
         bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
         return {'FINISHED'}
 
@@ -861,7 +863,10 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
                     KeyFrame(timestamp, value, 0, 0, 0)
                 )
         import_keyshape_animation('RLA', anim, mesh_obj, 0, False)
-        bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
+        try:
+            bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
+        except Exception as e:
+            print('* Failed to set frame_end:', e)
         bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps)        
         return {'FINISHED'}
 
@@ -1027,7 +1032,7 @@ def register():
     )
     WindowManager.sssekai_streaming_live_archive_bundle = StringProperty(
         name=T("RLA Bundle"),
-        description=T("The bundle file inside 'streaming_live/archive' directory, or, alternatively, a ZIP file containing 'sekai.rlh' (json) and respective rla files"),
+        description=T("The bundle file inside 'streaming_live/archive' directory.\nOr alternatively, a ZIP file containing 'sekai.rlh' (json) and respective 'sekai_xx_xxxxxx.rla' files. These files should have the extension '.rlh', '.rla'"),
         subtype='FILE_PATH',
     )
     WindowManager.sssekai_rla_selected = EnumProperty(
