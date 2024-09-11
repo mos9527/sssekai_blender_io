@@ -18,6 +18,7 @@ from bpy.props import (
     StringProperty,
     EnumProperty,
     BoolProperty,
+    IntVectorProperty,
     IntProperty
 )
 from bpy.app.translations import pgettext as T
@@ -811,9 +812,9 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
         # TODO: Figure out why the frame_end is not being set correctly sometimes
         try:
             bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
+            bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
         except Exception as e:
-            print('* Failed to set frame_end:', e)
-        bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
+            print('* Failed to set frame range:', e, 'range=', (tick_min, tick_max))
         return {'FINISHED'}
 
 class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
@@ -865,14 +866,38 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
         import_keyshape_animation('RLA', anim, mesh_obj, 0, False)
         try:
             bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
+            bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
         except Exception as e:
-            print('* Failed to set frame_end:', e)
-        bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps)        
+            print('* Failed to set frame range:', e, 'range=', (tick_min, tick_max))
         return {'FINISHED'}
 
+class SSSekaiBlenderImportRLABatchOperator(bpy.types.Operator):
+    bl_idname = "sssekai.rla_import_batch_op"
+    bl_label = T("Batch Import (slow!)")
+    bl_description = T("Import RLA clips (Armature/KeyShape) from the selected range for the selected character")
+    def execute(self, context):
+        wm = context.window_manager
+        rla_range = wm.sssekai_rla_import_range
+        entries = list(sssekai_global.rla_raw_clips)
+        entries = entries[rla_range[0]:rla_range[1]]
+        for entry in entries:
+            sssekai_global.rla_selected_raw_clip = entry        
+            update_selected_rla_asset(entry)
+            try:
+                bpy.ops.sssekai.rla_import_armature_animation_op()
+            except Exception as e:
+                print('* Failed to import armature animation:', e)
+            try:
+                bpy.ops.sssekai.rla_import_shapekey_animation_op()
+            except Exception as e:
+                print('* Failed to import shapekey animation:', e)                
+        return {'FINISHED'}         
+   
 def update_selected_rla_asset(entry):
+    global sssekai_global
     from sssekai.fmt.rla import read_rla
     from io import BytesIO
+    print('* Loading RLA index', entry)
     version = sssekai_global.rla_get_version()            
     sssekai_global.rla_clip_data = read_rla(BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=False)
     sssekai_global.rla_selected_raw_clip = entry
@@ -943,10 +968,9 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
     def poll(self, context):
         wm = context.window_manager
         entry = wm.sssekai_rla_selected
-        if entry and entry != sssekai_global.rla_selected_raw_clip and entry in sssekai_global.rla_raw_clips and sssekai_global.rla_raw_clips[entry]:
-            print('* Loading RLA index', entry)
+        if entry and entry != sssekai_global.rla_selected_raw_clip and entry in sssekai_global.rla_raw_clips and sssekai_global.rla_raw_clips[entry]:            
             update_selected_rla_asset(entry)
-            return True
+        return True
 
     def draw(self, context: Context):
         layout = self.layout
@@ -976,6 +1000,15 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_rla_single_pose_json", icon='SHAPEKEY_DATA')
         row = layout.row()
         row.operator(SSSekaiBlenderImportRLASinglePoseOperator.bl_idname, icon='ARMATURE_DATA')
+        row = layout.row()
+        row.label(text=T('Effective RLA clip range: %d - %d') % (0, len(sssekai_global.rla_raw_clips)))
+        row = layout.row()
+        selected = list(sssekai_global.rla_raw_clips or [])[wm.sssekai_rla_import_range[0]:wm.sssekai_rla_import_range[1]]
+        row.label(text=T('Selected Clip: %s') % ','.join(selected))
+        row = layout.row()
+        row.prop(wm, "sssekai_rla_import_range", icon='FILE_FOLDER')
+        row = layout.row()
+        row.operator(SSSekaiBlenderImportRLABatchOperator.bl_idname, icon='FILE_FOLDER')
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
     bl_label = T("Import")
@@ -1053,6 +1086,12 @@ def register():
         description=T("JSON of a single RLA pose (e.g. {'bodyPosition':...}) dumped by rla2json w/ sssekai"),
         default=""
     )
+    WindowManager.sssekai_rla_import_range = IntVectorProperty(
+        name=T("Import Range"),
+        description=T("Import clips from this range, order is as shown in the list"),
+        size=2,
+        default=[0,0]
+    )
     WindowManager.sssekai_armatures_as_articulations = BoolProperty(
         name=T("Armatures as Articulations"),
         description=T("Treating armatures as articulations instead of skinned meshes. Useful for importing stages, etc"),
@@ -1111,6 +1150,7 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
     bpy.utils.register_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
     bpy.utils.register_class(SSSekaiBlenderImportRLASinglePoseOperator)
+    bpy.utils.register_class(SSSekaiBlenderImportRLABatchOperator)
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportOperator)
@@ -1133,3 +1173,4 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportRLASinglePoseOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderImportRLABatchOperator)
