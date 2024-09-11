@@ -870,6 +870,25 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
         bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps)        
         return {'FINISHED'}
 
+def update_selected_rla_asset(entry):
+    from sssekai.fmt.rla import read_rla
+    from io import BytesIO
+    version = sssekai_global.rla_get_version()            
+    sssekai_global.rla_clip_data = read_rla(BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=False)
+    sssekai_global.rla_selected_raw_clip = entry
+    min_tick, max_tick = 1e18, 0
+    sssekai_global.rla_clip_charas.clear()
+    for tick, data in sssekai_global.rla_clip_data.items():
+        m_data = data.get('MotionCaptureData', None)
+        if m_data:
+            min_tick = min(min_tick, tick)
+            max_tick = max(max_tick, tick)
+            m_data = m_data[0]['data']
+            for pose in m_data:
+                sssekai_global.rla_clip_charas.add(pose['id'])
+    base_tick = sssekai_global.rla_header['baseTicks']            
+    sssekai_global.rla_clip_tick_range = ((min_tick - base_tick) / RLA_TIME_MAGNITUDE, (max_tick - base_tick) / RLA_TIME_MAGNITUDE)
+       
 def enumerate_rla_assets(self, context):
     global sssekai_global
 
@@ -926,24 +945,8 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         entry = wm.sssekai_rla_selected
         if entry and entry != sssekai_global.rla_selected_raw_clip and entry in sssekai_global.rla_raw_clips and sssekai_global.rla_raw_clips[entry]:
             print('* Loading RLA index', entry)
-            from sssekai.fmt.rla import read_rla
-            from io import BytesIO
-            version = sssekai_global.rla_get_version()            
-            sssekai_global.rla_clip_data = read_rla(BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=False)
-            sssekai_global.rla_selected_raw_clip = entry
-            min_tick, max_tick = 1e18, 0
-            sssekai_global.rla_clip_charas.clear()
-            for tick, data in sssekai_global.rla_clip_data.items():
-                m_data = data.get('MotionCaptureData', None)
-                if m_data:
-                    min_tick = min(min_tick, tick)
-                    max_tick = max(max_tick, tick)
-                    m_data = m_data[0]['data']
-                    for pose in m_data:
-                        sssekai_global.rla_clip_charas.add(pose['id'])
-            base_tick = sssekai_global.rla_header['baseTicks']            
-            sssekai_global.rla_clip_tick_range = ((min_tick - base_tick) / RLA_TIME_MAGNITUDE, (max_tick - base_tick) / RLA_TIME_MAGNITUDE)
-        return True
+            update_selected_rla_asset(entry)
+            return True
 
     def draw(self, context: Context):
         layout = self.layout
