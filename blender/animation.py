@@ -13,7 +13,7 @@ def ensure_action(object, name : str, always_create_new : bool):
     else:
         return object.animation_data.action
 
-def import_fcurve(action : bpy.types.Action, data_path : str , values : list, frames : list, num_curves : int = 1):
+def import_fcurve(action : bpy.types.Action, data_path : str , values : list, frames : list, num_curves : int = 1, interpolation : str = 'BEZIER'):
     '''Imports an Fcurve into an action
 
     Args:
@@ -22,6 +22,7 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
         values (list): values. size must be that of frames
         frames (list): frame indices. size must be that of values
         num_curves (int, optional): number of curves. e.g. with translation (X,Y,Z) you'd want 3. Defaults to 1.
+        interpolation (str, optional): interpolation type. Defaults to 'BEZIER'.
     '''
     valueIterable = type(values[0])
     valueIterable = valueIterable != float and valueIterable != int
@@ -39,18 +40,27 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
         fcurve[i].keyframe_points.clear()
         fcurve[i].keyframe_points.add(len(curve_data) // 2)
         fcurve[i].keyframe_points.foreach_set('co', curve_data)
+        # TODO: Import custom slope values (Bezier) as well
+        ipo = bpy.types.Keyframe.bl_rna.properties['interpolation'].enum_items[interpolation].value
+        fcurve[i].keyframe_points.foreach_set('interpolation', [ipo] * len(fcurve[i].keyframe_points))
         fcurve[i].update()
     return fcurve
 
-def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values : List[BlenderQuaternion], frames : list):
-    '''Imports an Fcurve into an action, specialized for quaternions
-    * The import function ensures that the quaternions in the curve are compatible with each other (i.e. lerping between them will not cause flips)    
+def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values : List[BlenderQuaternion], frames : list, interpolation : str = 'LINEAR'):
+    '''Imports an Fcurve into an action, specialized for quaternions    
 
     Args:
         action (bpy.types.Action): target action
         data_path (str): data path
         values (List[BlenderQuaternion]): values. size must be that of frames
         frames (list): frame indices. size must be that of values
+        interpolation (str, optional): interpolation type. Defaults to 'LINEAR'.
+    
+    Note:
+        * The import function ensures that the quaternions in the curve are compatible with each other 
+            (i.e. lerping between them will not cause flips and the shortest path will always be taken).
+        * Note it's *LERP* not *SLERP*. Blender fcurves does not specialize in quaternion interpolation.
+        * Hence, with `interpolation`, you should always use `LINEAR` for the most accurate results.
     '''
     fcurve = [action.fcurves.find(data_path=data_path, index=i) or action.fcurves.new(data_path=data_path, index=i) for i in range(4)]
     curve_datas = list()
@@ -73,6 +83,8 @@ def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values
         fcurve[i].keyframe_points.clear()
         fcurve[i].keyframe_points.add(len(curve_datas[i]) // 2)
         fcurve[i].keyframe_points.foreach_set('co', curve_datas[i])
+        ipo = bpy.types.Keyframe.bl_rna.properties['interpolation'].enum_items[interpolation].value
+        fcurve[i].keyframe_points.foreach_set('interpolation', [ipo] * len(fcurve[i].keyframe_points))
         fcurve[i].update()
     return fcurve
 
