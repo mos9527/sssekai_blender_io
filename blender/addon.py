@@ -19,7 +19,8 @@ from bpy.props import (
     EnumProperty,
     BoolProperty,
     IntVectorProperty,
-    IntProperty
+    IntProperty,
+    FloatProperty
 )
 from bpy.app.translations import pgettext as T
 
@@ -487,8 +488,6 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
         
         for animation in animations:
             if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
-                def check_is_active_camera():
-                    assert bpy.context.active_object and bpy.context.active_object.type == 'CAMERA', "Please select a camera for this animation!"
                 print('* Reading AnimationClip:', animation.name)
                 print('* Byte size:',animation.byte_size)
                 print('* Loading...')
@@ -504,21 +503,17 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 print('* Frames', bpy.context.scene.frame_end)
                 print('* Blender FPS set to:', bpy.context.scene.render.fps)
                 active_type = bpy.context.active_object.type
-                if active_type == 'CAMERA':
-                    if CAMERA_UNK_CRC in clip.TransformTracks[TransformType.Translation]:
-                        print('* Importing Camera animation', animation.name)
-                        check_is_active_camera()
-                        import_camera_animation(animation.name, clip, bpy.context.active_object,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                if active_type == 'CAMERA' or KEY_CAMERA_RIG in bpy.context.active_object:
+                    camera_obj = bpy.context.active_object
+                    if KEY_CAMERA_RIG in bpy.context.active_object:
+                        camera_obj = camera_obj.children[0]                    
+                    track = clip.TransformTracks[TransformType.Translation]
+                    if CAMERA_TRANS_ROT_CRC_MAIN in track or CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA in track:
+                        print('* Importing Camera animation', animation.name)                        
+                        import_camera_animation(animation.name, clip, camera_obj,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting, wm.sssekai_animation_import_camera_scaling)
                         print('* Imported Camera animation', animation.name)
-                    if CAMERA_DOF_UNK_CRC in clip.FloatTracks and CAMERA_DOF_FOV_UNK_CRC in clip.FloatTracks[CAMERA_DOF_UNK_CRC]:
-                        # depth_of_field animations
-                        # Don't know why FOV is here though...but it is!
-                        print('* Importing Camera FOV animation', animation.name)
-                        check_is_active_camera()
-                        import_camera_fov_animation(animation.name, clip.FloatTracks[CAMERA_DOF_UNK_CRC][CAMERA_DOF_FOV_UNK_CRC].Curve, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                        print('* Imported Camera FOV animation', animation.name)
                 elif active_type == 'ARMATURE':
-                    if BLENDSHAPES_UNK_CRC in clip.FloatTracks:
+                    if BLENDSHAPES_CRC in clip.FloatTracks:
                         print('* Importing Keyshape animation', animation.name)
                         mesh_obj = None
                         for obj in bpy.context.active_object.children:
@@ -730,9 +725,9 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
         anim.TransformTracks[TransformType.Translation][inv_bone_hash_table[RLA_ROOT_BONE]] = Track()
 
         if pose['shapeDatas']:
-            anim.FloatTracks[BLENDSHAPES_UNK_CRC] = dict()   
+            anim.FloatTracks[BLENDSHAPES_CRC] = dict()   
             for shape in RLA_VALID_BLENDSHAPES:
-                anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_shape_table[shape]] = Track()     
+                anim.FloatTracks[BLENDSHAPES_CRC][inv_shape_table[shape]] = Track()     
         
         for idx, boneEuler in enumerate(pose['boneDatas']):
             if RLA_VALID_BONES[idx] != RLA_ROOT_BONE:
@@ -747,7 +742,7 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
         )
 
         for idx, value in enumerate(pose['shapeDatas']):
-                anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_shape_table[RLA_VALID_BLENDSHAPES[idx]]].add_keyframe(
+                anim.FloatTracks[BLENDSHAPES_CRC][inv_shape_table[RLA_VALID_BLENDSHAPES[idx]]].add_keyframe(
                     KeyFrame(0, value, 0, 0, 0)
                 )
         
@@ -772,15 +767,16 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
         has_boneData = False
         for tick, data in sssekai_global.rla_clip_data.items():
             m_data = data.get('MotionCaptureData', None)
-            if m_data:
-                m_data = m_data[0]['data']
-                for pose in m_data:
-                    if pose['id'] == active_chara:
-                        chara_segments.append(pose)
-                        if pose['pose']['boneDatas']:
-                            has_boneData = True
+            if m_data:                
+                for data in m_data:                    
+                    for pose in data['data']:
+                        if pose['id'] == active_chara:
+                            chara_segments.append(pose)
+                            if pose['pose']['boneDatas']:
+                                has_boneData = True
         print('* Found %d segments for character %d' % (len(chara_segments), active_chara))
-
+        if not has_boneData:
+            print('! No bone data found in the segments.')
         inv_hash_table = obj.data[KEY_BONE_NAME_HASH_TBL]
         inv_hash_table = json.loads(inv_hash_table)
         inv_hash_table = {v:k for k,v in inv_hash_table.items()}
@@ -837,30 +833,30 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
         shapekey_segments = list()
         for tick, data in sssekai_global.rla_clip_data.items():
             m_data = data.get('MotionCaptureData', None)
-            if m_data:
-                m_data = m_data[0]['data']
-                for pose in m_data:
-                    if pose['id'] == active_chara:   
-                        shapeData = pose['pose']['shapeDatas']                     
-                        if shapeData:
-                            shapekey_segments.append((pose['timestamp'], shapeData))
+            if m_data:                
+                for data in m_data:
+                    for pose in data['data']:
+                        if pose['id'] == active_chara:   
+                            shapeData = pose['pose']['shapeDatas']                     
+                            if shapeData:
+                                shapekey_segments.append((pose['timestamp'], shapeData))
         
         inv_hash_table = mesh_obj.data[KEY_SHAPEKEY_NAME_HASH_TBL]
         inv_hash_table = json.loads(inv_hash_table)
         inv_hash_table = {v:k for k,v in inv_hash_table.items()}        
         anim = Animation()
         base_tick = sssekai_global.rla_header['baseTicks']
-        anim.FloatTracks[BLENDSHAPES_UNK_CRC] = dict()
+        anim.FloatTracks[BLENDSHAPES_CRC] = dict()
         if shapekey_segments:
             for shape in RLA_VALID_BLENDSHAPES:
-                anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_hash_table[shape]] = Track()
+                anim.FloatTracks[BLENDSHAPES_CRC][inv_hash_table[shape]] = Track()
         tick_min, tick_max = 1e18, 0
         for timestamp, segment in shapekey_segments:
             timestamp = (timestamp - base_tick) / RLA_TIME_MAGNITUDE
             tick_min = min(tick_min, timestamp)
             tick_max = max(tick_max, timestamp)
             for idx, value in enumerate(segment):
-                anim.FloatTracks[BLENDSHAPES_UNK_CRC][inv_hash_table[RLA_VALID_BLENDSHAPES[idx]]].add_keyframe(
+                anim.FloatTracks[BLENDSHAPES_CRC][inv_hash_table[RLA_VALID_BLENDSHAPES[idx]]].add_keyframe(
                     KeyFrame(timestamp, value, 0, 0, 0)
                 )
         import_keyshape_animation('RLA', anim, mesh_obj, 0, False)
@@ -908,9 +904,9 @@ def update_selected_rla_asset(entry):
         if m_data:
             min_tick = min(min_tick, tick)
             max_tick = max(max_tick, tick)
-            m_data = m_data[0]['data']
-            for pose in m_data:
-                sssekai_global.rla_clip_charas.add(pose['id'])
+            for data in m_data:
+                for pose in data['data']:
+                    sssekai_global.rla_clip_charas.add(pose['id'])
     base_tick = sssekai_global.rla_header['baseTicks']            
     sssekai_global.rla_clip_tick_range = ((min_tick - base_tick) / RLA_TIME_MAGNITUDE, (max_tick - base_tick) / RLA_TIME_MAGNITUDE)
        
@@ -1049,6 +1045,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_animation_import_offset",icon='TIME')
         row.prop(wm, "sssekai_animation_append_exisiting",icon='OVERLAY')
         row = layout.row()
+        row.prop(wm, "sssekai_animation_import_camera_scaling",icon='CAMERA_DATA')
+        row = layout.row()
         row.operator(SSSekaiBlenderExportAnimationTypeTree.bl_idname,icon='EXPORT')
         row = layout.row()        
         row.label(text=T("Import"))
@@ -1117,6 +1115,11 @@ def register():
         name=T("Offset"),
         description=T("Animation Offset in frames"),
         default=0
+    )
+    WindowManager.sssekai_animation_import_camera_scaling = FloatProperty(
+        name=T("Camera Scaling"),
+        description=T("Scaling used when importing camera animations"),
+        default=1
     )
     def sssekai_on_unity_version_change(self, context):
         sssekai_set_unity_version(context.window_manager.sssekai_unity_version_override)

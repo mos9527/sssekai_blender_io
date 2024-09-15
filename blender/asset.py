@@ -260,13 +260,6 @@ def import_articulation(arma : Armature, name : str = None):
     Returns:
         Tuple[Dict[str,bpy.types.Object], bpy.types.Object]: Created Empty objects and its parent object
     '''
-    def create_empty(name : str, parent = None):
-        joint = bpy.data.objects.new(name, None)
-        joint.empty_display_size = 0.1
-        joint.empty_display_type = 'ARROWS'     
-        joint.parent = parent        
-        bpy.context.collection.objects.link(joint)
-        return joint
     name = name or arma.name
     joint_map = dict()
     parent_joint = None
@@ -414,12 +407,6 @@ def import_armature_physics_constraints(armature, data : Armature):
             obj.rigid_body.collision_collections[0] = has_collison
             obj.display_type = 'BOUNDS'
             return obj
-        def create_joint(name : str):
-            joint = bpy.data.objects.new(name, None)
-            joint.empty_display_size = 0.1
-            joint.empty_display_type = 'ARROWS'                
-            bpy.context.collection.objects.link(joint)
-            return joint
         def set_bone_parent(object : bpy.types.Object, bone_name : str):
             object.parent = armature
             object.parent_type = 'BONE'
@@ -440,9 +427,8 @@ def import_armature_physics_constraints(armature, data : Armature):
             ebone.parent = None
             ebone.matrix = arma_matrix
         def set_no_collision(obj, parent_obj):
-            joint = create_joint(obj.name + '_nc_joint')
-            # Joint follows the pivot
-            joint.parent = parent_obj                                
+            # Joint follows the pivot              
+            joint = create_empty(obj.name + '_nc_joint', parent_obj)
             bpy.context.view_layer.objects.active = joint
             bpy.ops.rigidbody.constraint_add(type='GENERIC') 
             # Without limits. This acts as a dummy constraint
@@ -475,7 +461,7 @@ def import_armature_physics_constraints(armature, data : Armature):
             for bone_name in [pivot_bone_name] + chain_all:
                 parent = parent_all.get(bone_name,None)
                 # print('Creating joint for', bone_name)                    
-                joint = create_joint(bone_name + 'joint')
+                joint = create_empty(bone_name + 'joint')
                 joints[bone_name] = joint
                 if parent:
                     joint.parent = joints[parent]

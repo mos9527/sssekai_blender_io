@@ -162,7 +162,7 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
             if not bone: 
                 print("* WARNING: [Rotation Euler] Bone %s not found in pose bones" % bone_name)
                 continue
-            bone.rotation_mode = 'XZY'
+            bone.rotation_mode = 'YXZ'
             values = [to_pose_euler(bone_name, swizzle_euler(keyframe.value)) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'pose.bones["%s"].rotation_euler' % bone_name, values, frames, 3)            
@@ -222,7 +222,7 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
         obj = joint_obj.get(bone_name,None)
         if obj:
             action = ensure_action(obj, name, False)
-            obj.rotation_mode = 'XZY'
+            obj.rotation_mode = 'YXZ'
             values = [swizzle_euler(keyframe.value) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'rotation_euler', values, frames, 3)
@@ -253,41 +253,50 @@ def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.type
     '''NOTE: KeyShape value range [0,100]'''
     mesh = dest_mesh.data
     assert KEY_SHAPEKEY_NAME_HASH_TBL in mesh, "Shape Key table not found. You can only import blend shape animations on meshes with blend shapes!"
-    assert BLENDSHAPES_UNK_CRC in data.FloatTracks, "No blend shape animation found!"
+    assert BLENDSHAPES_CRC in data.FloatTracks, "No blend shape animation found!"
     keyshape_table = json.loads(mesh[KEY_SHAPEKEY_NAME_HASH_TBL])
     action = ensure_action(mesh.shape_keys, name, always_create_new)
-    for attrCRC, track in data.FloatTracks[BLENDSHAPES_UNK_CRC].items():
+    for attrCRC, track in data.FloatTracks[BLENDSHAPES_CRC].items():
         bsName = keyshape_table[str(attrCRC)]
         import_fcurve(action,'key_blocks["%s"].value' % bsName, [keyframe.value / 100.0 for keyframe in track.Curve], [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve])
 
-def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool):
-    action = ensure_action(camera, name, always_create_new)
-    camera.rotation_mode = 'XZY'
-    def swizzle_euler_camera(euler : Euler):
-        # Unity camera resets by viewing at Z+, which is the front direction
-        # Blenders looks at -Z, which is its down direction
-        offset = Euler((math.radians(90),0,math.radians(180)),'XZY')
-        euler = Euler(swizzle_euler(euler),'XZY')
-        offset.rotate(euler)
-        return offset
-    def swizzer_translation_camera(vector : Vector):
+def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool, scaling_factor : float): 
+    if not camera.parent or not KEY_CAMERA_RIG in camera.parent:
+        # The 'rig' Offsets the camera's look-at direction w/o modifying the Euler angles themselves, which
+        # would otherwise cause interpolation issues.
+        # This is simliar to how mmd_tools handles camera animations.
+        rig = create_empty('Camera Rig', camera.parent)
+        rig[KEY_CAMERA_RIG] = "<marker>"
+        camera.parent = rig
+        camera.location = Vector((0,0,0))
+        camera.rotation_euler = Euler((math.radians(90),0,math.radians(180)))
+        camera.rotation_mode = 'XYZ'
+        camera.scale = Vector((1,1,1))
+        print('* Created Camera Rig for camera',camera.name)    
+    rig = camera.parent
+    rig.rotation_mode = 'YXZ'
+    trs_action = ensure_action(rig, name, always_create_new)
+    def swizzle_translation_camera(vector : Vector):
         result = swizzle_vector(vector)
-        return result
-    if CAMERA_UNK_CRC in data.TransformTracks[TransformType.EulerRotation]:
-        curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_UNK_CRC].Curve
-        import_fcurve(action,'rotation_euler', [swizzle_euler_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)        
-    
-    if CAMERA_UNK_CRC in data.TransformTracks[TransformType.Translation]:
-        curve = data.TransformTracks[TransformType.Translation][CAMERA_UNK_CRC].Curve
-        import_fcurve(action,'location', [swizzer_translation_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)     
-
-def import_camera_fov_animation(name : str, curve : List[KeyFrame], camera : bpy.types.Object, frame_offset : int, always_create_new : bool):
-    action = ensure_action(camera, name, always_create_new)
-    camera.data.lens_unit = 'MILLIMETERS'
+        result *= scaling_factor
+        return result    
     def fov_to_focal_length(fov : float):
         # FOV = 2 arctan [sensorSize/(2*focalLength)] 
         # focalLength = sensorSize / (2 * tan(FOV/2))
-        print(fov)
-        return camera.data.sensor_width / (2 * math.tan(math.radians(fov) / 2))
-    # FOV
-    import_fcurve(action,'data.lens',[fov_to_focal_length(keyframe.value) for keyframe in curve],[time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 1)
+        return camera.data.sensor_width / (2 * math.tan(math.radians(fov) / 2))    
+    if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.EulerRotation]:
+        camera.rotation_mode = 'YXZ'
+        print('* Found Camera Rotation track')
+        curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
+        import_fcurve(trs_action,'rotation_euler', [swizzle_euler(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)        
+    if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.Translation]:
+        print('* Found Camera Translation track, scaling=',scaling_factor)
+        curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
+        import_fcurve(trs_action,'location', [swizzle_translation_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)     
+    if CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA in data.TransformTracks[TransformType.Translation]:
+        print('* Found Camera FOV track')
+        camera.data.lens_unit = 'MILLIMETERS'
+        fov_action = ensure_action(camera.data, name + '_lens', always_create_new)
+        curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA].Curve
+        fovs = [fov_to_focal_length(keyframe.value.Z * 100) for keyframe in curve]
+        import_fcurve(fov_action,'data.lens',fovs,[time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 1)
