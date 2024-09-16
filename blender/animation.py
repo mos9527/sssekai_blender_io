@@ -276,7 +276,7 @@ def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.type
         bsName = keyshape_table[str(attrCRC)]
         import_fcurve(action,'key_blocks["%s"].value' % bsName, [keyframe.value / 100.0 for keyframe in track.Curve], [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve])
 
-def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool, scaling_factor : Vector, scaling_offset : Vector): 
+def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool, scaling_factor : Vector, scaling_offset : Vector, fov_offset : float): 
     if not camera.parent or not KEY_CAMERA_RIG in camera.parent:
         # The 'rig' Offsets the camera's look-at direction w/o modifying the Euler angles themselves, which
         # would otherwise cause interpolation issues.
@@ -300,8 +300,9 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
     def fov_to_focal_length(fov : float):
         # FOV = 2 arctan [sensorSize/(2*focalLength)] 
         # focalLength = sensorSize / (2 * tan(FOV/2))        
-        fov = clamp(fov, 0, 180)
-        return camera.data.sensor_width / (2 * math.tan(math.radians(fov) / 2))
+        # fov -> Vertical FOV, which is the default in Unity
+        fov += fov_offset
+        return camera.data.sensor_height / (2 * math.tan(math.radians(fov) / 2))
     if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.EulerRotation]:
         print('* Found Camera Rotation track')
         curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
