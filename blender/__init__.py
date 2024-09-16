@@ -83,7 +83,8 @@ def create_empty(name : str, parent = None):
     joint.parent = parent        
     bpy.context.collection.objects.link(joint)
     return joint
-
+def clamp(value, mmin, mmax):
+    return max(min(value, mmax), mmin)
 # UnityPy deps
 import UnityPy
 from UnityPy import Environment

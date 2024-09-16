@@ -13,7 +13,7 @@ def ensure_action(object, name : str, always_create_new : bool):
     else:
         return object.animation_data.action
 
-def import_fcurve(action : bpy.types.Action, data_path : str , values : list, frames : list, num_curves : int = 1, interpolation : str = 'BEZIER'):
+def import_fcurve(action : bpy.types.Action, data_path : str , values : list, frames : list, num_curves : int = 1, interpolation : str = 'BEZIER', tangents_in : list = [], tangents_out : list = []):
     '''Imports an Fcurve into an action
 
     Args:
@@ -23,6 +23,8 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
         frames (list): frame indices. size must be that of values
         num_curves (int, optional): number of curves. e.g. with translation (X,Y,Z) you'd want 3. Defaults to 1.
         interpolation (str, optional): interpolation type. Defaults to 'BEZIER'.
+        tagents_in (list, optional): in tangents (i.e. inSlope). Defaults to [].
+        tagents_out (list, optional): out tangents (i.e. outSlope). Defaults to [].
     '''
     valueIterable = type(values[0])
     valueIterable = valueIterable != float and valueIterable != int
@@ -39,10 +41,24 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
             curve_data = existing_data + curve_data
         fcurve[i].keyframe_points.clear()
         fcurve[i].keyframe_points.add(len(curve_data) // 2)
-        fcurve[i].keyframe_points.foreach_set('co', curve_data)
-        # TODO: Import custom slope values (Bezier) as well
+        fcurve[i].keyframe_points.foreach_set('co', curve_data)        
         ipo = bpy.types.Keyframe.bl_rna.properties['interpolation'].enum_items[interpolation].value
         fcurve[i].keyframe_points.foreach_set('interpolation', [ipo] * len(fcurve[i].keyframe_points))
+        if tangents_in or tangents_out:
+            free_handle = bpy.types.Keyframe.bl_rna.properties['handle_left_type'].enum_items['FREE'].value
+            free_handles = [free_handle] * len(fcurve[i].keyframe_points)
+            handle_data = [0] * (len(frames) * 2)            
+            if tangents_in:
+                fcurve[i].keyframe_points.foreach_set('handle_left_type', free_handles)
+                handle_data[::2] = [f - 1 for f in frames] 
+                # Fixed 1 unit on the curve for now since that's what Unity does
+                handle_data[1::2] = [v[i] if valueIterable else v for v in tangents_in]
+                fcurve[i].keyframe_points.foreach_set('handle_left', handle_data)
+            if tangents_out:
+                fcurve[i].keyframe_points.foreach_set('handle_right_type', free_handles)
+                handle_data[::2] = [f + 1 for f in frames]
+                handle_data[1::2] = [v[i] if valueIterable else v for v in tangents_out]
+                fcurve[i].keyframe_points.foreach_set('handle_right', handle_data)
         fcurve[i].update()
     return fcurve
 
@@ -283,20 +299,42 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         return result    
     def fov_to_focal_length(fov : float):
         # FOV = 2 arctan [sensorSize/(2*focalLength)] 
-        # focalLength = sensorSize / (2 * tan(FOV/2))
-        return camera.data.sensor_width / (2 * math.tan(math.radians(fov) / 2))    
+        # focalLength = sensorSize / (2 * tan(FOV/2))        
+        fov = clamp(fov, 0, 180)
+        return camera.data.sensor_width / (2 * math.tan(math.radians(fov) / 2))
     if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.EulerRotation]:
         print('* Found Camera Rotation track')
         curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
-        import_fcurve(trs_action,'rotation_euler', [swizzle_euler(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)        
+        import_fcurve(
+            trs_action,'rotation_euler', 
+            [swizzle_euler(keyframe.value) for keyframe in curve], 
+            [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 
+            3, 'BEZIER',                         
+            # [swizzle_euler(keyframe.inSlope) for keyframe in curve], 
+            # [swizzle_euler(keyframe.outSlope) for keyframe in curve]
+        )        
     if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.Translation]:
         print('* Found Camera Translation track, scaling=',scaling_factor)
         curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
-        import_fcurve(trs_action,'location', [swizzle_translation_camera(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)     
+        import_fcurve(
+            trs_action,'location', 
+            [swizzle_translation_camera(keyframe.value) for keyframe in curve], 
+            [time_to_frame(keyframe.time,frame_offset) for keyframe in curve],
+            3, 'BEZIER',
+            # [swizzle_translation_camera(keyframe.inSlope) for keyframe in curve],
+            # [swizzle_translation_camera(keyframe.outSlope) for keyframe in curve]
+        )
     if CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA in data.TransformTracks[TransformType.Translation]:
         print('* Found Camera FOV track')
         camera.data.lens_unit = 'MILLIMETERS'
         fov_action = ensure_action(camera.data, name + '_lens', always_create_new)
         curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA].Curve
         fovs = [fov_to_focal_length(keyframe.value.Z * 100) for keyframe in curve]
-        import_fcurve(fov_action,'lens',fovs,[time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 1)
+        import_fcurve(
+            fov_action,'lens',
+            fovs,
+            [time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 
+            1, 'BEZIER',
+            # [fov_to_focal_length(keyframe.inSlope.Z * 100) for keyframe in curve],
+            # [fov_to_focal_length(keyframe.outSlope.Z * 100) for keyframe in curve]
+        )
