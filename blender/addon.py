@@ -20,7 +20,8 @@ from bpy.props import (
     BoolProperty,
     IntVectorProperty,
     IntProperty,
-    FloatProperty
+    FloatProperty,
+    FloatVectorProperty
 )
 from bpy.app.translations import pgettext as T
 
@@ -510,7 +511,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     track = clip.TransformTracks[TransformType.Translation]
                     if CAMERA_TRANS_ROT_CRC_MAIN in track or CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA in track:
                         print('* Importing Camera animation', animation.name)                        
-                        import_camera_animation(animation.name, clip, camera_obj,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting, wm.sssekai_animation_import_camera_scaling)
+                        import_camera_animation(animation.name, clip, camera_obj,  wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting, wm.sssekai_animation_import_camera_scaling, wm.sssekai_animation_import_camera_offset)
                         print('* Imported Camera animation', animation.name)
                 elif active_type == 'ARMATURE':
                     if BLENDSHAPES_CRC in clip.FloatTracks:
@@ -1047,6 +1048,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(wm, "sssekai_animation_import_camera_scaling",icon='CAMERA_DATA')
         row = layout.row()
+        row.prop(wm, "sssekai_animation_import_camera_offset",icon='CAMERA_DATA')
+        row = layout.row()
         row.operator(SSSekaiBlenderExportAnimationTypeTree.bl_idname,icon='EXPORT')
         row = layout.row()        
         row.label(text=T("Import"))
@@ -1116,10 +1119,15 @@ def register():
         description=T("Animation Offset in frames"),
         default=0
     )
-    WindowManager.sssekai_animation_import_camera_scaling = FloatProperty(
+    WindowManager.sssekai_animation_import_camera_scaling = FloatVectorProperty(
         name=T("Camera Scaling"),
         description=T("Scaling used when importing camera animations"),
-        default=1
+        default=Vector((1,1,1))
+    )
+    WindowManager.sssekai_animation_import_camera_offset = FloatVectorProperty(
+        name=T("Camera Offset"),
+        description=T("Offset used when importing camera animations"),
+        default=Vector((0,0,0))
     )
     def sssekai_on_unity_version_change(self, context):
         sssekai_set_unity_version(context.window_manager.sssekai_unity_version_override)

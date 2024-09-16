@@ -260,7 +260,7 @@ def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.type
         bsName = keyshape_table[str(attrCRC)]
         import_fcurve(action,'key_blocks["%s"].value' % bsName, [keyframe.value / 100.0 for keyframe in track.Curve], [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve])
 
-def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool, scaling_factor : float): 
+def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool, scaling_factor : Vector, scaling_offset : Vector): 
     if not camera.parent or not KEY_CAMERA_RIG in camera.parent:
         # The 'rig' Offsets the camera's look-at direction w/o modifying the Euler angles themselves, which
         # would otherwise cause interpolation issues.
@@ -278,14 +278,14 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
     trs_action = ensure_action(rig, name, always_create_new)
     def swizzle_translation_camera(vector : Vector):
         result = swizzle_vector(vector)
-        result *= scaling_factor
+        result *= Vector(scaling_factor)
+        result += Vector(scaling_offset)
         return result    
     def fov_to_focal_length(fov : float):
         # FOV = 2 arctan [sensorSize/(2*focalLength)] 
         # focalLength = sensorSize / (2 * tan(FOV/2))
         return camera.data.sensor_width / (2 * math.tan(math.radians(fov) / 2))    
     if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.EulerRotation]:
-        camera.rotation_mode = 'YXZ'
         print('* Found Camera Rotation track')
         curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
         import_fcurve(trs_action,'rotation_euler', [swizzle_euler(keyframe.value) for keyframe in curve], [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 3)        
@@ -299,4 +299,4 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         fov_action = ensure_action(camera.data, name + '_lens', always_create_new)
         curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA].Curve
         fovs = [fov_to_focal_length(keyframe.value.Z * 100) for keyframe in curve]
-        import_fcurve(fov_action,'data.lens',fovs,[time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 1)
+        import_fcurve(fov_action,'lens',fovs,[time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 1)

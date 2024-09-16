@@ -35,8 +35,9 @@ def swizzle_vector3(X,Y,Z):
 def swizzle_vector(vec):
     return swizzle_vector3(vec.X, vec.Y, vec.Z)
 def swizzle_euler3(X,Y,Z):
-    return Euler((X,Z,-Y), 'YXZ') # mode -> YXZ on the objects that support it. see euler3_to_quat_swizzled
+    return Euler((X,Z,-Y), 'YXZ') 
 def swizzle_euler(euler, isDegrees = True): 
+    '''mode -> YXZ on the objects that support it. see euler3_to_quat_swizzled'''
     if isDegrees:  
         return swizzle_euler3(math.radians(euler.X),math.radians(euler.Y),math.radians(euler.Z))
     else:
