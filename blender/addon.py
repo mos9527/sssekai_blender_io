@@ -534,9 +534,9 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         action = load_keyshape_animation(
                             animation.name, clip, mesh_obj, 
                             wm.sssekai_animation_import_offset, 
-                            retrive_action(mesh_obj) if wm.sssekai_animation_append_exisiting else None
+                            retrive_action(mesh_obj.data.shape_keys) if wm.sssekai_animation_append_exisiting else None
                         )
-                        apply_action(mesh_obj.data, action, wm.sssekai_animation_import_use_nla)
+                        apply_action(mesh_obj.data.shape_keys, action, wm.sssekai_animation_import_use_nla)
                         print('* Imported Keyshape animation', animation.name)
                     if clip.TransformTracks[TransformType.Translation] or clip.TransformTracks[TransformType.Rotation] or clip.TransformTracks[TransformType.EulerRotation] or clip.TransformTracks[TransformType.Scaling]:
                         print('* Importing Armature animation', animation.name)
@@ -769,7 +769,7 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
         apply_action(arma_obj, action, False)
         if pose['shapeDatas']:
             action = load_keyshape_animation('RLAPose', anim, mesh_obj, 0, None)
-            apply_action(mesh_obj.data, action, False)
+            apply_action(mesh_obj.data.shape_keys, action, False)
         bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, wm.sssekai_animation_import_offset)
         bpy.context.scene.frame_current = wm.sssekai_animation_import_offset
         return {'FINISHED'}
@@ -881,8 +881,8 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
                 anim.FloatTracks[BLENDSHAPES_CRC][inv_hash_table[RLA_VALID_BLENDSHAPES[idx]]].add_keyframe(
                     KeyFrame(timestamp, value, 0, 0, 0)
                 )
-        action = load_keyshape_animation('RLA', anim, mesh_obj, 0, retrive_action(mesh_obj) if wm.sssekai_animation_append_exisiting else None)
-        apply_action(mesh_obj.data, action, wm.sssekai_animation_import_use_nla)
+        action = load_keyshape_animation('RLA', anim, mesh_obj, 0, retrive_action(mesh_obj.data.shape_keys) if wm.sssekai_animation_append_exisiting else None)
+        apply_action(mesh_obj.data.shape_keys, action, wm.sssekai_animation_import_use_nla)
         try:
             bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
             bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
