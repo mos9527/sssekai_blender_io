@@ -1,3 +1,7 @@
+# TODO:
+# Sekai_Core_CharacterModel__Setup
+# - Set up character scale (XYZ) -> character height
+# - Set up character ''heel offset'' -> character Z += heel offset
 from typing import Set
 from os import path
 import zipfile
@@ -284,7 +288,7 @@ class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
         row = layout.row()
         row.operator(SSSekaiBlenderUtilArmatureMergeOperator.bl_idname,icon='TOOL_SETTINGS')
         row = layout.row()
-        row.operator(SSSekaiBlenderUtilArmatureSimplifyOperator.bl_idname,icon='TOOL_SETTINGS')
+        row.operator(SSSekaiBlenderUtilCharacterArmatureSimplifyOperator.bl_idname,icon='TOOL_SETTINGS')
 
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_attach_op"
@@ -308,7 +312,7 @@ class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
         add_constraint('Head')
         return {'FINISHED'}
 
-class SSSekaiBlenderUtilNeckMergeOperator(bpy.types.Operator):
+class SSSekaiBlenderUtilCharacterNeckMergeOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_merge_op"
     bl_label = T("Merge")
     bl_description = T("Merge the selected face armature with the selected body armature")
@@ -345,23 +349,78 @@ class SSSekaiBlenderUtilNeckMergeOperator(bpy.types.Operator):
         bpy.ops.object.mode_set(mode='OBJECT')
         return {"FINISHED"}
 
-class SSSekaiBlenderUtilNeckAttach(bpy.types.Panel):
-    bl_idname = "OBJ_PT_sssekai_util_neck_attach"
-    bl_label = T("Attach Neck")
+class SSSekaiBlenderUtilCharacterScalingMakeRootOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_character_scaling_make_root_op"
+    bl_label = T("Make Root")
+    bl_description = T("Appends the selected object to a Empty object (that can be configured with a height value), with the Empty object as the new root")
+    def execute(self, context):
+        scene = context.scene
+        root = create_empty('Character Root')
+        root[KEY_SEKAI_CHARACTER_HEIGHT] = 1.0        
+        objs = context.selected_objects
+        # Set up driver for the scaling        
+        for ch in root.driver_add('scale'):
+            ch : bpy.types.FCurve
+            ch.driver.type = 'SCRIPTED'
+            var = ch.driver.variables.new()
+            var.name = 'height'
+            var.type = 'SINGLE_PROP'
+            var.targets[0].id = root
+            var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
+            ch.driver.expression = 'height'
+        for obj in objs:
+            obj.parent = root
+        return {'FINISHED'}
+    
+class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_character_heel_offset_op"
+    bl_label = T("Heel Offset")
+    bl_description = T("Set the Z offset of the selected character by its OffsetValue bone")    
+    def execute(self, context):
+        obj = context.active_object
+        assert obj.type == "ARMATURE", "Please select an armature"
+        bpy.ops.object.mode_set(mode='EDIT')
+        ebone : bpy.types.EditBone = obj.data.edit_bones.get('OffsetValue')
+        assert ebone, "OffsetValue bone not found"
+        loc_xyz = ebone.head
+        bpy.ops.object.mode_set(mode='OBJECT')
+        obj.location.z = loc_xyz.z
+        return {'FINISHED'}
+class SSSekaiBlenderUtilCharacter(bpy.types.Panel):
+    bl_idname = "OBJ_PT_sssekai_util_character"
+    bl_label = T("Sekai Character")
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "SSSekai"
 
     def draw(self, context):
+        active_obj = bpy.context.active_object
         layout = self.layout
         scene = context.scene
-        layout.label(text=T('Select Targets'))
-        layout.prop(scene, 'sssekai_util_neck_attach_obj_face')
-        layout.prop(scene, 'sssekai_util_neck_attach_obj_body')
-        layout.operator(SSSekaiBlenderUtilNeckAttachOperator.bl_idname)       
-        layout.operator(SSSekaiBlenderUtilNeckMergeOperator.bl_idname)
-
-class SSSekaiBlenderUtilArmatureSimplifyOperator(bpy.types.Operator):
+        row = layout.row()
+        row.label(text=T('Neck Attach'))
+        row = layout.row()
+        row.label(text=T('Select Targets'))
+        row = layout.row()
+        row.prop(scene, 'sssekai_util_neck_attach_obj_face')
+        row.prop(scene, 'sssekai_util_neck_attach_obj_body')
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilNeckAttachOperator.bl_idname)       
+        row.operator(SSSekaiBlenderUtilCharacterNeckMergeOperator.bl_idname)
+        row = layout.row()
+        row.label(text=T('Character Scaling'))
+        row = layout.row()
+        row.operator(SSSekaiBlenderUtilCharacterScalingMakeRootOperator.bl_idname)
+        if active_obj and KEY_SEKAI_CHARACTER_HEIGHT in active_obj:
+            row = layout.row()            
+            row.prop(active_obj, '["%s"]' % KEY_SEKAI_CHARACTER_HEIGHT, text=T('Character Height (in meters)'))               
+        if active_obj and active_obj.type == 'ARMATURE':
+            row = layout.row()
+            row.prop(active_obj, "location", text=T('Use Heel Offset'))
+            row = layout.row()
+            row.operator(SSSekaiBlenderUtilCharacterHeelOffsetOperator.bl_idname)
+            
+class SSSekaiBlenderUtilCharacterArmatureSimplifyOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_armature_simplify_op"
     bl_label = T("Simplify Armature")
     bl_description = T("Simplify the bone hierachy of the selected armature. This operation is irreversible!")
@@ -372,7 +431,7 @@ class SSSekaiBlenderUtilArmatureSimplifyOperator(bpy.types.Operator):
         armature = bpy.context.active_object
         assert armature.type == 'ARMATURE', 'Please select an armature!'
         for bone in armature.data.edit_bones:
-            if bone.name not in SSSekaiBlenderUtilArmatureSimplifyOperator.WHITELIST:
+            if bone.name not in SSSekaiBlenderUtilCharacterArmatureSimplifyOperator.WHITELIST:
                 print('* Removing bone', bone.name)
                 armature.data.edit_bones.remove(bone)
         return {'FINISHED'}
@@ -1188,8 +1247,7 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderAssetSearchOperator)
     bpy.types.Scene.sssekai_util_neck_attach_obj_face = bpy.props.PointerProperty(name=T("Face"),type=bpy.types.Armature)
     bpy.types.Scene.sssekai_util_neck_attach_obj_body = bpy.props.PointerProperty(name=T("Body"),type=bpy.types.Armature)
-    bpy.utils.register_class(SSSekaiBlenderUtilNeckAttachOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilNeckAttach)
+    bpy.utils.register_class(SSSekaiBlenderUtilNeckAttachOperator)    
     bpy.utils.register_class(SSSekaiBlenderApplyOutlineOperator)
     bpy.utils.register_class(SSSekaiBlenderImportPhysicsOperator)
     bpy.utils.register_class(SSSekaiBlenderPhysicsDisplayOperator)
@@ -1199,20 +1257,23 @@ def register():
     bpy.utils.register_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilApplyModifersOperator)
     bpy.utils.register_class(SSSekaiBlenderUtilArmatureMergeOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilNeckMergeOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilCharacterNeckMergeOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilCharacterArmatureSimplifyOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilCharacterScalingMakeRootOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilCharacterHeelOffsetOperator)
+    bpy.utils.register_class(SSSekaiBlenderUtilCharacter)
     bpy.utils.register_class(SSSekaiBlenderExportAnimationTypeTree)
     bpy.utils.register_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
     bpy.utils.register_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
     bpy.utils.register_class(SSSekaiBlenderImportRLASinglePoseOperator)
     bpy.utils.register_class(SSSekaiBlenderImportRLABatchOperator)
+
 def unregister():    
     bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportPanel)
     bpy.utils.unregister_class(SSSekaiRLAImportPanel)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttachOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttach)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttachOperator)    
     bpy.utils.unregister_class(SSSekaiBlenderApplyOutlineOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportPhysicsOperator)
     bpy.utils.unregister_class(SSSekaiBlenderPhysicsDisplayOperator)
@@ -1222,8 +1283,11 @@ def unregister():
     bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilApplyModifersOperator)
     bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureMergeOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilNeckMergeOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureSimplifyOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacterNeckMergeOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacterArmatureSimplifyOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacterScalingMakeRootOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacterHeelOffsetOperator)
+    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacter)
     bpy.utils.unregister_class(SSSekaiBlenderExportAnimationTypeTree)
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
     bpy.utils.unregister_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
