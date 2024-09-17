@@ -383,17 +383,28 @@ If a root object is in the selection as well, this would become the root instead
     
 class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_character_heel_offset_op"
-    bl_label = T("Heel Offset")
-    bl_description = T("Set the Z offset of the selected character by its OffsetValue bone")    
+    bl_label = T("Calibrate Heel Offset")
+    bl_description = T("Set the Z offset of the selected character by its OffsetValue bone. Do this when the character's feet are not at the origin, or when you changed the character's height.")    
     def execute(self, context):
         obj = context.active_object
-        assert obj.type == "ARMATURE", "Please select an armature"
-        bpy.ops.object.mode_set(mode='EDIT')
-        ebone : bpy.types.EditBone = obj.data.edit_bones.get('OffsetValue')
+        assert obj and KEY_SEKAI_CHARACTER_HEIGHT in obj, "Please select an Character Root!"
+        # Search for armature that has the OffsetValue bone
+        ebone = None
+        for child in obj.children:
+            if child.type == 'ARMATURE':                 
+                bpy.context.view_layer.objects.active = child
+                bpy.ops.object.mode_set(mode='EDIT')
+                ebone = child.data.edit_bones.get('OffsetValue')
+                if ebone:
+                    print("* Found OffsetValue bone in", child.name)
+                    break    
         assert ebone, "OffsetValue bone not found"
         loc_xyz = ebone.head
+        bpy.context.view_layer.objects.active = obj
         bpy.ops.object.mode_set(mode='OBJECT')
-        obj.location.z = loc_xyz.z
+        # Blender's scale doesn't affect the translation of the object itself
+        # Pre-multiply the scale to the translation        
+        obj.location.z = loc_xyz.z * obj[KEY_SEKAI_CHARACTER_HEIGHT]
         return {'FINISHED'}
 class SSSekaiBlenderUtilCharacter(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_util_character"
@@ -423,7 +434,6 @@ class SSSekaiBlenderUtilCharacter(bpy.types.Panel):
         if active_obj and KEY_SEKAI_CHARACTER_HEIGHT in active_obj:
             row = layout.row()            
             row.prop(active_obj, '["%s"]' % KEY_SEKAI_CHARACTER_HEIGHT, text=T('Character Height (in meters)'))               
-        if active_obj and active_obj.type == 'ARMATURE':
             row = layout.row()
             row.prop(active_obj, "location", text=T('Use Heel Offset'))
             row = layout.row()
