@@ -162,10 +162,6 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
                 continue
             bone.rotation_mode = 'QUATERNION'       
             values = [to_pose_quaternion(bone_name, swizzle_quaternion(keyframe.value)) for keyframe in track.Curve]
-            # Ensure minimum rotation path (i.e. neighboring quats dots >= 0)
-            for i in range(0,len(values) - 1):
-                if values[i].dot(values[i+1]) < 0:
-                    values[i+1] = -values[i+1]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve_quatnerion(action,'pose.bones["%s"].rotation_quaternion' % bone_name, values, frames)
         else:
@@ -224,11 +220,7 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
         if obj:
             action = ensure_action(obj, name, False)
             obj.rotation_mode = 'QUATERNION'
-            values = [swizzle_quaternion(keyframe.value) for keyframe in track.Curve]      
-            # Ensure minimum rotation path (i.e. neighboring quats dots >= 0)
-            for i in range(0,len(values) - 1):
-                if values[i].dot(values[i+1]) < 0:
-                    values[i+1] = -values[i+1]                    
+            values = [swizzle_quaternion(keyframe.value) for keyframe in track.Curve]                    
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve_quatnerion(action,'rotation_quaternion', values, frames)
         else:
@@ -295,8 +287,12 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
     def swizzle_translation_camera(vector : Vector):
         result = swizzle_vector(vector)
         result *= Vector(scaling_factor)
-        result += Vector(scaling_offset)
+        result += Vector(scaling_offset)        
         return result    
+    def swizzle_euler_camera(euler : Euler):
+        result = swizzle_euler(euler)
+        result.y *= -1 # Invert Y (Unity's Roll)      
+        return result
     def fov_to_focal_length(fov : float):
         # FOV = 2 arctan [sensorSize/(2*focalLength)] 
         # focalLength = sensorSize / (2 * tan(FOV/2))        
@@ -308,7 +304,7 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
         import_fcurve(
             trs_action,'rotation_euler', 
-            [swizzle_euler(keyframe.value) for keyframe in curve], 
+            [swizzle_euler_camera(keyframe.value) for keyframe in curve], 
             [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 
             3, 'BEZIER',                         
             # [swizzle_euler(keyframe.inSlope) for keyframe in curve], 

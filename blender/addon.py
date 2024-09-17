@@ -1135,6 +1135,11 @@ def register():
         description=T("Animation Offset in frames"),
         default=0
     )
+    WindowManager.sssekai_animation_import_as_nla = BoolProperty(
+        name=T("NLA"),
+        description=T("Import as NLA Track"),
+        default=False
+    )
     WindowManager.sssekai_animation_import_camera_scaling = FloatVectorProperty(
         name=T("Camera Scaling"),
         description=T("Scaling used when importing camera animations"),
