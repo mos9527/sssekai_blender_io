@@ -3,8 +3,14 @@ from . import *
 def time_to_frame(time : float, frame_offset : int):
     return int(time * bpy.context.scene.render.fps) + 1 + frame_offset
 
+def retrive_action(object : bpy.types.Object):
+    '''Retrieves the action bound to an object, if any'''
+    return object.animation_data.action if object.animation_data else None
+
 def ensure_action(object, name : str, always_create_new : bool):
-    if always_create_new or not object.animation_data or not object.animation_data.action:
+    '''Creates (or retrieves) an action for an object, whilst ensuring that the action is bound to animation_data'''
+    existing_action = retrive_action(object)
+    if always_create_new or not existing_action:
         object.animation_data_clear()
         object.animation_data_create()
         action = bpy.data.actions.new(name)
@@ -16,6 +22,17 @@ def ensure_action(object, name : str, always_create_new : bool):
 def create_action(name : str):
     action = bpy.data.actions.new(name)
     return action
+
+def apply_action(action : bpy.types.Action, object : bpy.types.Object, use_nla : bool = False):    
+    '''Applies an action to an object'''
+    if not use_nla:
+        object.animation_data_clear()
+        object.animation_data_create()
+        object.animation_data.action = action
+    else:
+        nla_track = object.animation_data.nla_tracks.new()
+        nla_track.name = action.name
+        nla_track.strips.new(action.name, 0, action)        
 
 def import_fcurve(action : bpy.types.Action, data_path : str , values : list, frames : list, num_curves : int = 1, interpolation : str = 'BEZIER', tangents_in : list = [], tangents_out : list = []):
     '''Imports an Fcurve into an action
@@ -109,7 +126,7 @@ def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values
     return fcurve
 
 
-def import_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, action : bpy.types.Action = None):
+def load_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, action : bpy.types.Action = None):
     '''Converts an Animation object into Blender Action **without** applying it to the armature
 
     Args:
@@ -224,65 +241,7 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
             print("* WARNING: [Scale] Bone hash %s not found in bone table" % bone_hash)
     return action
 
-def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
-    '''Converts an Animation object into Blender Action(s), **whilst applying it to the articulation hierarchy**
-       
-    In this case there would be seperate actions for **each** joint in the hierarchy.
-    Support for exportable Actions (for usage with NLA Clips, for example) is not yet implemented.
-
-    Args:
-        name (str): name of the action
-        data (Animation): animation data
-        dest_arma (bpy.types.Object): target joint (Empty) hierarchy's top-most parent object
-        frame_offset (int): frame offset
-        always_create_new (bool): whether to always create a new action
-    '''
-    joint_table = json.loads(dest_arma[KEY_ARTICULATION_NAME_HASH_TBL])
-    joint_obj = {obj[KEY_JOINT_BONE_NAME]:obj for obj in dest_arma.children_recursive if obj.type == 'EMPTY' and KEY_JOINT_BONE_NAME in obj}
-    for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
-        bone_name = joint_table.get(str(bone_hash),None)
-        obj = joint_obj.get(bone_name,None)
-        if obj:
-            action = ensure_action(obj, name, always_create_new)
-            obj.rotation_mode = 'QUATERNION'
-            values = [swizzle_quaternion(keyframe.value) for keyframe in track.Curve]                    
-            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
-            import_fcurve_quatnerion(action,'rotation_quaternion', values, frames)
-        else:
-            print("* WARNING: [Rotation] Bone hash %s not found in joint table" % bone_hash)
-    for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
-        bone_name = joint_table.get(str(bone_hash),None)
-        obj = joint_obj.get(bone_name,None)
-        if obj:
-            action = ensure_action(obj, name, always_create_new)
-            obj.rotation_mode = 'YXZ'
-            values = [swizzle_euler(keyframe.value) for keyframe in track.Curve]
-            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
-            import_fcurve(action,'rotation_euler', values, frames, 3)
-        else:
-            print("* WARNING: [Rotation Euler] Bone hash %s not found in joint table" % bone_hash)
-    for bone_hash, track in data.TransformTracks[TransformType.Translation].items():
-        bone_name = joint_table.get(str(bone_hash),None)
-        obj = joint_obj.get(bone_name,None)
-        if obj:
-            action = ensure_action(obj, name, always_create_new)
-            values = [swizzle_vector(keyframe.value) for keyframe in track.Curve]
-            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
-            import_fcurve(action,'location', values, frames, 3)
-        else:
-            print("* WARNING: [Translation] Bone hash %s not found in joint table" % bone_hash)
-    for bone_hash, track in data.TransformTracks[TransformType.Scaling].items():
-        bone_name = joint_table.get(str(bone_hash),None)
-        obj = joint_obj.get(bone_name,None)
-        if obj:
-            action = ensure_action(obj, name, always_create_new)
-            values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
-            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
-            import_fcurve(action,'scale', values, frames, 3)
-        else:
-            print("* WARNING: [Scale] Bone hash %s not found in joint table" % bone_hash)
-
-def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object, frame_offset : int, action : bpy.types.Action = None):
+def load_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object, frame_offset : int, action : bpy.types.Action = None):
     '''Converts an Animation object into Blender Action **without** applying it to the mesh
     
     Args:
@@ -337,7 +296,7 @@ def prepare_camera_rig(camera : bpy.types.Object):
         return rig
     return camera.parent
 
-def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, scaling_factor : Vector, scaling_offset : Vector, fov_offset : float, action : bpy.types.Action = None): 
+def load_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, scaling_factor : Vector, scaling_offset : Vector, fov_offset : float, action : bpy.types.Action = None): 
     '''Converts an Animation object into Blender Action **without** applying it to the camera
 
     Args:
@@ -405,4 +364,63 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
             # [fov_to_focal_length(keyframe.inSlope.Z * 100) for keyframe in curve],
             # [fov_to_focal_length(keyframe.outSlope.Z * 100) for keyframe in curve]
         )
+
+def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
+    '''Converts an Animation object into Blender Action(s), **whilst applying it to the articulation hierarchy**
+       
+    In this case there would be seperate actions for **each** joint in the hierarchy.
+
+    Support for exportable Actions (for usage with NLA Clips, for example) is not planned due to this approach.
+
+    Args:
+        name (str): name of the action
+        data (Animation): animation data
+        dest_arma (bpy.types.Object): target joint (Empty) hierarchy's top-most parent object
+        frame_offset (int): frame offset
+        always_create_new (bool): whether to always create a new action
+    '''
+    joint_table = json.loads(dest_arma[KEY_ARTICULATION_NAME_HASH_TBL])
+    joint_obj = {obj[KEY_JOINT_BONE_NAME]:obj for obj in dest_arma.children_recursive if obj.type == 'EMPTY' and KEY_JOINT_BONE_NAME in obj}
+    for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
+        bone_name = joint_table.get(str(bone_hash),None)
+        obj = joint_obj.get(bone_name,None)
+        if obj:
+            action = ensure_action(obj, name, always_create_new)
+            obj.rotation_mode = 'QUATERNION'
+            values = [swizzle_quaternion(keyframe.value) for keyframe in track.Curve]                    
+            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
+            import_fcurve_quatnerion(action,'rotation_quaternion', values, frames)
+        else:
+            print("* WARNING: [Rotation] Bone hash %s not found in joint table" % bone_hash)
+    for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
+        bone_name = joint_table.get(str(bone_hash),None)
+        obj = joint_obj.get(bone_name,None)
+        if obj:
+            action = ensure_action(obj, name, always_create_new)
+            obj.rotation_mode = 'YXZ'
+            values = [swizzle_euler(keyframe.value) for keyframe in track.Curve]
+            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
+            import_fcurve(action,'rotation_euler', values, frames, 3)
+        else:
+            print("* WARNING: [Rotation Euler] Bone hash %s not found in joint table" % bone_hash)
+    for bone_hash, track in data.TransformTracks[TransformType.Translation].items():
+        bone_name = joint_table.get(str(bone_hash),None)
+        obj = joint_obj.get(bone_name,None)
+        if obj:
+            action = ensure_action(obj, name, always_create_new)
+            values = [swizzle_vector(keyframe.value) for keyframe in track.Curve]
+            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
+            import_fcurve(action,'location', values, frames, 3)
+        else:
+            print("* WARNING: [Translation] Bone hash %s not found in joint table" % bone_hash)
+    for bone_hash, track in data.TransformTracks[TransformType.Scaling].items():
+        bone_name = joint_table.get(str(bone_hash),None)
+        obj = joint_obj.get(bone_name,None)
+        if obj:
+            action = ensure_action(obj, name, always_create_new)
+            values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
+            frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
+            import_fcurve(action,'scale', values, frames, 3)
+        else:
+            print("* WARNING: [Scale] Bone hash %s not found in joint table" % bone_hash)
     return action

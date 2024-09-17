@@ -511,14 +511,15 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     track = clip.TransformTracks[TransformType.Translation]
                     if CAMERA_TRANS_ROT_CRC_MAIN in track or CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA in track:
                         print('* Importing Camera animation', animation.name)                        
-                        import_camera_animation(
+                        action = load_camera_animation(
                             animation.name, clip, camera_obj,  
-                            wm.sssekai_animation_import_offset, 
-                            not wm.sssekai_animation_append_exisiting, 
+                            wm.sssekai_animation_import_offset,                             
                             wm.sssekai_animation_import_camera_scaling, 
                             wm.sssekai_animation_import_camera_offset, 
-                            wm.sssekai_animation_import_camera_fov_offset
+                            wm.sssekai_animation_import_camera_fov_offset,
+                            retrive_action(camera_obj) if wm.sssekai_animation_append_exisiting else None
                         )
+                        apply_action(camera_obj, action, wm.sssekai_animation_import_as_nla)
                         print('* Imported Camera animation', animation.name)
                 elif active_type == 'ARMATURE':
                     if BLENDSHAPES_CRC in clip.FloatTracks:
@@ -530,11 +531,21 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                                 break
                         assert mesh_obj, "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes!" 
                         print("* Importing into", mesh_obj.name)
-                        import_keyshape_animation(animation.name, clip, mesh_obj, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                        action = load_keyshape_animation(
+                            animation.name, clip, mesh_obj, 
+                            wm.sssekai_animation_import_offset, 
+                            retrive_action(mesh_obj) if wm.sssekai_animation_append_exisiting else None
+                        )
+                        apply_action(mesh_obj, action, wm.sssekai_animation_import_as_nla)
                         print('* Imported Keyshape animation', animation.name)
                     if clip.TransformTracks[TransformType.Translation] or clip.TransformTracks[TransformType.Rotation] or clip.TransformTracks[TransformType.EulerRotation] or clip.TransformTracks[TransformType.Scaling]:
                         print('* Importing Armature animation', animation.name)
-                        import_armature_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
+                        action = load_armature_animation(
+                            animation.name, clip, bpy.context.active_object, 
+                            wm.sssekai_animation_import_offset, 
+                            retrive_action(bpy.context.active_object) if wm.sssekai_animation_append_exisiting else None
+                        )
+                        apply_action(bpy.context.active_object, action, wm.sssekai_animation_import_as_nla)
                         print('* Imported Armature animation', animation.name)
                 elif active_type == 'EMPTY':
                     if clip.TransformTracks[TransformType.Translation] or clip.TransformTracks[TransformType.Rotation] or clip.TransformTracks[TransformType.EulerRotation] or clip.TransformTracks[TransformType.Scaling]:
@@ -754,9 +765,11 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
                     KeyFrame(0, value, 0, 0, 0)
                 )
         
-        import_armature_animation('RLAPose', anim, arma_obj, wm.sssekai_animation_import_offset, False)
+        action = load_armature_animation('RLAPose', anim, arma_obj, wm.sssekai_animation_import_offset, None)
+        apply_action(arma_obj, action, False)
         if pose['shapeDatas']:
-            import_keyshape_animation('RLAPose', anim, mesh_obj, 0, False)
+            action = load_keyshape_animation('RLAPose', anim, mesh_obj, 0, None)
+            apply_action(mesh_obj, action, False)
         bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, wm.sssekai_animation_import_offset)
         bpy.context.scene.frame_current = wm.sssekai_animation_import_offset
         return {'FINISHED'}
@@ -812,7 +825,8 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
             anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_ROOT_BONE]].add_keyframe(
                 KeyFrame(timestamp, euler3_to_quat_swizzled(*segment['pose']['bodyRotation']), UnityQuaternion(), UnityQuaternion(), 0)
             )
-        import_armature_animation('RLA', anim, obj, 0, False)
+        action = load_armature_animation('RLA', anim, obj, 0, retrive_action(obj) if wm.sssekai_animation_append_exisiting else None)
+        apply_action(obj, action, wm.sssekai_animation_import_as_nla)
         # TODO: Figure out why the frame_end is not being set correctly sometimes
         try:
             bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
@@ -867,7 +881,8 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
                 anim.FloatTracks[BLENDSHAPES_CRC][inv_hash_table[RLA_VALID_BLENDSHAPES[idx]]].add_keyframe(
                     KeyFrame(timestamp, value, 0, 0, 0)
                 )
-        import_keyshape_animation('RLA', anim, mesh_obj, 0, False)
+        action = load_keyshape_animation('RLA', anim, mesh_obj, 0, retrive_action(mesh_obj) if wm.sssekai_animation_append_exisiting else None)
+        apply_action(mesh_obj, action, wm.sssekai_animation_import_as_nla)
         try:
             bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
             bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
