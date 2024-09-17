@@ -31,10 +31,12 @@ def apply_action(object : bpy.types.Object, action : bpy.types.Action, use_nla :
         object.animation_data_clear()
         object.animation_data_create()
         object.animation_data.action = action
-    else:
+    else:        
         nla_track = object.animation_data.nla_tracks.new()
         nla_track.name = action.name
-        nla_track.strips.new(action.name, 0, action)        
+        frame_begin = max(0, action.frame_range[0])
+        strip = nla_track.strips.new(action.name, frame_begin, action)
+        strip.action_frame_start = max(0, frame_begin)
 
 def import_fcurve(action : bpy.types.Action, data_path : str , values : list, frames : list, num_curves : int = 1, interpolation : str = 'BEZIER', tangents_in : list = [], tangents_out : list = []):
     '''Imports an Fcurve into an action
@@ -83,7 +85,6 @@ def import_fcurve(action : bpy.types.Action, data_path : str , values : list, fr
                 handle_data[1::2] = [v[i] if valueIterable else v for v in tangents_out]
                 fcurve[i].keyframe_points.foreach_set('handle_right', handle_data)
         fcurve[i].update()
-    return fcurve
 
 def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values : List[BlenderQuaternion], frames : list, interpolation : str = 'LINEAR'):
     '''Imports an Fcurve into an action, specialized for quaternions    
@@ -124,8 +125,7 @@ def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values
         fcurve[i].keyframe_points.foreach_set('co', curve_datas[i])
         ipo = bpy.types.Keyframe.bl_rna.properties['interpolation'].enum_items[interpolation].value
         fcurve[i].keyframe_points.foreach_set('interpolation', [ipo] * len(fcurve[i].keyframe_points))
-        fcurve[i].update()
-    return fcurve
+        fcurve[i].update()    
 
 
 def load_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, action : bpy.types.Action = None):
