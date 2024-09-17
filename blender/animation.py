@@ -13,11 +13,15 @@ def ensure_action(object, name : str, always_create_new : bool):
     else:
         return object.animation_data.action
 
+def create_action(name : str):
+    action = bpy.data.actions.new(name)
+    return action
+
 def import_fcurve(action : bpy.types.Action, data_path : str , values : list, frames : list, num_curves : int = 1, interpolation : str = 'BEZIER', tangents_in : list = [], tangents_out : list = []):
     '''Imports an Fcurve into an action
 
     Args:
-        action (bpy.types.Action): target action
+        action (bpy.types.Action): target action. keyframes will be merged into this action.
         data_path (str): data path
         values (list): values. size must be that of frames
         frames (list): frame indices. size must be that of values
@@ -66,7 +70,7 @@ def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values
     '''Imports an Fcurve into an action, specialized for quaternions    
 
     Args:
-        action (bpy.types.Action): target action
+        action (bpy.types.Action): target action. keyframes will be merged into this action.
         data_path (str): data path
         values (List[BlenderQuaternion]): values. size must be that of frames
         frames (list): frame indices. size must be that of values
@@ -105,7 +109,19 @@ def import_fcurve_quatnerion(action : bpy.types.Action, data_path : str , values
     return fcurve
 
 
-def import_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
+def import_armature_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, action : bpy.types.Action = None):
+    '''Converts an Animation object into Blender Action **without** applying it to the armature
+
+    Args:
+        name (str): name of the action
+        data (Animation): animation data
+        dest_arma (bpy.types.Object): target armature object
+        frame_offset (int): frame offset
+        action (bpy.types.Action, optional): existing action to append to. Defaults
+
+    Returns:
+        bpy.types.Action: the created action
+    '''
     bone_table = json.loads(dest_arma.data[KEY_BONE_NAME_HASH_TBL])
     bpy.ops.object.mode_set(mode='EDIT')
     # Collect bone space <-> local space transforms
@@ -151,7 +167,7 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
     bpy.ops.pose.transforms_clear()
     bpy.ops.pose.select_all(action='DESELECT')
     # Setup actions
-    action = ensure_action(dest_arma, name, always_create_new)
+    action = action or create_action(name)
     for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
         # Quaternion rotations
         if str(bone_hash) in bone_table:
@@ -206,19 +222,28 @@ def import_armature_animation(name : str, data : Animation, dest_arma : bpy.type
             import_fcurve(action,'pose.bones["%s"].scale' % bone_name, values, frames, 3)        
         else:
             print("* WARNING: [Scale] Bone hash %s not found in bone table" % bone_hash)
+    return action
 
 def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
+    '''Converts an Animation object into Blender Action(s), **whilst applying it to the articulation hierarchy**
+       
+    In this case there would be seperate actions for **each** joint in the hierarchy.
+    Support for exportable Actions (for usage with NLA Clips, for example) is not yet implemented.
+
+    Args:
+        name (str): name of the action
+        data (Animation): animation data
+        dest_arma (bpy.types.Object): target joint (Empty) hierarchy's top-most parent object
+        frame_offset (int): frame offset
+        always_create_new (bool): whether to always create a new action
+    '''
     joint_table = json.loads(dest_arma[KEY_ARTICULATION_NAME_HASH_TBL])
     joint_obj = {obj[KEY_JOINT_BONE_NAME]:obj for obj in dest_arma.children_recursive if obj.type == 'EMPTY' and KEY_JOINT_BONE_NAME in obj}
-    if always_create_new:
-        for obj in joint_obj.values():
-            obj.animation_data_clear()
-            obj.animation_data_create()
     for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
         bone_name = joint_table.get(str(bone_hash),None)
         obj = joint_obj.get(bone_name,None)
         if obj:
-            action = ensure_action(obj, name, False)
+            action = ensure_action(obj, name, always_create_new)
             obj.rotation_mode = 'QUATERNION'
             values = [swizzle_quaternion(keyframe.value) for keyframe in track.Curve]                    
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
@@ -229,7 +254,7 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
         bone_name = joint_table.get(str(bone_hash),None)
         obj = joint_obj.get(bone_name,None)
         if obj:
-            action = ensure_action(obj, name, False)
+            action = ensure_action(obj, name, always_create_new)
             obj.rotation_mode = 'YXZ'
             values = [swizzle_euler(keyframe.value) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
@@ -240,7 +265,7 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
         bone_name = joint_table.get(str(bone_hash),None)
         obj = joint_obj.get(bone_name,None)
         if obj:
-            action = ensure_action(obj, name, False)
+            action = ensure_action(obj, name, always_create_new)
             values = [swizzle_vector(keyframe.value) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'location', values, frames, 3)
@@ -250,29 +275,47 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
         bone_name = joint_table.get(str(bone_hash),None)
         obj = joint_obj.get(bone_name,None)
         if obj:
-            action = ensure_action(obj, name, False)
+            action = ensure_action(obj, name, always_create_new)
             values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'scale', values, frames, 3)
         else:
             print("* WARNING: [Scale] Bone hash %s not found in joint table" % bone_hash)
 
-def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object, frame_offset : int, always_create_new : bool):
-    '''NOTE: KeyShape value range [0,100]'''
+def import_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object, frame_offset : int, action : bpy.types.Action = None):
+    '''Converts an Animation object into Blender Action **without** applying it to the mesh
+    
+    Args:
+        name (str): name of the action
+        data (Animation): animation data
+        dest_mesh (bpy.types.Object): target mesh object
+        frame_offset (int): frame offset
+        action (bpy.types.Action, optional): existing action to append to. Defaults to None
+
+    Returns:
+        bpy.types.Action: the created action
+    
+    Note:
+        KeyShape value range [0,100]
+    '''
     mesh = dest_mesh.data
     assert KEY_SHAPEKEY_NAME_HASH_TBL in mesh, "Shape Key table not found. You can only import blend shape animations on meshes with blend shapes!"
     assert BLENDSHAPES_CRC in data.FloatTracks, "No blend shape animation found!"
     keyshape_table = json.loads(mesh[KEY_SHAPEKEY_NAME_HASH_TBL])
-    action = ensure_action(mesh.shape_keys, name, always_create_new)
+    action = create_action(name)
     for attrCRC, track in data.FloatTracks[BLENDSHAPES_CRC].items():
         bsName = keyshape_table[str(attrCRC)]
         import_fcurve(action,'key_blocks["%s"].value' % bsName, [keyframe.value / 100.0 for keyframe in track.Curve], [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve])
+    return action
 
-def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, always_create_new : bool, scaling_factor : Vector, scaling_offset : Vector, fov_offset : float): 
+def prepare_camera_rig(camera : bpy.types.Object):
     if not camera.parent or not KEY_CAMERA_RIG in camera.parent:
         # The 'rig' Offsets the camera's look-at direction w/o modifying the Euler angles themselves, which
         # would otherwise cause interpolation issues.
         # This is simliar to how mmd_tools handles camera animations.
+        #
+        # We also store the FOV in the X scale of the parent object so that it's easy to interpolate
+        # and we'd only need one action for the entire animation.        
         rig = create_empty('Camera Rig', camera.parent)
         rig[KEY_CAMERA_RIG] = "<marker>"
         camera.parent = rig
@@ -280,10 +323,39 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         camera.rotation_euler = Euler((math.radians(90),0,math.radians(180)))
         camera.rotation_mode = 'XYZ'
         camera.scale = Vector((1,1,1))
+        # Driver for FOV
+        driver = camera.data.driver_add('lens')
+        driver.type = 'SCRIPTED'
+        var_scale = driver.variables.new()
+        var_scale.name = 'fov'
+        var_scale.type = 'TRANSFORMS'
+        var_scale.targets[0].id = rig
+        var_scale.targets[0].transform_space = 'WORLD_SPACE'
+        var_scale.targets[0].transform_type = 'SCALE_X'
+        driver.expression = 'fov'
         print('* Created Camera Rig for camera',camera.name)    
-    rig = camera.parent
+        return rig
+    return camera.parent
+
+def import_camera_animation(name : str, data : Animation, camera : bpy.types.Object, frame_offset : int, scaling_factor : Vector, scaling_offset : Vector, fov_offset : float, action : bpy.types.Action = None): 
+    '''Converts an Animation object into Blender Action **without** applying it to the camera
+
+    Args:
+        name (str): name of the action
+        data (Animation): animation data
+        camera (bpy.types.Object): target camera object
+        frame_offset (int): frame offset        
+        scaling_factor (Vector): scale factor
+        scaling_offset (Vector): scale offset
+        fov_offset (float): offset to the FOV
+        action (bpy.types.Action, optional): existing action to append to. Defaults to None
+
+    Returns:
+        bpy.types.Action: the created action
+    '''
+    rig = prepare_camera_rig(camera)
     rig.rotation_mode = 'YXZ'
-    trs_action = ensure_action(rig, name, always_create_new)
+    action = action or create_action(name)
     def swizzle_translation_camera(vector : Vector):
         result = swizzle_vector(vector)
         result *= Vector(scaling_factor)
@@ -303,7 +375,7 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         print('* Found Camera Rotation track')
         curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
         import_fcurve(
-            trs_action,'rotation_euler', 
+            action,'rotation_euler', 
             [swizzle_euler_camera(keyframe.value) for keyframe in curve], 
             [time_to_frame(keyframe.time,frame_offset) for keyframe in curve], 
             3, 'BEZIER',                         
@@ -314,7 +386,7 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         print('* Found Camera Translation track, scaling=',scaling_factor)
         curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
         import_fcurve(
-            trs_action,'location', 
+            action,'location', 
             [swizzle_translation_camera(keyframe.value) for keyframe in curve], 
             [time_to_frame(keyframe.time,frame_offset) for keyframe in curve],
             3, 'BEZIER',
@@ -323,15 +395,14 @@ def import_camera_animation(name : str, data : Animation, camera : bpy.types.Obj
         )
     if CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA in data.TransformTracks[TransformType.Translation]:
         print('* Found Camera FOV track')
-        camera.data.lens_unit = 'MILLIMETERS'
-        fov_action = ensure_action(camera.data, name + '_lens', always_create_new)
-        curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA].Curve
-        fovs = [fov_to_focal_length(keyframe.value.Z * 100) for keyframe in curve]
+        camera.data.lens_unit = 'MILLIMETERS'        
+        curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA].Curve        
         import_fcurve(
-            fov_action,'lens',
-            fovs,
+            action,'scale', # FOV on the X scale
+            [(fov_to_focal_length(keyframe.value.Z * 100),1,1) for keyframe in curve],
             [time_to_frame(keyframe.time, frame_offset) for keyframe in curve], 
-            1, 'BEZIER',
+            3, 'BEZIER',
             # [fov_to_focal_length(keyframe.inSlope.Z * 100) for keyframe in curve],
             # [fov_to_focal_length(keyframe.outSlope.Z * 100) for keyframe in curve]
         )
+    return action
