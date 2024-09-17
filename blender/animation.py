@@ -23,8 +23,10 @@ def create_action(name : str):
     action = bpy.data.actions.new(name)
     return action
 
-def apply_action(action : bpy.types.Action, object : bpy.types.Object, use_nla : bool = False):    
+def apply_action(object : bpy.types.Object, action : bpy.types.Action, use_nla : bool = False):    
     '''Applies an action to an object'''
+    if not object.animation_data:
+        object.animation_data_create()
     if not use_nla:
         object.animation_data_clear()
         object.animation_data_create()
@@ -284,14 +286,14 @@ def prepare_camera_rig(camera : bpy.types.Object):
         camera.scale = Vector((1,1,1))
         # Driver for FOV
         driver = camera.data.driver_add('lens')
-        driver.type = 'SCRIPTED'
-        var_scale = driver.variables.new()
+        driver.driver.type = 'SCRIPTED'
+        var_scale = driver.driver.variables.new()
         var_scale.name = 'fov'
         var_scale.type = 'TRANSFORMS'
         var_scale.targets[0].id = rig
         var_scale.targets[0].transform_space = 'WORLD_SPACE'
         var_scale.targets[0].transform_type = 'SCALE_X'
-        driver.expression = 'fov'
+        driver.driver.expression = 'fov'
         print('* Created Camera Rig for camera',camera.name)    
         return rig
     return camera.parent
@@ -364,6 +366,7 @@ def load_camera_animation(name : str, data : Animation, camera : bpy.types.Objec
             # [fov_to_focal_length(keyframe.inSlope.Z * 100) for keyframe in curve],
             # [fov_to_focal_length(keyframe.outSlope.Z * 100) for keyframe in curve]
         )
+    return action
 
 def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.types.Object, frame_offset : int, always_create_new : bool):
     '''Converts an Animation object into Blender Action(s), **whilst applying it to the articulation hierarchy**
@@ -423,4 +426,4 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
             import_fcurve(action,'scale', values, frames, 3)
         else:
             print("* WARNING: [Scale] Bone hash %s not found in joint table" % bone_hash)
-    return action
+    

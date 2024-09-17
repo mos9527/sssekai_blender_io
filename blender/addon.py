@@ -507,19 +507,19 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 if active_type == 'CAMERA' or KEY_CAMERA_RIG in bpy.context.active_object:
                     camera_obj = bpy.context.active_object
                     if KEY_CAMERA_RIG in bpy.context.active_object:
-                        camera_obj = camera_obj.children[0]                    
+                        camera_obj = camera_obj.children[0]
                     track = clip.TransformTracks[TransformType.Translation]
                     if CAMERA_TRANS_ROT_CRC_MAIN in track or CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA in track:
                         print('* Importing Camera animation', animation.name)                        
                         action = load_camera_animation(
                             animation.name, clip, camera_obj,  
-                            wm.sssekai_animation_import_offset,                             
+                            wm.sssekai_animation_import_offset,                         
                             wm.sssekai_animation_import_camera_scaling, 
                             wm.sssekai_animation_import_camera_offset, 
                             wm.sssekai_animation_import_camera_fov_offset,
                             retrive_action(camera_obj) if wm.sssekai_animation_append_exisiting else None
                         )
-                        apply_action(camera_obj, action, wm.sssekai_animation_import_as_nla)
+                        apply_action(camera_obj.parent, action, wm.sssekai_animation_import_use_nla)
                         print('* Imported Camera animation', animation.name)
                 elif active_type == 'ARMATURE':
                     if BLENDSHAPES_CRC in clip.FloatTracks:
@@ -536,7 +536,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             wm.sssekai_animation_import_offset, 
                             retrive_action(mesh_obj) if wm.sssekai_animation_append_exisiting else None
                         )
-                        apply_action(mesh_obj, action, wm.sssekai_animation_import_as_nla)
+                        apply_action(mesh_obj, action, wm.sssekai_animation_import_use_nla)
                         print('* Imported Keyshape animation', animation.name)
                     if clip.TransformTracks[TransformType.Translation] or clip.TransformTracks[TransformType.Rotation] or clip.TransformTracks[TransformType.EulerRotation] or clip.TransformTracks[TransformType.Scaling]:
                         print('* Importing Armature animation', animation.name)
@@ -545,7 +545,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             wm.sssekai_animation_import_offset, 
                             retrive_action(bpy.context.active_object) if wm.sssekai_animation_append_exisiting else None
                         )
-                        apply_action(bpy.context.active_object, action, wm.sssekai_animation_import_as_nla)
+                        apply_action(bpy.context.active_object, action, wm.sssekai_animation_import_use_nla)
                         print('* Imported Armature animation', animation.name)
                 elif active_type == 'EMPTY':
                     if clip.TransformTracks[TransformType.Translation] or clip.TransformTracks[TransformType.Rotation] or clip.TransformTracks[TransformType.EulerRotation] or clip.TransformTracks[TransformType.Scaling]:
@@ -826,7 +826,7 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
                 KeyFrame(timestamp, euler3_to_quat_swizzled(*segment['pose']['bodyRotation']), UnityQuaternion(), UnityQuaternion(), 0)
             )
         action = load_armature_animation('RLA', anim, obj, 0, retrive_action(obj) if wm.sssekai_animation_append_exisiting else None)
-        apply_action(obj, action, wm.sssekai_animation_import_as_nla)
+        apply_action(obj, action, wm.sssekai_animation_import_use_nla)
         # TODO: Figure out why the frame_end is not being set correctly sometimes
         try:
             bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
@@ -882,7 +882,7 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
                     KeyFrame(timestamp, value, 0, 0, 0)
                 )
         action = load_keyshape_animation('RLA', anim, mesh_obj, 0, retrive_action(mesh_obj) if wm.sssekai_animation_append_exisiting else None)
-        apply_action(mesh_obj, action, wm.sssekai_animation_import_as_nla)
+        apply_action(mesh_obj, action, wm.sssekai_animation_import_use_nla)
         try:
             bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
             bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
@@ -975,7 +975,6 @@ def enumerate_rla_assets(self, context):
     except Exception as e:
         print('* Failed to load RLA bundle:', e)       
     return sssekai_global.rla_enum_entries
-
 class SSSekaiRLAImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_rla_import"
     bl_label = T("RLA Import")
@@ -1012,6 +1011,8 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_rla_active_character", icon='ARMATURE_DATA')
         row = layout.row()
         row.prop(bpy.context.scene.render, "fps", icon='TIME')
+        row = layout.row()
+        row.prop(wm, "sssekai_animation_import_use_nla", icon='NLA')
         row = layout.row()
         row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='ARMATURE_DATA')
         row.operator(SSSekaiBlenderImportRLAShapekeyAnimationOperator.bl_idname, icon='SHAPEKEY_DATA')
@@ -1080,6 +1081,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_animation_import_camera_offset",icon='CAMERA_DATA')        
         row = layout.row()
         row.prop(wm, "sssekai_animation_import_camera_fov_offset",icon='CAMERA_DATA')
+        row = layout.row()
+        row.prop(wm, "sssekai_animation_import_use_nla", icon='NLA')
         row = layout.row()
         row.operator(SSSekaiBlenderExportAnimationTypeTree.bl_idname,icon='EXPORT')
         row = layout.row()        
@@ -1150,7 +1153,7 @@ def register():
         description=T("Animation Offset in frames"),
         default=0
     )
-    WindowManager.sssekai_animation_import_as_nla = BoolProperty(
+    WindowManager.sssekai_animation_import_use_nla = BoolProperty(
         name=T("NLA"),
         description=T("Import as NLA Track"),
         default=False
