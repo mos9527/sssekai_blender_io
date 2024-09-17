@@ -352,24 +352,33 @@ class SSSekaiBlenderUtilCharacterNeckMergeOperator(bpy.types.Operator):
 class SSSekaiBlenderUtilCharacterScalingMakeRootOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_character_scaling_make_root_op"
     bl_label = T("Make Root")
-    bl_description = T("Appends the selected object to a Empty object (that can be configured with a height value), with the Empty object as the new root")
+    bl_description = T("""Appends the selected object to an Empty object (that can be configured with a height value), with the Empty object as the new root.\n
+If a root object is in the selection as well, this would become the root instead.""")
     def execute(self, context):
         scene = context.scene
-        root = create_empty('Character Root')
-        root[KEY_SEKAI_CHARACTER_HEIGHT] = 1.0        
         objs = context.selected_objects
-        # Set up driver for the scaling        
-        for ch in root.driver_add('scale'):
-            ch : bpy.types.FCurve
-            ch.driver.type = 'SCRIPTED'
-            var = ch.driver.variables.new()
-            var.name = 'height'
-            var.type = 'SINGLE_PROP'
-            var.targets[0].id = root
-            var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
-            ch.driver.expression = 'height'
+        root = None
         for obj in objs:
-            obj.parent = root
+            if obj.type == 'EMPTY' and KEY_SEKAI_CHARACTER_HEIGHT in obj:
+                root = obj
+                print('* Found existing root', obj.name)
+                break
+        if not root:
+            root = create_empty('Character Root')
+            root[KEY_SEKAI_CHARACTER_HEIGHT] = 1.0  
+            # Set up driver for the scaling        
+            for ch in root.driver_add('scale'):
+                ch : bpy.types.FCurve
+                ch.driver.type = 'SCRIPTED'
+                var = ch.driver.variables.new()
+                var.name = 'height'
+                var.type = 'SINGLE_PROP'
+                var.targets[0].id = root
+                var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
+                ch.driver.expression = 'height'
+        for obj in objs:
+            if obj != root:
+                obj.parent = root
         return {'FINISHED'}
     
 class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
