@@ -1,7 +1,3 @@
-# TODO:
-# Sekai_Core_CharacterModel__Setup
-# - Set up character scale (XYZ) -> character height
-# - Set up character ''heel offset'' -> character Z += heel offset
 from typing import Set
 from os import path
 import zipfile
@@ -401,10 +397,8 @@ class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
         assert ebone, "OffsetValue bone not found"
         loc_xyz = ebone.head
         bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.mode_set(mode='OBJECT')
-        # Blender's scale doesn't affect the translation of the object itself
-        # Pre-multiply the scale to the translation        
-        obj.location.z = loc_xyz.z * obj[KEY_SEKAI_CHARACTER_HEIGHT]
+        bpy.ops.object.mode_set(mode='OBJECT')     
+        obj.location.z = loc_xyz.z
         return {'FINISHED'}
 class SSSekaiBlenderUtilCharacter(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_util_character"
@@ -595,7 +589,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             wm.sssekai_animation_import_camera_scaling, 
                             wm.sssekai_animation_import_camera_offset, 
                             wm.sssekai_animation_import_camera_fov_offset,
-                            retrive_action(camera_obj) if wm.sssekai_animation_append_exisiting else None
+                            retrive_action(camera_obj.parent) if wm.sssekai_animation_append_exisiting else None
                         )
                         apply_action(camera_obj.parent, action, wm.sssekai_animation_import_use_nla)
                         print('* Imported Camera animation', animation.name)
