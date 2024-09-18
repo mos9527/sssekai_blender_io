@@ -398,7 +398,7 @@ class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
         loc_xyz = ebone.head
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.mode_set(mode='OBJECT')     
-        obj.location.z = loc_xyz.z
+        obj.location.z = loc_xyz.z * obj[KEY_SEKAI_CHARACTER_HEIGHT]
         return {'FINISHED'}
 class SSSekaiBlenderUtilCharacter(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_util_character"
