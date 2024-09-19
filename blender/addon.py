@@ -362,16 +362,22 @@ If a root object is in the selection as well, this would become the root instead
         if not root:
             root = create_empty('Character Root')
             root[KEY_SEKAI_CHARACTER_HEIGHT] = 1.0  
-            # Set up driver for the scaling        
-            for ch in root.driver_add('scale'):
-                ch : bpy.types.FCurve
-                ch.driver.type = 'SCRIPTED'
-                var = ch.driver.variables.new()
-                var.name = 'height'
-                var.type = 'SINGLE_PROP'
-                var.targets[0].id = root
-                var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
-                ch.driver.expression = 'height'
+            # Set up drivers for the scaling 
+            for obj in objs:
+                # Collect `Position` pose bones that we can apply the scaling to
+                if obj.type == 'ARMATURE':
+                    for bone in obj.pose.bones:
+                        if bone.name == 'Position':                        
+                            bone.driver_remove('scale')
+                            for ch in  bone.driver_add('scale'):
+                                ch.driver.type = 'SCRIPTED'
+                                var = ch.driver.variables.new()
+                                var.name = 'height'
+                                var.type = 'SINGLE_PROP'
+                                var.targets[0].id = root
+                                var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
+                                ch.driver.expression = 'height'
+                            print('* Applied Height driver for', obj.name)
         for obj in objs:
             if obj != root:
                 obj.parent = root
