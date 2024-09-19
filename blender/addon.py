@@ -290,50 +290,13 @@ class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 @register_class
-class SSSekaiBlenderUtilCharacterNeckMergeOperator(bpy.types.Operator):
-    bl_idname = "sssekai.util_neck_merge_op"
-    bl_label = T("Merge")
-    bl_description = T("Merge the selected face armature with the selected body armature")
-    def execute(self, context):
-        scene = context.scene
-        wm = context.window_manager
-        face_arma = wm.sssekai_util_neck_attach_obj_face
-        body_arma = wm.sssekai_util_neck_attach_obj_body
-        assert face_arma and body_arma, "Please select both face and body armatures"
-        bpy.ops.sssekai.util_neck_attach_op() # Attach nontheless
-        face_obj = scene.objects.get(face_arma.name)
-        body_obj = scene.objects.get(body_arma.name)
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.select_all(action='DESELECT')
-        face_obj.select_set(True)
-        body_obj.select_set(True)
-        bpy.context.view_layer.objects.active = body_obj         
-        bpy.ops.sssekai.util_armature_merge_op()
-        # Clean up bone hierarchy
-        # We have made a lot of assumptions here...
-        # Priori:
-        # - The duped bones would be named as 'Bone.001', 'Bone.002', etc
-        # - The face armature and body armature (if chosen correctly) would share some bones, up until the 'Neck' bone
-        bpy.ops.object.mode_set(mode='EDIT')
-        # - Changing the bone hierarchy in EDIT mode would not affect the mesh or the bone's armature space transforms
-        # We will:
-        # - Replace the subtree of the Neck bone of the body armature with the subtree of the Neck bone of the face armature
-        # - Fix up the naming
-        body_arma = body_obj.data
-        for bone in body_arma.edit_bones['Head.001'].children:
-            bone.parent = body_arma.edit_bones['Head']       
-        # - Remove the now redundant bones
-        body_arma.edit_bones.active = body_arma.edit_bones['Position.001']
-        bpy.ops.sssekai.util_misc_remove_bone_hierarchy_op()
-        bpy.ops.object.mode_set(mode='OBJECT')
-        return {"FINISHED"}
-
-@register_class
 class SSSekaiBlenderUtilCharacterScalingMakeRootOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_character_scaling_make_root_op"
     bl_label = T("Make/Update Root Height Scale")
-    bl_description = T("""Appends the selected object to an Empty object (that can be configured with a height value), with the Empty object as the new root.\n
-If a root object is in the selection as well, this would become the root instead.""")
+    bl_description = T("""Appends the selected object to an Empty object (that can be configured with a height value), with the Empty object as the new root.
+If a root object is in the selection as well, this would become the root instead.
+NOTE: This only affects the FINAL visual of the pose. The armature itself isn't affected.
+      If otherwise needed, enter Object Mode, scale the armature, and then Apply Scale to the entire armature.""")
     def execute(self, context):
         scene = context.scene
         objs = context.selected_objects
@@ -371,6 +334,45 @@ If a root object is in the selection as well, this would become the root instead
             if obj != root:
                 obj.parent = root
         return {'FINISHED'}
+
+@register_class
+class SSSekaiBlenderUtilCharacterNeckMergeOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_neck_merge_op"
+    bl_label = T("Merge")
+    bl_description = T("Merge the selected face armature with the selected body armature")
+    def execute(self, context):
+        scene = context.scene
+        wm = context.window_manager
+        face_arma = wm.sssekai_util_neck_attach_obj_face
+        body_arma = wm.sssekai_util_neck_attach_obj_body
+        assert face_arma and body_arma, "Please select both face and body armatures"
+        bpy.ops.sssekai.util_neck_attach_op() # Attach nontheless
+        face_obj = scene.objects.get(face_arma.name)
+        body_obj = scene.objects.get(body_arma.name)
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        face_obj.select_set(True)
+        body_obj.select_set(True)
+        bpy.context.view_layer.objects.active = body_obj         
+        bpy.ops.sssekai.util_armature_merge_op()
+        # Clean up bone hierarchy
+        # We have made a lot of assumptions here...
+        # Priori:
+        # - The duped bones would be named as 'Bone.001', 'Bone.002', etc
+        # - The face armature and body armature (if chosen correctly) would share some bones, up until the 'Neck' bone
+        bpy.ops.object.mode_set(mode='EDIT')
+        # - Changing the bone hierarchy in EDIT mode would not affect the mesh or the bone's armature space transforms
+        # We will:
+        # - Replace the subtree of the Neck bone of the body armature with the subtree of the Neck bone of the face armature
+        # - Fix up the naming
+        body_arma = body_obj.data
+        for bone in body_arma.edit_bones['Head.001'].children:
+            bone.parent = body_arma.edit_bones['Head']       
+        # - Remove the now redundant bones
+        body_arma.edit_bones.active = body_arma.edit_bones['Position.001']
+        bpy.ops.sssekai.util_misc_remove_bone_hierarchy_op()
+        bpy.ops.object.mode_set(mode='OBJECT')
+        return {"FINISHED"}
 
 @register_class  
 class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
@@ -800,6 +802,7 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
 
         wm = context.window_manager
         active_chara = wm.sssekai_rla_active_character
+        active_chara_height = wm.sssekai_rla_active_character_height
         chara_segments = list()
         has_boneData = False
         for tick, data in sssekai_global.rla_clip_data.items():
@@ -836,7 +839,7 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
                         KeyFrame(timestamp, euler3_to_quat_swizzled(*boneEuler), UnityQuaternion(), UnityQuaternion(), 0)
                     )
             anim.TransformTracks[TransformType.Translation][inv_hash_table[RLA_ROOT_BONE]].add_keyframe(
-                KeyFrame(timestamp, Vector3(*segment['pose']['bodyPosition']), Vector3(), Vector3(), 0)
+                KeyFrame(timestamp, Vector3(*(v / active_chara_height for v in segment['pose']['bodyPosition'])), Vector3(), Vector3(), 0)
             )
             anim.TransformTracks[TransformType.Rotation][inv_hash_table[RLA_ROOT_BONE]].add_keyframe(
                 KeyFrame(timestamp, euler3_to_quat_swizzled(*segment['pose']['bodyRotation']), UnityQuaternion(), UnityQuaternion(), 0)
@@ -1033,6 +1036,8 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(wm, "sssekai_rla_active_character", icon='ARMATURE_DATA')
         row = layout.row()
+        row.prop(wm, "sssekai_rla_active_character_height", icon='ARMATURE_DATA')
+        row = layout.row()
         row.prop(bpy.context.scene.render, "fps", icon='TIME')
         row = layout.row()
         row.prop(wm, "sssekai_animation_import_use_nla", icon='NLA')
@@ -1207,6 +1212,11 @@ register_wm_props(
         name=T("Character ID"),
         description=T("Active Character ID"),
         default=0
+    ),
+    sssekai_rla_active_character_height = FloatProperty(
+        name=T("Height"),
+        description=T("Active Character Height"),
+        default=1.00
     ),
     sssekai_rla_single_pose_json = StringProperty(
         name=T("RLA Pose JSON"),
