@@ -22,7 +22,7 @@ import math
 import json
 import zlib
 import tempfile
-from typing import List, Dict
+from typing import List, Dict, Set
 from dataclasses import dataclass
 from enum import IntEnum
 # Coordinate System | Forward |  Up  |  Left
@@ -77,7 +77,7 @@ CAMERA_TRANS_ROT_CRC_MAIN = 3326594866 # Euler, Position in transform tracks
 CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA = 3283970054 # Position, Scale(??) in transform tracks, FOV in the last float track
 # --- END Sekai specific values
 
-# Utility functions
+# Utilities
 def create_empty(name : str, parent = None):
     joint = bpy.data.objects.new(name, None)
     joint.empty_display_size = 0.1
@@ -87,6 +87,44 @@ def create_empty(name : str, parent = None):
     return joint
 def clamp(value, mmin, mmax):
     return max(min(value, mmax), mmin)
+def encode_asset_id(obj):
+    prop = lambda x: '<%s %s>' % (x,getattr(obj,x,'<unk>'))
+    return f"""{prop('name')},{prop('container')},{prop('path_id')},{prop('file_id')}"""
+# Import helpers
+class _registry:
+    classes = list()
+    wm_props = dict()
+    
+    def add_register_class(self, clazz):
+        self.classes.append(clazz)    
+    def register_all(self):
+        for clazz in self.classes:
+            bpy.utils.register_class(clazz)
+    def unregister_all(self):
+        for clazz in self.classes:
+            bpy.utils.unregister_class(clazz)
+        self.classes.clear()
+    # ---
+    def add_register_wm(self, **kw):
+        self.wm_props.update(kw)
+    def register_all_wm(self):
+        for k,v in self.wm_props.items():
+            setattr(bpy.types.WindowManager,k,v)
+    def unregister_all_wm(self):
+        for k,v in self.wm_props.items():
+            setattr(bpy.types.WindowManager,k,None)
+        self.wm_props.clear()
+    # ---
+    def reset(self):
+        self.classes.clear()
+        self.wm_props.clear()
+registry = _registry()
+def register_class(clazz):
+    registry.add_register_class(clazz)
+    return clazz
+def register_wm_props(**kw):
+    registry.add_register_wm(**kw)
+  
 # UnityPy deps
 import UnityPy
 from UnityPy import Environment
@@ -97,6 +135,7 @@ from UnityPy.math import Vector3, Quaternion as UnityQuaternion
 from sssekai.unity.AnimationClip import read_animation, Animation, TransformType, KeyFrame
 from sssekai.unity import sssekai_get_unity_version, sssekai_set_unity_version
 
+# Types
 class BonePhysicsType(IntEnum):
     NoPhysics = 0x00
 
@@ -214,8 +253,27 @@ class Armature:
         for parent, child, depth in self.root.dfs_generator():
             print('\t' * depth, child.name)
 
-def pack_matrix(matrix : Matrix):
-    return [matrix[i][j] for i in range(4) for j in range(4)]
-
-def unpack_matrix(data : list):
-    return Matrix([data[i:i+4] for i in range(0,16,4)])
+# Evil(!!) global variables
+# Copilot autocompleted this after 'evil' lmao
+class SSSekaiGlobalEnvironment:
+    current_dir : str = None
+    current_enum_entries : list = None
+    # --- SSSekai exclusive
+    env : Environment
+    articulations : Set[Armature]
+    armatures : Set[Armature]
+    animations : Set[Animation]
+    # --- RLA exclusive
+    rla_sekai_streaming_live_bundle_path : str = None
+    rla_header : dict = dict()  
+    rla_clip_data : dict = dict()   
+    rla_selected_raw_clip : str = 0
+    rla_raw_clips : dict = dict()  
+    rla_animations : dict = dict()  # character ID -> Animation
+    rla_clip_tick_range : tuple = (0,0)
+    rla_clip_charas : set = set()
+    rla_enum_entries : list = None
+    rla_enum_bookmarks : list = []
+    def rla_get_version(self):
+        return tuple(map(int, sssekai_global.rla_header['version'].split('.'))) if 'version' in sssekai_global.rla_header else (0,0)
+sssekai_global = SSSekaiGlobalEnvironment()

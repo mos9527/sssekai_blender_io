@@ -1,4 +1,4 @@
-from typing import Set
+# TODO: Seperate the operators/panels into different files
 from os import path
 import zipfile
 
@@ -12,7 +12,6 @@ from sssekai.unity.AssetBundle import load_assetbundle
 
 import bpy
 import bpy.utils.previews
-import mathutils
 from bpy.types import Context, WindowManager
 from bpy.props import (
     StringProperty,
@@ -25,32 +24,7 @@ from bpy.props import (
 )
 from bpy.app.translations import pgettext as T
 
-def encode_asset_id(obj):
-    prop = lambda x: '<%s %s>' % (x,getattr(obj,x,'<unk>'))
-    return f"""{prop('name')},{prop('container')},{prop('path_id')},{prop('file_id')}"""
-class SSSekaiGlobalEnvironment:
-    current_dir : str = None
-    current_enum_entries : list = None
-    # --- SSSekai exclusive
-    env : Environment
-    articulations : Set[Armature]
-    armatures : Set[Armature]
-    animations : Set[Animation]
-    # --- RLA exclusive
-    rla_sekai_streaming_live_bundle_path : str = None
-    rla_header : dict = dict()  
-    rla_clip_data : dict = dict()   
-    rla_selected_raw_clip : str = 0
-    rla_raw_clips : dict = dict()  
-    rla_animations : dict = dict()  # character ID -> Animation
-    rla_clip_tick_range : tuple = (0,0)
-    rla_clip_charas : set = set()
-    rla_enum_entries : list = None
-    rla_enum_bookmarks : list = []
-    def rla_get_version(self):
-        return tuple(map(int, sssekai_global.rla_header['version'].split('.'))) if 'version' in sssekai_global.rla_header else (0,0)
-sssekai_global = SSSekaiGlobalEnvironment()
-
+@register_class
 class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_misc_recalculate_bone_hash_table_op"
     bl_label = T("Recalculate Hash Table")
@@ -92,6 +66,7 @@ class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator)
             assert False, 'Please select an armature/articulation imported by SSSekai first!'
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_misc_remove_bone_hierarchy_op"
     bl_label = T("Remove Bone Hierarchy")
@@ -103,6 +78,7 @@ class SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator(bpy.types.Operator):
             bpy.context.active_object.data.edit_bones.remove(bone)
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_misc_rename_remove_numeric_suffix_op"
     bl_label = T("Remove Numeric Suffix")
@@ -122,6 +98,7 @@ class SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator(bpy.types.Operator
             rename_one(bone)
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderUtilApplyModifersOperator(bpy.types.Operator):
     # From: https://github.com/przemir/ApplyModifierForObjectWithShapeKeys/blob/master/ApplyModifierForObjectWithShapeKeys.py
     # NOTE: Only a subset of the original features are implemented here
@@ -220,6 +197,7 @@ class SSSekaiBlenderUtilApplyModifersOperator(bpy.types.Operator):
     
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderUtilArmatureMergeOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_armature_merge_op"
     bl_label = T("Merge Armatures")
@@ -263,6 +241,7 @@ class SSSekaiBlenderUtilArmatureMergeOperator(bpy.types.Operator):
                 child.modifiers.new('Armature', 'ARMATURE').object = parent_obj
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_misc"
     bl_label = T("Misc")
@@ -286,14 +265,16 @@ class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
         row = layout.row()
         row.operator(SSSekaiBlenderUtilCharacterArmatureSimplifyOperator.bl_idname,icon='TOOL_SETTINGS')
 
+@register_class
 class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_attach_op"
     bl_label = T("Attach")
     bl_description = T("Attach the selected face armature to the selected body armature")
     def execute(self, context):
         scene = context.scene
-        face_arma = scene.sssekai_util_neck_attach_obj_face
-        body_arma = scene.sssekai_util_neck_attach_obj_body
+        wm = context.window_manager
+        face_arma = wm.sssekai_util_neck_attach_obj_face
+        body_arma = wm.sssekai_util_neck_attach_obj_body
         assert face_arma and body_arma, "Please select both face and body armatures"        
         face_obj = scene.objects.get(face_arma.name)
         body_obj = scene.objects.get(body_arma.name)
@@ -308,14 +289,16 @@ class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
         add_constraint('Head')
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderUtilCharacterNeckMergeOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_neck_merge_op"
     bl_label = T("Merge")
     bl_description = T("Merge the selected face armature with the selected body armature")
     def execute(self, context):
         scene = context.scene
-        face_arma = scene.sssekai_util_neck_attach_obj_face
-        body_arma = scene.sssekai_util_neck_attach_obj_body
+        wm = context.window_manager
+        face_arma = wm.sssekai_util_neck_attach_obj_face
+        body_arma = wm.sssekai_util_neck_attach_obj_body
         assert face_arma and body_arma, "Please select both face and body armatures"
         bpy.ops.sssekai.util_neck_attach_op() # Attach nontheless
         face_obj = scene.objects.get(face_arma.name)
@@ -345,6 +328,7 @@ class SSSekaiBlenderUtilCharacterNeckMergeOperator(bpy.types.Operator):
         bpy.ops.object.mode_set(mode='OBJECT')
         return {"FINISHED"}
 
+@register_class
 class SSSekaiBlenderUtilCharacterScalingMakeRootOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_character_scaling_make_root_op"
     bl_label = T("Make Root")
@@ -382,7 +366,8 @@ If a root object is in the selection as well, this would become the root instead
             if obj != root:
                 obj.parent = root
         return {'FINISHED'}
-    
+
+@register_class  
 class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_character_heel_offset_op"
     bl_label = T("Calibrate Heel Offset")
@@ -406,6 +391,8 @@ class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
         bpy.ops.object.mode_set(mode='OBJECT')     
         obj.location.z = loc_xyz.z * obj[KEY_SEKAI_CHARACTER_HEIGHT]
         return {'FINISHED'}
+
+@register_class
 class SSSekaiBlenderUtilCharacter(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_util_character"
     bl_label = T("Sekai Character")
@@ -416,14 +403,14 @@ class SSSekaiBlenderUtilCharacter(bpy.types.Panel):
     def draw(self, context):
         active_obj = bpy.context.active_object
         layout = self.layout
-        scene = context.scene
+        wm = context.window_manager
         row = layout.row()
         row.label(text=T('Neck Attach'))
         row = layout.row()
         row.label(text=T('Select Targets'))
         row = layout.row()
-        row.prop(scene, 'sssekai_util_neck_attach_obj_face')
-        row.prop(scene, 'sssekai_util_neck_attach_obj_body')
+        row.prop(wm, 'sssekai_util_neck_attach_obj_face')
+        row.prop(wm, 'sssekai_util_neck_attach_obj_body')
         row = layout.row()
         row.operator(SSSekaiBlenderUtilNeckAttachOperator.bl_idname)       
         row.operator(SSSekaiBlenderUtilCharacterNeckMergeOperator.bl_idname)
@@ -438,7 +425,8 @@ class SSSekaiBlenderUtilCharacter(bpy.types.Panel):
             row.prop(active_obj, "location", text=T('Use Heel Offset'))
             row = layout.row()
             row.operator(SSSekaiBlenderUtilCharacterHeelOffsetOperator.bl_idname)
-            
+
+@register_class  
 class SSSekaiBlenderUtilCharacterArmatureSimplifyOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_armature_simplify_op"
     bl_label = T("Simplify Armature")
@@ -455,6 +443,7 @@ class SSSekaiBlenderUtilCharacterArmatureSimplifyOperator(bpy.types.Operator):
                 armature.data.edit_bones.remove(bone)
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderImportOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_op"
     bl_label = T("Import Selected")
@@ -634,6 +623,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 return {'FINISHED'}
         return {'CANCELLED'}
 
+@register_class
 class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
     bl_idname = "sssekai.import_physics_op"
     bl_label = T("Import Physics")
@@ -650,6 +640,7 @@ class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
                 return {'FINISHED'}
         return {'CANCELLED'}
 
+@register_class
 class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
     bl_idname = "sssekai.display_physics_op"
     bl_label = T("Show Physics Objects")
@@ -666,7 +657,8 @@ class SSSekaiBlenderPhysicsDisplayOperator(bpy.types.Operator):
                 cchild.hide_set(display)
                 cchild.hide_render = display
         return {'FINISHED'}
-    
+
+@register_class
 class SSSekaiBlenderApplyOutlineOperator(bpy.types.Operator):
     bl_idname = "sssekai.apply_outline_op"
     bl_label = T("Add Outline to Selected")
@@ -686,12 +678,14 @@ class SSSekaiBlenderApplyOutlineOperator(bpy.types.Operator):
                     modifier['Socket_4'] = index # XXX: Any other way to assign this attribute?
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderExportAnimationTypeTree(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     bl_idname = "sssekai.export_typetree_op"
     bl_label = T("Export Animation TypeTree")
     bl_description = T("Export the TypeTree of the selected animation")
 
     filename_ext = ".anim"
+    
     filter_glob: bpy.props.StringProperty(default='*.anim;', options={'HIDDEN'})
 
     def execute(self, context):
@@ -725,70 +719,7 @@ class SSSekaiBlenderExportAnimationTypeTree(bpy.types.Operator, bpy_extras.io_ut
                 return {'FINISHED'}
         return {'CANCELLED'}
 
-def enumerate_assets(self, context):
-    global sssekai_global
-    enum_items = []
-
-    if context is None:
-        return enum_items
-
-    wm = context.window_manager
-    dirname = wm.sssekai_assetbundle_file
-
-    if dirname == sssekai_global.current_dir:
-        return sssekai_global.current_enum_entries or [("NONE", "None", "", 0)]
-
-    print("* Loading index for %s" % dirname)
-
-    if dirname and os.path.exists(dirname):
-        index = 0        
-        UnityPy.config.FALLBACK_VERSION_WARNED = True
-        UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()         
-        sssekai_global.env = UnityPy.load(dirname)
-        sssekai_global.articulations, sssekai_global.armatures = search_env_meshes(sssekai_global.env)
-        print('* Found %d articulations and %d armatures' % (len(sssekai_global.articulations), len(sssekai_global.armatures)))
-        # See https://docs.blender.org/api/current/bpy.props.html#bpy.props.EnumProperty
-        # enum_items = [(identifier, name, description, icon, number),...]
-        # Note that `identifier` is the value that will be stored (and read) in the property
-        for articulation in sssekai_global.articulations:
-            encoded = encode_asset_id(articulation.root.gameObject)
-            enum_items.append((encoded,articulation.name,encoded,'MESH_DATA', index))
-            index+=1
-
-        for armature in sssekai_global.armatures:
-            encoded = encode_asset_id(armature.root.gameObject)
-            enum_items.append((encoded,armature.name,encoded,'ARMATURE_DATA',index))
-            index+=1
-
-        sssekai_global.animations = search_env_animations(sssekai_global.env)    
-        for animation in sssekai_global.animations:            
-            encoded = encode_asset_id(animation)
-            enum_items.append((encoded,animation.name,encoded,'ANIM_DATA',index))
-            index+=1
-
-        enum_items.sort(key=lambda x: x[0])
-
-    sssekai_global.current_enum_entries = enum_items
-    sssekai_global.current_dir = dirname
-    return sssekai_global.current_enum_entries
-
-class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
-    bl_idname = "sssekai.asset_search_op"
-    bl_label = T("Search")
-    bl_property = "selected"
-    bl_description = T("Search for assets with their object name and/or container name")
-
-    selected: EnumProperty(name="Asset",description="Selected Asset",items=enumerate_assets)
-    def execute(self, context):
-        wm = context.window_manager
-        wm.sssekai_assetbundle_selected = self.selected
-        return {'FINISHED'}
-
-    def invoke(self, context, event):
-        wm = context.window_manager
-        wm.invoke_search_popup(self)
-        return {'FINISHED'}    
-
+@register_class
 class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
     bl_idname = "sssekai.rla_import_armature_pose_op"
     bl_label = T("Import RLA Pose")
@@ -852,6 +783,7 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
         bpy.context.scene.frame_current = wm.sssekai_animation_import_offset
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
     bl_idname = "sssekai.rla_import_armature_animation_op"
     bl_label = T("Import Armature Animation")
@@ -913,6 +845,7 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
             print('* Failed to set frame range:', e, 'range=', (tick_min, tick_max))
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
     bl_idname = "sssekai.rla_import_shapekey_animation_op"
     bl_label = T("Import Shapekey Animation")
@@ -968,10 +901,34 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
             print('* Failed to set frame range:', e, 'range=', (tick_min, tick_max))
         return {'FINISHED'}
 
+@register_class
 class SSSekaiBlenderImportRLABatchOperator(bpy.types.Operator):
     bl_idname = "sssekai.rla_import_batch_op"
     bl_label = T("Batch Import (slow!)")
     bl_description = T("Import RLA clips (Armature/KeyShape) from the selected range for the selected character")
+    
+    @staticmethod
+    def update_selected_rla_asset(entry):
+        global sssekai_global
+        from sssekai.fmt.rla import read_rla
+        from io import BytesIO
+        print('* Loading RLA index', entry)
+        version = sssekai_global.rla_get_version()            
+        sssekai_global.rla_clip_data = read_rla(BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=False)
+        sssekai_global.rla_selected_raw_clip = entry
+        min_tick, max_tick = 1e18, 0
+        sssekai_global.rla_clip_charas.clear()
+        for tick, data in sssekai_global.rla_clip_data.items():
+            m_data = data.get('MotionCaptureData', None)
+            if m_data:
+                min_tick = min(min_tick, tick)
+                max_tick = max(max_tick, tick)
+                for data in m_data:
+                    for pose in data['data']:
+                        sssekai_global.rla_clip_charas.add(pose['id'])
+        base_tick = sssekai_global.rla_header['baseTicks']            
+        sssekai_global.rla_clip_tick_range = ((min_tick - base_tick) / RLA_TIME_MAGNITUDE, (max_tick - base_tick) / RLA_TIME_MAGNITUDE)
+        
     def execute(self, context):
         wm = context.window_manager
         rla_range = wm.sssekai_rla_import_range
@@ -979,7 +936,7 @@ class SSSekaiBlenderImportRLABatchOperator(bpy.types.Operator):
         entries = entries[rla_range[0]:rla_range[1]]
         for entry in entries:
             sssekai_global.rla_selected_raw_clip = entry        
-            update_selected_rla_asset(entry)
+            SSSekaiBlenderImportRLABatchOperator.update_selected_rla_asset(entry)
             try:
                 bpy.ops.sssekai.rla_import_armature_animation_op()
             except Exception as e:
@@ -989,83 +946,65 @@ class SSSekaiBlenderImportRLABatchOperator(bpy.types.Operator):
             except Exception as e:
                 print('* Failed to import shapekey animation:', e)                
         return {'FINISHED'}         
-   
-def update_selected_rla_asset(entry):
-    global sssekai_global
-    from sssekai.fmt.rla import read_rla
-    from io import BytesIO
-    print('* Loading RLA index', entry)
-    version = sssekai_global.rla_get_version()            
-    sssekai_global.rla_clip_data = read_rla(BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=False)
-    sssekai_global.rla_selected_raw_clip = entry
-    min_tick, max_tick = 1e18, 0
-    sssekai_global.rla_clip_charas.clear()
-    for tick, data in sssekai_global.rla_clip_data.items():
-        m_data = data.get('MotionCaptureData', None)
-        if m_data:
-            min_tick = min(min_tick, tick)
-            max_tick = max(max_tick, tick)
-            for data in m_data:
-                for pose in data['data']:
-                    sssekai_global.rla_clip_charas.add(pose['id'])
-    base_tick = sssekai_global.rla_header['baseTicks']            
-    sssekai_global.rla_clip_tick_range = ((min_tick - base_tick) / RLA_TIME_MAGNITUDE, (max_tick - base_tick) / RLA_TIME_MAGNITUDE)
-       
-def enumerate_rla_assets(self, context):
-    global sssekai_global
 
-    if context is None:
-        return []
-    
-    wm = context.window_manager
-
-    filename = wm.sssekai_streaming_live_archive_bundle
-    if not path.isfile(filename) or filename == sssekai_global.rla_sekai_streaming_live_bundle_path:
-        return sssekai_global.rla_enum_entries or [("NONE", "None", "", 0)]
-
-    try:
-        with open(filename, 'rb') as f:
-            datas = dict()
-            if f.read(2) == b'PK':
-                f.seek(0)
-                print('* Loaded RLA ZIP archive:', filename)
-                with zipfile.ZipFile(f, 'r') as z:
-                    for name in z.namelist():
-                        with z.open(name) as zf:
-                            datas[name] = zf.read()
-            else:
-                f.seek(0)
-                rla_env = load_assetbundle(f)
-                print('* Loaded RLA Unity bundle:', filename)
-                for obj in rla_env.objects:
-                    if obj.type in {ClassIDType.TextAsset}:
-                        data = obj.read()
-                        datas[data.name] = data.script.tobytes()
-            header = sssekai_global.rla_header = json.loads(datas['sekai.rlh'].decode('utf-8'))   
-            seconds = header['splitSeconds']
-            sssekai_global.rla_raw_clips.clear()
-            for sid in header['splitFileIds']:
-                sname = 'sekai_%02d_%08d' % (seconds, sid)
-                data = datas[sname + '.rla']
-                sssekai_global.rla_raw_clips[sname] = data
-            sssekai_global.rla_sekai_streaming_live_bundle_path = filename
-            sssekai_global.rla_enum_entries = [(sname, sname, '', 'ANIM_DATA', index) for index, sname in enumerate(sssekai_global.rla_raw_clips.keys())]
-    except Exception as e:
-        print('* Failed to load RLA bundle:', e)       
-    return sssekai_global.rla_enum_entries
+@register_class
 class SSSekaiRLAImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_rla_import"
     bl_label = T("RLA Import")
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "SSSekai"
+
+    @staticmethod
+    def enumerate_rla_assets(self, context):
+        global sssekai_global
+
+        if context is None:
+            return []
+        
+        wm = context.window_manager
+
+        filename = wm.sssekai_streaming_live_archive_bundle
+        if not path.isfile(filename) or filename == sssekai_global.rla_sekai_streaming_live_bundle_path:
+            return sssekai_global.rla_enum_entries or [("NONE", "None", "", 0)]
+
+        try:
+            with open(filename, 'rb') as f:
+                datas = dict()
+                if f.read(2) == b'PK':
+                    f.seek(0)
+                    print('* Loaded RLA ZIP archive:', filename)
+                    with zipfile.ZipFile(f, 'r') as z:
+                        for name in z.namelist():
+                            with z.open(name) as zf:
+                                datas[name] = zf.read()
+                else:
+                    f.seek(0)
+                    rla_env = load_assetbundle(f)
+                    print('* Loaded RLA Unity bundle:', filename)
+                    for obj in rla_env.objects:
+                        if obj.type in {ClassIDType.TextAsset}:
+                            data = obj.read()
+                            datas[data.name] = data.script.tobytes()
+                header = sssekai_global.rla_header = json.loads(datas['sekai.rlh'].decode('utf-8'))   
+                seconds = header['splitSeconds']
+                sssekai_global.rla_raw_clips.clear()
+                for sid in header['splitFileIds']:
+                    sname = 'sekai_%02d_%08d' % (seconds, sid)
+                    data = datas[sname + '.rla']
+                    sssekai_global.rla_raw_clips[sname] = data
+                sssekai_global.rla_sekai_streaming_live_bundle_path = filename
+                sssekai_global.rla_enum_entries = [(sname, sname, '', 'ANIM_DATA', index) for index, sname in enumerate(sssekai_global.rla_raw_clips.keys())]
+        except Exception as e:
+            print('* Failed to load RLA bundle:', e)       
+        return sssekai_global.rla_enum_entries
     
     @classmethod
     def poll(self, context):
         wm = context.window_manager
         entry = wm.sssekai_rla_selected
         if entry and entry != sssekai_global.rla_selected_raw_clip and entry in sssekai_global.rla_raw_clips and sssekai_global.rla_raw_clips[entry]:            
-            update_selected_rla_asset(entry)
+            SSSekaiBlenderImportRLABatchOperator.update_selected_rla_asset(entry)
         return True
 
     def draw(self, context: Context):
@@ -1107,12 +1046,62 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row.prop(wm, "sssekai_rla_import_range", icon='FILE_FOLDER')
         row = layout.row()
         row.operator(SSSekaiBlenderImportRLABatchOperator.bl_idname, icon='FILE_FOLDER')
+
+@register_class
 class SSSekaiBlenderImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_import"
     bl_label = T("Import")
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "SSSekai"
+
+    @staticmethod
+    def enumerate_assets(self, context):
+        global sssekai_global
+        enum_items = []
+
+        if context is None:
+            return enum_items
+
+        wm = context.window_manager
+        dirname = wm.sssekai_assetbundle_file
+
+        if dirname == sssekai_global.current_dir:
+            return sssekai_global.current_enum_entries or [("NONE", "None", "", 0)]
+
+        print("* Loading index for %s" % dirname)
+
+        if dirname and os.path.exists(dirname):
+            index = 0        
+            UnityPy.config.FALLBACK_VERSION_WARNED = True
+            UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()         
+            sssekai_global.env = UnityPy.load(dirname)
+            sssekai_global.articulations, sssekai_global.armatures = search_env_meshes(sssekai_global.env)
+            print('* Found %d articulations and %d armatures' % (len(sssekai_global.articulations), len(sssekai_global.armatures)))
+            # See https://docs.blender.org/api/current/bpy.props.html#bpy.props.EnumProperty
+            # enum_items = [(identifier, name, description, icon, number),...]
+            # Note that `identifier` is the value that will be stored (and read) in the property
+            for articulation in sssekai_global.articulations:
+                encoded = encode_asset_id(articulation.root.gameObject)
+                enum_items.append((encoded,articulation.name,encoded,'MESH_DATA', index))
+                index+=1
+
+            for armature in sssekai_global.armatures:
+                encoded = encode_asset_id(armature.root.gameObject)
+                enum_items.append((encoded,armature.name,encoded,'ARMATURE_DATA',index))
+                index+=1
+
+            sssekai_global.animations = search_env_animations(sssekai_global.env)    
+            for animation in sssekai_global.animations:            
+                encoded = encode_asset_id(animation)
+                enum_items.append((encoded,animation.name,encoded,'ANIM_DATA',index))
+                index+=1
+
+            enum_items.sort(key=lambda x: x[0])
+
+        sssekai_global.current_enum_entries = enum_items
+        sssekai_global.current_dir = dirname
+        return sssekai_global.current_enum_entries
 
     def draw(self, context):
         layout = self.layout
@@ -1168,147 +1157,116 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row = layout.row()
         row.operator(SSSekaiBlenderImportOperator.bl_idname,icon='APPEND_BLEND')        
 
-def register():
-    WindowManager.sssekai_assetbundle_file = StringProperty(
+@register_class
+class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
+    bl_idname = "sssekai.asset_search_op"
+    bl_label = T("Search")
+    bl_property = "selected"
+    bl_description = T("Search for assets with their object name and/or container name")
+
+    selected: EnumProperty(name="Asset",description="Selected Asset",items=SSSekaiBlenderImportPanel.enumerate_assets)
+
+    def execute(self, context):
+        wm = context.window_manager
+        wm.sssekai_assetbundle_selected = self.selected
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        wm.invoke_search_popup(self)
+        return {'FINISHED'}    
+
+register_wm_props(
+    sssekai_assetbundle_file = StringProperty(
         name=T("Directory"),
         description=T("Where the asset bundle(s) are located. Every AssetBundle in this directory will be loaded (if possible)"),
         subtype='DIR_PATH',
-    )
-    WindowManager.sssekai_assetbundle_selected = EnumProperty(
+    ),
+    sssekai_assetbundle_selected = EnumProperty(
         name=T("Asset"),
         description=T("Selected Asset"),
-        items=enumerate_assets,
-    )
-    WindowManager.sssekai_streaming_live_archive_bundle = StringProperty(
+        items=SSSekaiBlenderImportPanel.enumerate_assets,
+    ),
+    sssekai_streaming_live_archive_bundle = StringProperty(
         name=T("RLA Bundle"),
         description=T("The bundle file inside 'streaming_live/archive' directory.\nOr alternatively, a ZIP file containing 'sekai.rlh' (json) and respective 'sekai_xx_xxxxxx.rla' files. These files should have the extension '.rlh', '.rla'"),
         subtype='FILE_PATH',
-    )
-    WindowManager.sssekai_rla_selected = EnumProperty(
+    ),
+    sssekai_rla_selected = EnumProperty(
         name=T("RLA Clip"),
         description=T("Selected RLA Clip"),
-        items=enumerate_rla_assets,
-    )    
-    WindowManager.sssekai_rla_active_character = IntProperty(
+        items=SSSekaiRLAImportPanel.enumerate_rla_assets,
+    ),
+    sssekai_rla_active_character = IntProperty(
         name=T("Character ID"),
         description=T("Active Character ID"),
         default=0
-    )
-    WindowManager.sssekai_rla_single_pose_json = StringProperty(
+    ),
+    sssekai_rla_single_pose_json = StringProperty(
         name=T("RLA Pose JSON"),
         description=T("JSON of a single RLA pose (e.g. {'bodyPosition':...}) dumped by rla2json w/ sssekai"),
         default=""
-    )
-    WindowManager.sssekai_rla_import_range = IntVectorProperty(
+    ),
+    sssekai_rla_import_range = IntVectorProperty(
         name=T("Import Range"),
         description=T("Import clips from this range, order is as shown in the list"),
         size=2,
         default=[0,0]
-    )
-    WindowManager.sssekai_armatures_as_articulations = BoolProperty(
+    ),
+    sssekai_armatures_as_articulations = BoolProperty(
         name=T("Armatures as Articulations"),
         description=T("Treating armatures as articulations instead of skinned meshes. Useful for importing stages, etc"),
         default=False        
-    )        
-    WindowManager.sssekai_materials_use_principled_bsdf = BoolProperty(
+    ),      
+    sssekai_materials_use_principled_bsdf = BoolProperty(
         name=T("Use Principled BSDF"),
         description=T("Use Principled BSDF instead of SekaiShader for imported materials"),
         default=False        
-    )    
-    WindowManager.sssekai_armature_display_physics = BoolProperty(
+    ),    
+    sssekai_armature_display_physics = BoolProperty(
         name=T("Display Physics"),
         description=T("Display Physics Objects"),
         default=True,
         update=SSSekaiBlenderPhysicsDisplayOperator.execute
-    )
-    WindowManager.sssekai_animation_append_exisiting = BoolProperty(
+    ),
+    sssekai_animation_append_exisiting = BoolProperty(
         name=T("Append"),
         description=T("Append Animations to the existing Action, instead of overwriting it"),
         default=False
-    )
-    WindowManager.sssekai_animation_import_offset = IntProperty(
+    ),
+    sssekai_animation_import_offset = IntProperty(
         name=T("Offset"),
         description=T("Animation Offset in frames"),
         default=0
-    )
-    WindowManager.sssekai_animation_import_use_nla = BoolProperty(
+    ),
+    sssekai_animation_import_use_nla = BoolProperty(
         name=T("NLA"),
         description=T("Import as NLA Track"),
         default=False
-    )
-    WindowManager.sssekai_animation_import_camera_scaling = FloatVectorProperty(
+    ),
+    sssekai_animation_import_camera_scaling = FloatVectorProperty(
         name=T("Camera Scaling"),
         description=T("Scaling used when importing camera animations"),
         default=Vector((1,1,1))
-    )
-    WindowManager.sssekai_animation_import_camera_offset = FloatVectorProperty(
+    ),
+    sssekai_animation_import_camera_offset = FloatVectorProperty(
         name=T("Camera Offset"),
         description=T("Offset used when importing camera animations"),
         default=Vector((0,0,0))
-    )
-    WindowManager.sssekai_animation_import_camera_fov_offset = FloatProperty(
+    ),
+    sssekai_animation_import_camera_fov_offset = FloatProperty(
         name=T("Camera FOV Offset"),
         description=T("Offset used when importing camera (vertical) FOV animation in degrees"),
         default=0
-    )
-    def sssekai_on_unity_version_change(self, context):
-        sssekai_set_unity_version(context.window_manager.sssekai_unity_version_override)
-    WindowManager.sssekai_unity_version_override = StringProperty(
+    ),
+    sssekai_util_neck_attach_obj_face = bpy.props.PointerProperty(name=T("Face"),type=bpy.types.Armature),
+    sssekai_util_neck_attach_obj_body = bpy.props.PointerProperty(name=T("Body"),type=bpy.types.Armature),
+    sssekai_unity_version_override = StringProperty(
         name=T("Unity"),
         description=T("Override Unity Version"),
         default=sssekai_get_unity_version(),
-        update=sssekai_on_unity_version_change
+        update=lambda self, context: sssekai_set_unity_version(context.window_manager.sssekai_unity_version_override)
     )
+)
 
-    bpy.utils.register_class(SSSekaiBlenderImportOperator)
-    bpy.utils.register_class(SSSekaiBlenderImportPanel)
-    bpy.utils.register_class(SSSekaiRLAImportPanel)
-    bpy.utils.register_class(SSSekaiBlenderAssetSearchOperator)
-    bpy.types.Scene.sssekai_util_neck_attach_obj_face = bpy.props.PointerProperty(name=T("Face"),type=bpy.types.Armature)
-    bpy.types.Scene.sssekai_util_neck_attach_obj_body = bpy.props.PointerProperty(name=T("Body"),type=bpy.types.Armature)
-    bpy.utils.register_class(SSSekaiBlenderUtilNeckAttachOperator)    
-    bpy.utils.register_class(SSSekaiBlenderApplyOutlineOperator)
-    bpy.utils.register_class(SSSekaiBlenderImportPhysicsOperator)
-    bpy.utils.register_class(SSSekaiBlenderPhysicsDisplayOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilMiscPanel)
-    bpy.utils.register_class(SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilApplyModifersOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilArmatureMergeOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilCharacterNeckMergeOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilCharacterArmatureSimplifyOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilCharacterScalingMakeRootOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilCharacterHeelOffsetOperator)
-    bpy.utils.register_class(SSSekaiBlenderUtilCharacter)
-    bpy.utils.register_class(SSSekaiBlenderExportAnimationTypeTree)
-    bpy.utils.register_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
-    bpy.utils.register_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
-    bpy.utils.register_class(SSSekaiBlenderImportRLASinglePoseOperator)
-    bpy.utils.register_class(SSSekaiBlenderImportRLABatchOperator)
-
-def unregister():    
-    bpy.utils.unregister_class(SSSekaiBlenderAssetSearchOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderImportOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderImportPanel)
-    bpy.utils.unregister_class(SSSekaiRLAImportPanel)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilNeckAttachOperator)    
-    bpy.utils.unregister_class(SSSekaiBlenderApplyOutlineOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderImportPhysicsOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderPhysicsDisplayOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilMiscPanel)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilApplyModifersOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilArmatureMergeOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacterNeckMergeOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacterArmatureSimplifyOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacterScalingMakeRootOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacterHeelOffsetOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderUtilCharacter)
-    bpy.utils.unregister_class(SSSekaiBlenderExportAnimationTypeTree)
-    bpy.utils.unregister_class(SSSekaiBlenderImportRLAArmatureAnimationOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderImportRLAShapekeyAnimationOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderImportRLASinglePoseOperator)
-    bpy.utils.unregister_class(SSSekaiBlenderImportRLABatchOperator)
+print('* Addon reloaded')
