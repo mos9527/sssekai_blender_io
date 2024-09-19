@@ -331,7 +331,7 @@ class SSSekaiBlenderUtilCharacterNeckMergeOperator(bpy.types.Operator):
 @register_class
 class SSSekaiBlenderUtilCharacterScalingMakeRootOperator(bpy.types.Operator):
     bl_idname = "sssekai.util_character_scaling_make_root_op"
-    bl_label = T("Make Root")
+    bl_label = T("Make/Update Root Height Scale")
     bl_description = T("""Appends the selected object to an Empty object (that can be configured with a height value), with the Empty object as the new root.\n
 If a root object is in the selection as well, this would become the root instead.""")
     def execute(self, context):
@@ -339,29 +339,34 @@ If a root object is in the selection as well, this would become the root instead
         objs = context.selected_objects
         root = None
         for obj in objs:
-            if obj.type == 'EMPTY' and KEY_SEKAI_CHARACTER_HEIGHT in obj:
-                root = obj
-                print('* Found existing root', obj.name)
+            pred = lambda obj: obj.type == 'EMPTY' and KEY_SEKAI_CHARACTER_HEIGHT in obj
+            if pred(obj):
+                root = obj                
                 break
+            if pred(obj.parent):
+                root = obj.parent
+                break    
         if not root:
             root = create_empty('Character Root')
             root[KEY_SEKAI_CHARACTER_HEIGHT] = 1.0  
-            # Set up drivers for the scaling 
-            for obj in objs:
-                # Collect `Position` pose bones that we can apply the scaling to
-                if obj.type == 'ARMATURE':
-                    for bone in obj.pose.bones:
-                        if bone.name == 'Position':                        
-                            bone.driver_remove('scale')
-                            for ch in  bone.driver_add('scale'):
-                                ch.driver.type = 'SCRIPTED'
-                                var = ch.driver.variables.new()
-                                var.name = 'height'
-                                var.type = 'SINGLE_PROP'
-                                var.targets[0].id = root
-                                var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
-                                ch.driver.expression = 'height'
-                            print('* Applied Height driver for', obj.name)
+        else:
+            print('* Using root',root.name)
+        # Set up drivers for the scaling 
+        for obj in objs:
+            # Collect `Position` pose bones that we can apply the scaling to
+            if obj.type == 'ARMATURE':
+                for bone in obj.pose.bones:
+                    if bone.name == 'Position':                        
+                        bone.driver_remove('scale')
+                        for ch in bone.driver_add('scale'):
+                            ch.driver.type = 'SCRIPTED'
+                            var = ch.driver.variables.new()
+                            var.name = 'height'
+                            var.type = 'SINGLE_PROP'
+                            var.targets[0].id = root
+                            var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
+                            ch.driver.expression = 'height'
+                        print('* Applied Height driver for', obj.name)
         for obj in objs:
             if obj != root:
                 obj.parent = root
