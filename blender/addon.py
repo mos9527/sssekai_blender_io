@@ -387,6 +387,7 @@ class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
                 bpy.context.view_layer.objects.active = child
                 bpy.ops.object.mode_set(mode='EDIT')
                 ebone = child.data.edit_bones.get('OffsetValue')
+                bpy.ops.object.mode_set(mode='OBJECT')
                 if ebone:
                     print("* Found OffsetValue bone in", child.name)
                     break    
