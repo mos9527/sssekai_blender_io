@@ -1,10 +1,10 @@
 # TODO: Seperate the operators/panels into different files
 from os import path
+from logging import getLogger
 import zipfile
 
 import UnityPy.classes
 import UnityPy.classes
-from . import *
 from .asset import *
 from .animation import *
 from sssekai.unity.AnimationClip import Animation, Track
@@ -23,6 +23,7 @@ from bpy.props import (
     FloatVectorProperty
 )
 from bpy.app.translations import pgettext as T
+logger = getLogger(__name__)
 
 @register_class
 class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator):
@@ -302,7 +303,7 @@ NOTE: This only affects the FINAL visual of the pose. The armature itself isn't 
         objs = context.selected_objects
         root = None
         for obj in objs:
-            pred = lambda obj: obj.type == 'EMPTY' and KEY_SEKAI_CHARACTER_HEIGHT in obj
+            pred = lambda obj: obj and obj.type == 'EMPTY' and KEY_SEKAI_CHARACTER_HEIGHT in obj
             if pred(obj):
                 root = obj                
                 break
@@ -313,7 +314,7 @@ NOTE: This only affects the FINAL visual of the pose. The armature itself isn't 
             root = create_empty('Character Root')
             root[KEY_SEKAI_CHARACTER_HEIGHT] = 1.0  
         else:
-            print('* Using root',root.name)
+            logger.debug('Using root %s' % root.name)
         # Set up drivers for the scaling 
         for obj in objs:
             # Collect `Position` pose bones that we can apply the scaling to
@@ -329,7 +330,7 @@ NOTE: This only affects the FINAL visual of the pose. The armature itself isn't 
                             var.targets[0].id = root
                             var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
                             ch.driver.expression = 'height'
-                        print('* Applied Height driver for', obj.name)
+                        logger.debug('Applied Height driver for %s' %  obj.name)
         for obj in objs:
             if obj != root:
                 obj.parent = root
@@ -391,7 +392,7 @@ class SSSekaiBlenderUtilCharacterHeelOffsetOperator(bpy.types.Operator):
                 ebone = child.data.edit_bones.get('OffsetValue')
                 bpy.ops.object.mode_set(mode='OBJECT')
                 if ebone:
-                    print("* Found OffsetValue bone in", child.name)
+                    logger.debug("Found OffsetValue bone in %s" %  child.name)
                     break    
         assert ebone, "OffsetValue bone not found"
         loc_xyz = ebone.head
@@ -447,7 +448,7 @@ class SSSekaiBlenderUtilCharacterArmatureSimplifyOperator(bpy.types.Operator):
         assert armature.type == 'ARMATURE', 'Please select an armature!'
         for bone in armature.data.edit_bones:
             if bone.name not in SSSekaiBlenderUtilCharacterArmatureSimplifyOperator.WHITELIST:
-                print('* Removing bone', bone.name)
+                logger.debug('Removing bone %s' %  bone.name)
                 armature.data.edit_bones.remove(bone)
         return {'FINISHED'}
 
@@ -461,13 +462,13 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
         wm = context.window_manager        
         articulations, armatures, animations = sssekai_global.articulations, sssekai_global.armatures, sssekai_global.animations
         
-        print('* Loading selected asset:', wm.sssekai_assetbundle_selected)
+        logger.debug('Loading selected asset: %s' %  wm.sssekai_assetbundle_selected)
         texture_cache = dict()
         material_cache = dict()
         def add_mesh(gameObject, name : str = None, parent_obj = None, bone_hash_tbl : dict = None):
             name = name or gameObject.name
             if getattr(gameObject,'m_SkinnedMeshRenderer',None):
-                print('* Found Skinned Mesh at', gameObject.name)
+                logger.debug('Found Skinned Mesh at %s' %  gameObject.name)
                 mesh_rnd : SkinnedMeshRenderer = gameObject.m_SkinnedMeshRenderer.read()
                 bone_order  = [b.read().m_GameObject.read().name for b in mesh_rnd.m_Bones]
                 if getattr(mesh_rnd,'m_Mesh',None):
@@ -476,10 +477,10 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     if parent_obj:
                         obj.parent = parent_obj
                     add_material(mesh_rnd.m_Materials, obj, mesh_data, import_character_material)    
-                    print('* Imported Skinned Mesh', mesh_data.name)
+                    logger.debug('Imported Skinned Mesh %s' %  mesh_data.name)
                     return obj
             elif getattr(gameObject,'m_MeshFilter',None):
-                print('* Found Static Mesh at', gameObject.name)
+                logger.debug('Found Static Mesh at %s' %  gameObject.name)
                 mesh_filter : MeshFilter = gameObject.m_MeshFilter.read()
                 mesh_rnd : MeshRenderer = gameObject.m_MeshRenderer.read()
                 mesh_data = mesh_filter.m_Mesh.read(return_typetree_on_error=False)
@@ -487,7 +488,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 if parent_obj:
                     obj.parent = parent_obj
                 add_material(mesh_rnd.m_Materials, obj, mesh_data, import_scene_material)    
-                print('* Imported Static Mesh', mesh_data.name)
+                logger.debug('Imported Static Mesh %s' %  mesh_data.name)
                 return obj
             return None
         
@@ -508,7 +509,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             parser = import_chara_face_v2_material
                     if material.name in material_cache:
                         asset = material_cache[material.name]
-                        print('* Reusing Material', material.name)
+                        logger.debug('Reusing Material %s' %  material.name)
                     else:
                         asset = parser(
                             material.name, 
@@ -517,7 +518,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             texture_cache=texture_cache
                         )
                         material_cache[material.name] = asset
-                        print('* Imported new Material', material.name)
+                        logger.debug('Imported new Material %s' %  material.name)
                     obj.data.materials.append(asset)
             
             bpy.context.view_layer.objects.active = obj
@@ -538,7 +539,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             for bone_name, joint in joint_map.items():
                 bone = articulation.get_bone_by_name(bone_name)
                 mesh = add_mesh(bone.gameObject, bone_name, joint)             
-            print('* Imported Articulation', articulation.name)        
+            logger.debug('Imported Articulation %s' %  articulation.name)        
         
         def add_armature(armature : Armature):
             armInst, armObj = import_armature(armature)
@@ -546,7 +547,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 mesh = add_mesh(bone.gameObject, bone.name, armObj, armature.bone_path_hash_tbl)
                 if mesh:                    
                     mesh.modifiers.new('Armature', 'ARMATURE').object = armObj                        
-            print('* Imported Armature', armature.name)
+            logger.debug('Imported Armature %s' %  armature.name)
     
         for articulation in articulations:            
             if encode_asset_id(articulation.root.gameObject) == wm.sssekai_assetbundle_selected:
@@ -564,20 +565,20 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
         
         for animation in animations:
             if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
-                print('* Reading AnimationClip:', animation.name)
-                print('* Byte size:',animation.byte_size)
-                print('* Loading...')
+                logger.debug('Reading AnimationClip: %s' %  animation.name)
+                logger.debug('Byte size: %d' % animation.byte_size)
+                logger.debug('Loading...')
                 clip = read_animation(animation)  
-                print('* Importing...')
+                logger.debug('Importing...')
                 # Set the fps. Otherwise keys may get lost!
                 bpy.context.scene.render.fps = int(clip.Framerate)
                 bpy.context.scene.frame_end = max(bpy.context.scene.frame_end,int(clip.Framerate * clip.Duration + 0.5 + wm.sssekai_animation_import_offset))
                 if bpy.context.scene.rigidbody_world:
                     bpy.context.scene.rigidbody_world.point_cache.frame_end = max(bpy.context.scene.rigidbody_world.point_cache.frame_end, bpy.context.scene.frame_end)
-                print('* Duration', clip.Duration)
-                print('* Framerate', clip.Framerate)
-                print('* Frames', bpy.context.scene.frame_end)
-                print('* Blender FPS set to:', bpy.context.scene.render.fps)
+                logger.debug('Duration: %f' %  clip.Duration)
+                logger.debug('Framerate: %d' %  clip.Framerate)
+                logger.debug('Frames: %d' %  bpy.context.scene.frame_end)
+                logger.debug('Blender FPS set to: %d' % bpy.context.scene.render.fps)
                 active_type = bpy.context.active_object.type
                 if active_type == 'CAMERA' or KEY_CAMERA_RIG in bpy.context.active_object:
                     camera_obj = bpy.context.active_object
@@ -585,7 +586,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         camera_obj = camera_obj.children[0]
                     track = clip.TransformTracks[TransformType.Translation]
                     if CAMERA_TRANS_ROT_CRC_MAIN in track or CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA in track:
-                        print('* Importing Camera animation', animation.name)                        
+                        logger.debug('Importing Camera animation %s' %  animation.name)                        
                         action = load_camera_animation(
                             animation.name, clip, camera_obj,  
                             wm.sssekai_animation_import_offset,                         
@@ -595,38 +596,38 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             retrive_action(camera_obj.parent) if wm.sssekai_animation_append_exisiting else None
                         )
                         apply_action(camera_obj.parent, action, wm.sssekai_animation_import_use_nla)
-                        print('* Imported Camera animation', animation.name)
+                        logger.debug('Imported Camera animation %s' %  animation.name)
                 elif active_type == 'ARMATURE':
                     if BLENDSHAPES_CRC in clip.FloatTracks:
-                        print('* Importing Keyshape animation', animation.name)
+                        logger.debug('Importing Keyshape animation %s' %  animation.name)
                         mesh_obj = None
                         for obj in bpy.context.active_object.children:
                             if KEY_SHAPEKEY_NAME_HASH_TBL in obj.data:
                                 mesh_obj = obj
                                 break
                         assert mesh_obj, "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes!" 
-                        print("* Importing into", mesh_obj.name)
+                        logger.debug("Importing into %s" %  mesh_obj.name)
                         action = load_keyshape_animation(
                             animation.name, clip, mesh_obj, 
                             wm.sssekai_animation_import_offset, 
                             retrive_action(mesh_obj.data.shape_keys) if wm.sssekai_animation_append_exisiting else None
                         )
                         apply_action(mesh_obj.data.shape_keys, action, wm.sssekai_animation_import_use_nla)
-                        print('* Imported Keyshape animation', animation.name)
+                        logger.debug('Imported Keyshape animation %s' %  animation.name)
                     if clip.TransformTracks[TransformType.Translation] or clip.TransformTracks[TransformType.Rotation] or clip.TransformTracks[TransformType.EulerRotation] or clip.TransformTracks[TransformType.Scaling]:
-                        print('* Importing Armature animation', animation.name)
+                        logger.debug('Importing Armature animation %s' %  animation.name)
                         action = load_armature_animation(
                             animation.name, clip, bpy.context.active_object, 
                             wm.sssekai_animation_import_offset, 
                             retrive_action(bpy.context.active_object) if wm.sssekai_animation_append_exisiting else None
                         )
                         apply_action(bpy.context.active_object, action, wm.sssekai_animation_import_use_nla)
-                        print('* Imported Armature animation', animation.name)
+                        logger.debug('Imported Armature animation %s' %  animation.name)
                 elif active_type == 'EMPTY':
                     if clip.TransformTracks[TransformType.Translation] or clip.TransformTracks[TransformType.Rotation] or clip.TransformTracks[TransformType.EulerRotation] or clip.TransformTracks[TransformType.Scaling]:
-                        print('* Importing Articulation animation', animation.name)
+                        logger.debug('Importing Articulation animation %s' %  animation.name)
                         import_articulation_animation(animation.name, clip, bpy.context.active_object, wm.sssekai_animation_import_offset, not wm.sssekai_animation_append_exisiting)
-                        print('* Imported Articulation animation', animation.name)
+                        logger.debug('Imported Articulation animation %s' %  animation.name)
 
                 return {'FINISHED'}
         return {'CANCELLED'}
@@ -706,13 +707,13 @@ class SSSekaiBlenderExportAnimationTypeTree(bpy.types.Operator, bpy_extras.io_ut
             filename = self.filepath
             import yaml
             with open(filename, 'w', encoding='utf-8') as f:
-                print('* Exporting TypeTree to', filename)
+                logger.debug('Exporting TypeTree to %s' %  filename)
                 f.write('''%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!74 &7400000
 ''') 
                 yaml.dump({'AnimationClip':gameObject.read_typetree()}, f, indent=4, ensure_ascii=False)
-                print('* Exported TypeTree to', filename)                
+                logger.debug('Exported TypeTree to %s' %  filename)                
         for articulation in articulations:
             if encode_asset_id(articulation.root.gameObject) == wm.sssekai_assetbundle_selected:
                 export_typetree(articulation.root.gameObject)
@@ -814,9 +815,9 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
                             chara_segments.append(pose)
                             if pose['pose']['boneDatas']:
                                 has_boneData = True
-        print('* Found %d segments for character %d' % (len(chara_segments), active_chara))
+        logger.debug('Found %d segments for character %d' % (len(chara_segments), active_chara))
         if not has_boneData:
-            print('! No bone data found in the segments.')
+            logger.warning('No bone data found in the segments.')
         inv_hash_table = obj.data[KEY_BONE_NAME_HASH_TBL]
         inv_hash_table = json.loads(inv_hash_table)
         inv_hash_table = {v:k for k,v in inv_hash_table.items()}
@@ -851,7 +852,7 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
             bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
             bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
         except Exception as e:
-            print('* Failed to set frame range:', e, 'range=', (tick_min, tick_max))
+            logger.error('Failed to set frame range: %s (%d-%d)' % (e, tick_min, tick_max))
         return {'FINISHED'}
 
 @register_class
@@ -907,7 +908,7 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
             bpy.context.scene.frame_end = max(bpy.context.scene.frame_end, int(tick_max * bpy.context.scene.render.fps))
             bpy.context.scene.frame_current = int(tick_min * bpy.context.scene.render.fps) 
         except Exception as e:
-            print('* Failed to set frame range:', e, 'range=', (tick_min, tick_max))
+            logger.error('Failed to set frame range: %s (%d-%d)' % (e, tick_min, tick_max))
         return {'FINISHED'}
 
 @register_class
@@ -921,7 +922,7 @@ class SSSekaiBlenderImportRLABatchOperator(bpy.types.Operator):
         global sssekai_global
         from sssekai.fmt.rla import read_rla
         from io import BytesIO
-        print('* Loading RLA index', entry)
+        logger.debug('Loading RLA index %s' %  entry)
         version = sssekai_global.rla_get_version()            
         sssekai_global.rla_clip_data = read_rla(BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=False)
         sssekai_global.rla_selected_raw_clip = entry
@@ -949,11 +950,11 @@ class SSSekaiBlenderImportRLABatchOperator(bpy.types.Operator):
             try:
                 bpy.ops.sssekai.rla_import_armature_animation_op()
             except Exception as e:
-                print('* Failed to import armature animation:', e)
+                logger.error('Failed to import armature animation: %s' %  e)
             try:
                 bpy.ops.sssekai.rla_import_shapekey_animation_op()
             except Exception as e:
-                print('* Failed to import shapekey animation:', e)                
+                logger.error('Failed to import shapekey animation: %s' %  e)                
         return {'FINISHED'}         
 
 @register_class
@@ -982,7 +983,7 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
                 datas = dict()
                 if f.read(2) == b'PK':
                     f.seek(0)
-                    print('* Loaded RLA ZIP archive:', filename)
+                    logger.debug('Loaded RLA ZIP archive: %s' %  filename)
                     with zipfile.ZipFile(f, 'r') as z:
                         for name in z.namelist():
                             with z.open(name) as zf:
@@ -990,7 +991,7 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
                 else:
                     f.seek(0)
                     rla_env = load_assetbundle(f)
-                    print('* Loaded RLA Unity bundle:', filename)
+                    logger.debug('Loaded RLA Unity bundle: %s' %  filename)
                     for obj in rla_env.objects:
                         if obj.type in {ClassIDType.TextAsset}:
                             data = obj.read()
@@ -1005,7 +1006,7 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
                 sssekai_global.rla_sekai_streaming_live_bundle_path = filename
                 sssekai_global.rla_enum_entries = [(sname, sname, '', 'ANIM_DATA', index) for index, sname in enumerate(sssekai_global.rla_raw_clips.keys())]
         except Exception as e:
-            print('* Failed to load RLA bundle:', e)       
+            logger.error('Failed to load RLA bundle: %s' %  e)       
         return sssekai_global.rla_enum_entries
     
     @classmethod
@@ -1080,7 +1081,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         if dirname == sssekai_global.current_dir:
             return sssekai_global.current_enum_entries or [("NONE", "None", "", 0)]
 
-        print("* Loading index for %s" % dirname)
+        logger.debug("Loading index for %s" % dirname)
 
         if dirname and os.path.exists(dirname):
             index = 0        
@@ -1088,7 +1089,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
             UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()         
             sssekai_global.env = UnityPy.load(dirname)
             sssekai_global.articulations, sssekai_global.armatures = search_env_meshes(sssekai_global.env)
-            print('* Found %d articulations and %d armatures' % (len(sssekai_global.articulations), len(sssekai_global.armatures)))
+            logger.debug('Found %d articulations and %d armatures' % (len(sssekai_global.articulations), len(sssekai_global.armatures)))
             # See https://docs.blender.org/api/current/bpy.props.html#bpy.props.EnumProperty
             # enum_items = [(identifier, name, description, icon, number),...]
             # Note that `identifier` is the value that will be stored (and read) in the property
@@ -1285,4 +1286,4 @@ register_wm_props(
     )
 )
 
-print('* Addon reloaded')
+logger.info('Addon reloaded')

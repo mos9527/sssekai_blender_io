@@ -17,12 +17,20 @@ try:
 except ImportError as e:
     raise Exception('Dependencies incomplete. Refer to README.md for installation instructions.')
 
-import importlib, bpy
+import importlib, bpy, logging
+from logging import getLogger
 
+logger = getLogger(__name__)
 def register():
-    from .blender import registry
+    from .blender import registry, SCRIPT_DIR
+    from coloredlogs import install       
+    install(level='DEBUG', fmt='sssekai | %(levelname)s | %(module)s | %(message)s')
+
     ADDONS = ['addon']
-    print('* Registering addon.')
+    logger.debug('*** SSSekai Blender IO ***')
+    logger.debug('Script directory: %s', SCRIPT_DIR)
+    logger.debug('Blender version: %s', bpy.app.version_string)
+    logger.info('Registering addon.')
     modules = []
     for addon in ADDONS:
         modules.append(importlib.import_module('.blender.' + addon , __name__))
@@ -36,7 +44,7 @@ def register():
     bpy.app.translations.register(__package__, translations_dict)
 
 def unregister():
-    print('* Unregistering addon.')
+    logger.info('Unregistering addon.')
     from .blender import registry
 
     registry.unregister_all()

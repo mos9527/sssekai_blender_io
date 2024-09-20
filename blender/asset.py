@@ -1,5 +1,6 @@
 from . import *
-
+import tempfile
+logger = logging.getLogger(__name__)
 def search_env_meshes(env : Environment):
     '''(Partially) Loads the UnityPy Environment for further Mesh processing
 
@@ -133,7 +134,7 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
     Returns:
         Tuple[bpy.types.Mesh, bpy.types.Object]: Created mesh and its parent object
     '''
-    print('* Importing Mesh', data.name, 'Skinned=', skinned)
+    logger.debug('Importing Mesh %s, Skinned=%s' % (data.name, skinned))
     mesh = bpy.data.meshes.new(name=data.name)
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
@@ -187,7 +188,7 @@ def import_mesh(name : str, data: Mesh, skinned : bool = False, bone_path_tbl : 
             face = bm.faces.new(reversed([bm.verts[data.m_Indices[idx + j]] for j in range(3)])) # UV rewinding
             face.smooth = True
         except ValueError:
-            print('! Invalid face index', idx, 'Discarded.')
+            logger.warning('Invalid face index %d - discarded.' % idx)
     bm.to_mesh(mesh)
     # UV Map
     uv_layer = mesh.uv_layers.new()
@@ -446,8 +447,7 @@ def import_armature_physics_constraints(armature, data : Armature):
             bonesize_all = {bone.name : bone.length for bone in chain_all}            
             # Read this later on in pose mode since constraits/animations are not available in edit mode
             world_all = {bone.name : bone.matrix for bone in chain_all + [bone.parent for bone in chain_all if bone.parent]}                
-            chain_all = [bone.name for bone in chain_all]
-            # print('Chain', chain.begin.name, '->', chain.end.name, 'Length', len(chain_all), 'Bones',*chain_all)
+            chain_all = [bone.name for bone in chain_all]            
             bpy.ops.object.mode_set(mode='POSE')
             for bone in chain_all: 
                 unparent_bone(bone)
@@ -459,8 +459,7 @@ def import_armature_physics_constraints(armature, data : Armature):
             rigidbodies = dict()
             prev_radius = PIVOT_SIZE
             for bone_name in [pivot_bone_name] + chain_all:
-                parent = parent_all.get(bone_name,None)
-                # print('Creating joint for', bone_name)                    
+                parent = parent_all.get(bone_name,None)                
                 joint = create_empty(bone_name + 'joint')
                 joints[bone_name] = joint
                 if parent:
@@ -575,21 +574,22 @@ def import_texture(name : str, data : Texture2D):
         bpy.types.Image: Created image
     '''
     with tempfile.NamedTemporaryFile(suffix='.tga',delete=False) as temp:
-        print('* Saving Texture', name, 'to', temp.name)
+        logger.debug('Saving Texture %s->%s' % (data.name, temp.name))
         data.image.save(temp)
         temp.close()
         img = bpy.data.images.load(temp.name, check_existing=True)        
         img.name = name
-        print('* Imported Texture', name)
+        logger.debug('Imported Texture %s' % name)
         return img
 
 def ensure_sssekai_shader_blend():
+    SHADER_BLEND_FILE = get_addon_relative_path('assets', 'SekaiShaderStandalone.blend')
     if not 'SekaiShaderChara' in bpy.data.materials or not 'SekaiShaderScene' in bpy.data.materials:
-        print('! SekaiShader not loaded. Importing from source.')
+        logger.warning('SekaiShader not loaded. Importing from %s' % SHADER_BLEND_FILE)
         with bpy.data.libraries.load(SHADER_BLEND_FILE, link=False) as (data_from, data_to):
             data_to.materials = data_from.materials
             data_to.node_groups = data_from.node_groups
-            print('! Loaded shader blend file.')
+            logger.debug('Loaded shader blend file.')
 
 def make_material_texture_node(material , ppTexture, texture_cache = None, uv_layer = 'UV0', uv_remap_override_node = None):
     uvMap = material.node_tree.nodes.new('ShaderNodeUVMap')
@@ -612,7 +612,7 @@ def make_material_texture_node(material , ppTexture, texture_cache = None, uv_la
         else:
             texNode.image = import_texture(texture.name, texture)
     except Exception as e:
-        print('! Failed to load texture. Discarding.',e) 
+        logger.error('Failed to load texture - %s. Discarding.' % e) 
         return None       
     material.node_tree.links.new(uvMap.outputs['UV'], uvRemap.inputs[0])
     material.node_tree.links.new(uvRemap.outputs[0], texNode.inputs['Vector'])

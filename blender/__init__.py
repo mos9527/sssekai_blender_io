@@ -1,10 +1,4 @@
 import os, sys
-SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SHADER_BLEND_FILE = os.path.join(SCRIPT_DIR, 'assets/SekaiShaderStandalone.blend')
-PYTHON_PACKAGES_PATH = r'C:\Users\Huang\AppData\Local\Programs\Python\Python310\Lib\site-packages'
-print('*** SSSekai Blender IO ***')
-print('* Script Directory:', SCRIPT_DIR)
-print('* Shader Blend File:', SHADER_BLEND_FILE)
 try:
     import bpy
     import bpy_extras
@@ -19,9 +13,9 @@ except ImportError:
     class Vector:pass
     BLENDER = False
 import math
-import json
 import zlib
-import tempfile
+import json
+import logging
 from typing import List, Dict, Set
 from dataclasses import dataclass
 from enum import IntEnum
@@ -78,6 +72,9 @@ CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA = 3283970054 # Position, Scale(??) in transfo
 # --- END Sekai specific values
 
 # Utilities
+SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def get_addon_relative_path(*args):
+    return os.path.join(SCRIPT_DIR, *args)
 def create_empty(name : str, parent = None):
     joint = bpy.data.objects.new(name, None)
     joint.empty_display_size = 0.1
@@ -124,7 +121,7 @@ def register_class(clazz):
     return clazz
 def register_wm_props(**kw):
     registry.add_register_wm(**kw)
-  
+
 # UnityPy deps
 import UnityPy
 from UnityPy import Environment
@@ -135,7 +132,7 @@ from UnityPy.math import Vector3, Quaternion as UnityQuaternion
 from sssekai.unity.AnimationClip import read_animation, Animation, TransformType, KeyFrame
 from sssekai.unity import sssekai_get_unity_version, sssekai_set_unity_version
 
-# Types
+# Data Types
 class BonePhysicsType(IntEnum):
     NoPhysics = 0x00
 
@@ -249,9 +246,6 @@ class Armature:
         return self.bone_path_hash_tbl[get_name_hash(path)]
     def get_bone_by_name(self, name : str):
         return self.bone_name_tbl[name]
-    def debug_print_bone_hierarchy(self):
-        for parent, child, depth in self.root.dfs_generator():
-            print('\t' * depth, child.name)
 
 # Evil(!!) global variables
 # Copilot autocompleted this after 'evil' lmao

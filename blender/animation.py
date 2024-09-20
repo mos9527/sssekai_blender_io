@@ -1,5 +1,5 @@
 from . import *
-
+logger = logging.getLogger(__name__)
 def time_to_frame(time : float, frame_offset : int):
     return int(time * bpy.context.scene.render.fps) + 1 + frame_offset
 
@@ -193,54 +193,54 @@ def load_armature_animation(name : str, data : Animation, dest_arma : bpy.types.
             bone_name = bone_table[str(bone_hash)]            
             bone = dest_arma.pose.bones.get(bone_name,None)
             if not bone: 
-                print("* WARNING: [Rotation] Bone %s not found in pose bones" % bone_name)
+                logger.warning("[Rotation] Bone %s not found in pose bones" % bone_name)
                 continue
             bone.rotation_mode = 'QUATERNION'       
             values = [to_pose_quaternion(bone_name, swizzle_quaternion(keyframe.value)) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve_quatnerion(action,'pose.bones["%s"].rotation_quaternion' % bone_name, values, frames)
         else:
-            print("* WARNING: [Rotation] Bone hash %s not found in bone table" % bone_hash)
+            logger.warning("[Rotation] Bone hash %s not found in bone table" % bone_hash)
     for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
         # Euler rotations
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
             bone = dest_arma.pose.bones.get(bone_name,None)
             if not bone: 
-                print("* WARNING: [Rotation Euler] Bone %s not found in pose bones" % bone_name)
+                logger.warning("[Rotation Euler] Bone %s not found in pose bones" % bone_name)
                 continue
             bone.rotation_mode = 'YXZ'
             values = [to_pose_euler(bone_name, swizzle_euler(keyframe.value)) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'pose.bones["%s"].rotation_euler' % bone_name, values, frames, 3)            
         else:
-            print("* WARNING: [Rotation Euler] Bone hash %s not found in bone table" % bone_hash)
+            logger.warning("[Rotation Euler] Bone hash %s not found in bone table" % bone_hash)
     for bone_hash, track in data.TransformTracks[TransformType.Translation].items():
         # Translations
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
             bone = dest_arma.pose.bones.get(bone_name,None)
             if not bone: 
-                print("* WARNING: [Translation] Bone %s not found in pose bones" % bone_name)
+                logger.warning("[Translation] Bone %s not found in pose bones" % bone_name)
                 continue
             values = [to_pose_translation(bone_name, swizzle_vector(keyframe.value)) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'pose.bones["%s"].location' % bone_name, values, frames, 3)
         else:
-            print("* WARNING: [Translation] Bone hash %s not found in bone table" % bone_hash)
+            logger.warning("[Translation] Bone hash %s not found in bone table" % bone_hash)
     for bone_hash, track in data.TransformTracks[TransformType.Scaling].items():
         # Scale
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
             bone = dest_arma.pose.bones.get(bone_name,None)
             if not bone: 
-                print("* WARNING: [Scale] Bone %s not found in pose bones" % bone_name)
+                logger.warning("[Scale] Bone %s not found in pose bones" % bone_name)
                 continue
             values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'pose.bones["%s"].scale' % bone_name, values, frames, 3)        
         else:
-            print("* WARNING: [Scale] Bone hash %s not found in bone table" % bone_hash)
+            logger.warning("[Scale] Bone hash %s not found in bone table" % bone_hash)
     return action
 
 def load_keyshape_animation(name : str, data : Animation, dest_mesh : bpy.types.Object, frame_offset : int, action : bpy.types.Action = None):
@@ -294,7 +294,7 @@ def prepare_camera_rig(camera : bpy.types.Object):
         var_scale.targets[0].transform_space = 'WORLD_SPACE'
         var_scale.targets[0].transform_type = 'SCALE_X'
         driver.driver.expression = 'fov'
-        print('* Created Camera Rig for camera',camera.name)    
+        logger.debug('Created Camera Rig for camera %s' % camera.name)    
         return rig
     return camera.parent
 
@@ -333,7 +333,7 @@ def load_camera_animation(name : str, data : Animation, camera : bpy.types.Objec
         fov += fov_offset
         return camera.data.sensor_height / (2 * math.tan(math.radians(fov) / 2))
     if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.EulerRotation]:
-        print('* Found Camera Rotation track')
+        logger.debug('Found Camera Rotation track')
         curve = data.TransformTracks[TransformType.EulerRotation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
         import_fcurve(
             action,'rotation_euler', 
@@ -344,7 +344,7 @@ def load_camera_animation(name : str, data : Animation, camera : bpy.types.Objec
             # [swizzle_euler(keyframe.outSlope) for keyframe in curve]
         )        
     if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.Translation]:
-        print('* Found Camera Translation track, scaling=',scaling_factor)
+        logger.debug('Found Camera Translation track, scaling=%f' % scaling_factor)
         curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_ROT_CRC_MAIN].Curve
         import_fcurve(
             action,'location', 
@@ -355,7 +355,7 @@ def load_camera_animation(name : str, data : Animation, camera : bpy.types.Objec
             # [swizzle_translation_camera(keyframe.outSlope) for keyframe in curve]
         )
     if CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA in data.TransformTracks[TransformType.Translation]:
-        print('* Found Camera FOV track')
+        logger.debug('Found Camera FOV track')
         camera.data.lens_unit = 'MILLIMETERS'        
         curve = data.TransformTracks[TransformType.Translation][CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA].Curve        
         import_fcurve(
@@ -394,7 +394,7 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve_quatnerion(action,'rotation_quaternion', values, frames)
         else:
-            print("* WARNING: [Rotation] Bone hash %s not found in joint table" % bone_hash)
+            logger.warning("[Rotation] Bone hash %s not found in joint table" % bone_hash)
     for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
         bone_name = joint_table.get(str(bone_hash),None)
         obj = joint_obj.get(bone_name,None)
@@ -405,7 +405,7 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'rotation_euler', values, frames, 3)
         else:
-            print("* WARNING: [Rotation Euler] Bone hash %s not found in joint table" % bone_hash)
+            logger.warning("[Rotation Euler] Bone hash %s not found in joint table" % bone_hash)
     for bone_hash, track in data.TransformTracks[TransformType.Translation].items():
         bone_name = joint_table.get(str(bone_hash),None)
         obj = joint_obj.get(bone_name,None)
@@ -415,7 +415,7 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'location', values, frames, 3)
         else:
-            print("* WARNING: [Translation] Bone hash %s not found in joint table" % bone_hash)
+            logger.warning("[Translation] Bone hash %s not found in joint table" % bone_hash)
     for bone_hash, track in data.TransformTracks[TransformType.Scaling].items():
         bone_name = joint_table.get(str(bone_hash),None)
         obj = joint_obj.get(bone_name,None)
@@ -425,5 +425,5 @@ def import_articulation_animation(name : str, data : Animation, dest_arma : bpy.
             frames = [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve]
             import_fcurve(action,'scale', values, frames, 3)
         else:
-            print("* WARNING: [Scale] Bone hash %s not found in joint table" % bone_hash)
+            logger.warning("[Scale] Bone hash %s not found in joint table" % bone_hash)
     
