@@ -595,7 +595,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             wm.sssekai_animation_import_camera_fov_offset,
                             retrive_action(camera_obj.parent) if wm.sssekai_animation_append_exisiting else None
                         )
-                        apply_action(camera_obj.parent, action, wm.sssekai_animation_import_use_nla)
+                        apply_action(camera_obj.parent, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_tracks)
                         logger.debug('Imported Camera animation %s' %  animation.name)
                 elif active_type == 'ARMATURE':
                     if BLENDSHAPES_CRC in clip.FloatTracks:
@@ -914,8 +914,9 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
 @register_class
 class SSSekaiBlenderImportRLABatchOperator(bpy.types.Operator):
     bl_idname = "sssekai.rla_import_batch_op"
-    bl_label = T("Batch Import (slow!)")
-    bl_description = T("Import RLA clips (Armature/KeyShape) from the selected range for the selected character")
+    bl_label = T("Batch Import")
+    bl_description = T("""Import RLA clips (Armature/KeyShape) from the selected range for the selected character.
+NOTE: NLA tracks will be used regardless of the option specified!""")
     
     @staticmethod
     def update_selected_rla_asset(entry):
@@ -944,6 +945,7 @@ class SSSekaiBlenderImportRLABatchOperator(bpy.types.Operator):
         rla_range = wm.sssekai_rla_import_range
         entries = list(sssekai_global.rla_raw_clips)
         entries = entries[rla_range[0]:rla_range[1]]
+        wm.sssekai_animation_import_use_nla = True
         for entry in entries:
             sssekai_global.rla_selected_raw_clip = entry        
             SSSekaiBlenderImportRLABatchOperator.update_selected_rla_asset(entry)
@@ -1041,7 +1043,12 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(bpy.context.scene.render, "fps", icon='TIME')
         row = layout.row()
-        row.prop(wm, "sssekai_animation_import_use_nla", icon='NLA')
+        row.label(text=T("NLA"))
+        row = layout.row()
+        row.prop(wm, "sssekai_animation_import_use_nla", icon='NLA')        
+        row.prop(wm, "sssekai_animation_import_nla_always_new_tracks", icon='NLA_PUSHDOWN')
+        row = layout.row()
+        row.label(text=T("Import"))
         row = layout.row()
         row.operator(SSSekaiBlenderImportRLAArmatureAnimationOperator.bl_idname, icon='ARMATURE_DATA')
         row.operator(SSSekaiBlenderImportRLAShapekeyAnimationOperator.bl_idname, icon='SHAPEKEY_DATA')
@@ -1138,16 +1145,14 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row = layout.row()
         row.label(text=T("Material Options"))
         row = layout.row()
-        row.prop(wm, "sssekai_materials_use_principled_bsdf",icon='MATERIAL')
-        row = layout.row()
         row.operator(SSSekaiBlenderApplyOutlineOperator.bl_idname,icon='META_CUBE')
+        row.prop(wm, "sssekai_materials_use_principled_bsdf",icon='MATERIAL')        
         row = layout.row()
         row.label(text=T("Armature Options"))
         row = layout.row()
         row.prop(wm, "sssekai_armatures_as_articulations", icon='OUTLINER_OB_EMPTY')
         row = layout.row()
         row.operator(SSSekaiBlenderImportPhysicsOperator.bl_idname, icon='RIGID_BODY_CONSTRAINT')
-        row = layout.row()
         row.prop(wm, "sssekai_armature_display_physics", toggle=True, icon='HIDE_OFF')
         row = layout.row()
         row.label(text=T("Animation Options"))
@@ -1161,7 +1166,12 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(wm, "sssekai_animation_import_camera_fov_offset",icon='CAMERA_DATA')
         row = layout.row()
+        row.label(text=T("NLA"))
+        row = layout.row()
         row.prop(wm, "sssekai_animation_import_use_nla", icon='NLA')
+        row.prop(wm, "sssekai_animation_import_nla_always_new_tracks", icon='NLA_PUSHDOWN')                
+        row = layout.row()
+        row.label(text=T("Export"))
         row = layout.row()
         row.operator(SSSekaiBlenderExportAnimationTypeTree.bl_idname,icon='EXPORT')
         row = layout.row()        
@@ -1257,8 +1267,13 @@ register_wm_props(
         default=0
     ),
     sssekai_animation_import_use_nla = BoolProperty(
-        name=T("NLA"),
+        name=T("Use NLA"),
         description=T("Import as NLA Track"),
+        default=False
+    ),
+    sssekai_animation_import_nla_always_new_tracks = BoolProperty(
+        name=T("Create new NLA tracks"),
+        description=T("Always create new NLA tracks"),
         default=False
     ),
     sssekai_animation_import_camera_scaling = FloatVectorProperty(

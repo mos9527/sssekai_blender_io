@@ -23,7 +23,7 @@ def create_action(name : str):
     action = bpy.data.actions.new(name)
     return action
 
-def apply_action(object : bpy.types.Object, action : bpy.types.Action, use_nla : bool = False):    
+def apply_action(object : bpy.types.Object, action : bpy.types.Action, use_nla : bool = False, nla_always_new_track : bool = False):    
     '''Applies an action to an object'''
     if not object.animation_data:
         object.animation_data_create()
@@ -32,10 +32,20 @@ def apply_action(object : bpy.types.Object, action : bpy.types.Action, use_nla :
         object.animation_data_create()
         object.animation_data.action = action
     else:        
-        nla_track = object.animation_data.nla_tracks.new()
+        nla_tracks = object.animation_data.nla_tracks
+        if not len(nla_tracks): 
+            object.animation_data_clear()
+            object.animation_data_create()
+            nla_tracks = object.animation_data.nla_tracks
+            nla_tracks.new()
+            nla_always_new_track = False
+        if nla_always_new_track:
+            nla_track = nla_tracks.new()
+        else:
+            nla_track = nla_tracks[-1] # Use the last track if available
         nla_track.name = action.name
         frame_begin = max(0, action.frame_range[0])
-        strip = nla_track.strips.new(action.name, frame_begin, action)
+        strip = nla_track.strips.new(action.name, int(frame_begin), action)
         strip.action_frame_start = max(0, frame_begin)
 
 def import_fcurve(action : bpy.types.Action, data_path : str , values : list, frames : list, num_curves : int = 1, interpolation : str = 'BEZIER', tangents_in : list = [], tangents_out : list = []):
