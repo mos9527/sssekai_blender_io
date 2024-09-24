@@ -2,6 +2,11 @@
 
 translations_tuple = [
     (
+        ("*", "Active Character Height"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1811",),), ""),
+        ("zh_HANS", "当前角色身高 (米)", (False, ())),
+    ),
+    (
         ("*", "Active Character ID"),
         (("",), ""),
         ("zh_HANS", "选中角色 ID", (False, ())),
@@ -15,6 +20,11 @@ translations_tuple = [
         ("*", "Add outline to selected objects"),
         (("bpy.types.SSSEKAI_OT_apply_outline_op",), ""),
         ("zh_HANS", "向选中对象添加描边", (False, ())),
+    ),
+    (
+        ("*", "Always create new NLA tracks"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1861",),), ""),
+        ("zh_HANS", "保证创建新 NLA 动画轨", (False, ())),
     ),
     (
         ("*", "Animation Offset in frames"),
@@ -35,6 +45,27 @@ translations_tuple = [
         ("*", "Append Animations to the existing Action, instead of overwriting it"),
         (("",), ""),
         ("zh_HANS", "将动画附加到现有动作中，而不是覆盖它", (False, ())),
+    ),
+    (
+        (
+            "*",
+            "Appends the selected object to an Empty object (that can be configured "
+            "with a height value), with the Empty object as the new root.\n"
+            "If a root object is in the selection as well, this would become the root "
+            "instead.\n"
+            "NOTE: This only affects the FINAL visual of the pose. The armature itself "
+            "isn't affected.\n"
+            "      If otherwise needed, enter Object Mode, scale the armature, and then "
+            "Apply Scale to the entire armature.",
+        ),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:435",),), ""),
+        (
+            "zh_HANS",
+            "以添加空对象为根，将选中对象附加到空对象上（可以配置高度值）。\n"
+            "注意： 这只影响姿势的最终视觉效果。骨架本身不受影响。\n"
+            "      如果需要其他操作，请进入对象模式，缩放骨架，然后对整个骨架应用缩放。",
+            (False, ()),
+        ),
     ),
     (
         ("Operator", "Apply Modifiers"),
@@ -90,7 +121,37 @@ translations_tuple = [
         (("bpy.types.SSSEKAI_OT_util_neck_attach_op",), ""),
         ("zh_HANS", "将选中的面部骨架连接到选中的身体骨架", (False, ())),
     ),
+    (
+        ("*", "Batch Import"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1430",),), ""),
+        ("zh_HANS", "批量导入", (False, ())),
+    ),
     (("*", "Body"), (("",), ""), ("zh_HANS", "身体", (False, ()))),
+    (
+        ("*", "Calibrate Heel Offset"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:533",),), ""),
+        ("zh_HANS", "纠正鞋跟高度", (False, ())),
+    ),
+    (
+        ("*", "Camera FOV Offset"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1875",),), ""),
+        ("zh_HANS", "相机视野偏移量", (False, ())),
+    ),
+    (
+        ("*", "Camera Offset"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1870",),), ""),
+        ("zh_HANS", "相机位移偏移量", (False, ())),
+    ),
+    (
+        ("*", "Camera Scaling"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1865",),), ""),
+        ("zh_HANS", "相机位移比例", (False, ())),
+    ),
+    (
+        ("*", "Character Height (in meters)"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:593",),), ""),
+        ("zh_HANS", "角色身高 (m)", (False, ())),
+    ),
     (("*", "Character ID"), (("",), ""), ("zh_HANS", "角色 ID", (False, ()))),
     (
         ("*", "Character IDs: %s"),
@@ -101,6 +162,16 @@ translations_tuple = [
         ("*", "Character IDs: %s,"),
         (("scripts/addons/sssekai_blender_io/blender/addon.py:886",), ""),
         ("zh_HANS", "角色 ID：%s,", (False, ())),
+    ),
+    (
+        ("*", "Character Scaling"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:585",),), ""),
+        ("zh_HANS", "角色大学缩放", (False, ())),
+    ),
+    (
+        ("*", "Create new NLA tracks"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1860",),), ""),
+        ("zh_HANS", "创建新 NLA 动画轨", (False, ())),
     ),
     (
         ("*", "Directory"),
@@ -114,6 +185,16 @@ translations_tuple = [
         ("zh_HANS", "显示物理物体", (False, ())),
     ),
     (
+        ("*", "Effective RLA clip range: %d - %d"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1609",),), ""),
+        ("zh_HANS", "有效 RLA 片段区间: %d - %d", (False, ())),
+    ),
+    (
+        ("*", "Export"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1749",),), ""),
+        ("zh_HANS", "导出", (False, ())),
+    ),
+    (
         ("Operator", "Export Animation TypeTree"),
         (("bpy.types.SSSEKAI_OT_export_typetree_op",), ""),
         ("zh_HANS", "导出动画 TypeTree", (False, ())),
@@ -124,6 +205,11 @@ translations_tuple = [
         ("zh_HANS", "导出选中动画的 TypeTree", (False, ())),
     ),
     (("*", "Face"), (("",), ""), ("zh_HANS", "面部", (False, ()))),
+    (
+        ("*", "Height"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1811",),), ""),
+        ("zh_HANS", "身高", (False, ())),
+    ),
     (
         ("*", "Import"),
         (("scripts/addons/sssekai_blender_io/blender/addon.py:943",), ""),
@@ -164,6 +250,25 @@ translations_tuple = [
         ),
     ),
     (
+        (
+            "*",
+            "Import RLA clips (Armature/KeyShape) from the selected range for the "
+            "selected character.\n"
+            "NOTE: NLA tracks will be used regardless of the option specified!",
+        ),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1431",),), ""),
+        (
+            "zh_HANS",
+            "为选中的角色导入选中范围内的 RLA 片段（骨架/KeyShape）。\n注意：无论指定的选项如何，该操作都将使用 NLA 动画轨！",
+            (False, ()),
+        ),
+    ),
+    (
+        ("*", "Import Range"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1821",),), ""),
+        ("zh_HANS", "导入区间", (False, ())),
+    ),
+    (
         ("Operator", "Import Selected"),
         (("bpy.types.SSSEKAI_OT_import_op",), ""),
         ("zh_HANS", "导入", (False, ())),
@@ -177,6 +282,16 @@ translations_tuple = [
         ("*", "Import Shapekey Animation for the selected character"),
         (("bpy.types.SSSEKAI_OT_rla_import_shapekey_animation_op",), ""),
         ("zh_HANS", "为选中的角色导入 ShapeKey 动画", (False, ())),
+    ),
+    (
+        ("*", "Import as NLA Track"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1857",),), ""),
+        ("zh_HANS", "以 NLA 动画轨形式导入", (False, ())),
+    ),
+    (
+        ("*", "Import clips from this range, order is as shown in the list"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1822",),), ""),
+        ("zh_HANS", "导入选定区间的片段；顺序同列表所显示", (False, ())),
     ),
     (
         (
@@ -204,6 +319,11 @@ translations_tuple = [
             "单个 JSON 格式的 RLA Pose (e.g. {'bodyPosition':...})，可由 rla2json 取得",
             (False, ()),
         ),
+    ),
+    (
+        ("*", "Make/Update Root Height Scale"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:434",),), ""),
+        ("zh_HANS", "创建/更新角色身高", (False, ())),
     ),
     (
         ("*", "Material Options"),
@@ -244,6 +364,29 @@ translations_tuple = [
         ("zh_HANS", "杂项", (False, ())),
     ),
     (
+        ("*", "NLA"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1584",),), ""),
+        ("zh_HANS", "NLA", (False, ())),
+    ),
+    (
+        (
+            "*",
+            "NOTE: Seek help/notices in the project README, Wiki, GH Issues (in that "
+            "order) before submitting a new issue!",
+        ),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1695",),), ""),
+        (
+            "zh_HANS",
+            "注意：在提交新 Issue 之前，请先按 README, Wiki, 现存 Issue 的顺序检查你的问题是否已经有过相关答案！",
+            (False, ()),
+        ),
+    ),
+    (
+        ("*", "Neck Attach"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:575",),), ""),
+        ("zh_HANS", "连接头部", (False, ())),
+    ),
+    (
         ("*", "Number of segments: %d"),
         (("scripts/addons/sssekai_blender_io/blender/addon.py:888",), ""),
         ("zh_HANS", "段数：%d", (False, ())),
@@ -252,6 +395,16 @@ translations_tuple = [
         ("*", "Offset"),
         ((("scripts/addons/sssekai_blender_io/blender/addon.py:1075",),), ""),
         ("zh_HANS", "偏移量", (False, ())),
+    ),
+    (
+        ("*", "Offset used when importing camera (vertical) FOV animation in degrees"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1876",),), ""),
+        ("zh_HANS", "导入相机动画时所用的 FOV (垂直度数) 偏移量", (False, ())),
+    ),
+    (
+        ("*", "Offset used when importing camera animations"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1871",),), ""),
+        ("zh_HANS", "导入相机动画时位移上的偏移量", (False, ())),
     ),
     (
         ("*", "Override Unity Version"),
@@ -264,6 +417,15 @@ translations_tuple = [
         (
             "zh_HANS",
             "世界计划缤纷舞台！ feat. 初音未来 游戏素材导入工具 (Blender 4.0+)",
+            (False, ()),
+        ),
+    ),
+    (
+        ("*", "README/Issues: https://github.com/mos9527/sssekai_blender_io"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1701",),), ""),
+        (
+            "zh_HANS",
+            "README/Issues: https://github.com/mos9527/sssekai_blender_io",
             (False, ()),
         ),
     ),
@@ -332,6 +494,11 @@ translations_tuple = [
         ("zh_HANS", "SSSekai Blender IO", (False, ())),
     ),
     (
+        ("*", "Scaling used when importing camera animations"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1866",),), ""),
+        ("zh_HANS", "导入相机动画时位移的缩放值", (False, ())),
+    ),
+    (
         ("Operator", "Search"),
         (("bpy.types.SSSEKAI_OT_asset_search_op",), ""),
         ("zh_HANS", "搜索", (False, ())),
@@ -340,6 +507,11 @@ translations_tuple = [
         ("*", "Search for assets with their object name and/or container name"),
         (("bpy.types.SSSEKAI_OT_asset_search_op",), ""),
         ("zh_HANS", "通过对象名称和/或容器名称搜索素材", (False, ())),
+    ),
+    (
+        ("*", "Sekai Character"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:565",),), ""),
+        ("zh_HANS", "角色设定", (False, ())),
     ),
     (
         ("*", "Select Asset"),
@@ -353,6 +525,11 @@ translations_tuple = [
     ),
     (("*", "Selected Asset"), (("",), ""), ("zh_HANS", "选中的素材", (False, ()))),
     (
+        ("*", "Selected Clip: %s"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1616",),), ""),
+        ("zh_HANS", "已选择片段: %s", (False, ())),
+    ),
+    (
         ("*", "Selected RLA Clip"),
         ((("scripts/addons/sssekai_blender_io/blender/addon.py:1040",),), ""),
         ("zh_HANS", "选中的 RLA 片段", (False, ())),
@@ -361,6 +538,16 @@ translations_tuple = [
         ("*", "Selected RLA Clip "),
         (("",), ""),
         ("zh_HANS", "选中的RLA 片段", (False, ())),
+    ),
+    (
+        (
+            "*",
+            "Set the Z offset of the selected character by its OffsetValue bone. Do "
+            "this when the character's feet are not at the origin, or when you changed "
+            "the character's height.",
+        ),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:534",),), ""),
+        ("zh_HANS", "纠正所选角色的Z方向位置", (False, ())),
     ),
     (
         ("Operator", "Show Physics Objects"),
@@ -432,6 +619,16 @@ translations_tuple = [
         ("zh_HANS", "Unity", (False, ())),
     ),
     (
+        ("*", "Use Heel Offset"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:596",),), ""),
+        ("zh_HANS", "使用鞋跟偏移量", (False, ())),
+    ),
+    (
+        ("*", "Use NLA"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1857",),), ""),
+        ("zh_HANS", "使用 NLA 动画轨", (False, ())),
+    ),
+    (
         ("*", "Use Principled BSDF"),
         (("",), ""),
         ("zh_HANS", "使用原理化 BSDF", (False, ())),
@@ -456,6 +653,15 @@ translations_tuple = [
         (
             "zh_HANS",
             "素材包所在的目录。此目录中的每个素材包都将被加载（如果可能）",
+            (False, ()),
+        ),
+    ),
+    (
+        ("*", "Wiki: https://github.com/mos9527/sssekai_blender_io/wiki"),
+        ((("scripts/addons/sssekai_blender_io/blender/addon.py:1704",),), ""),
+        (
+            "zh_HANS",
+            "Wiki: https://github.com/mos9527/sssekai_blender_io/wiki",
             (False, ()),
         ),
     ),

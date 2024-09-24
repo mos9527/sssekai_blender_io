@@ -396,6 +396,10 @@ class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
             SSSekaiBlenderUtilCharacterArmatureSimplifyOperator.bl_idname,
             icon="TOOL_SETTINGS",
         )
+        row = layout.row()
+        row.label(text=T("Danger Zone"))
+        row = layout.row()
+        row.operator(bpy.ops.script.reload.idname(), icon="FILE_SCRIPT")
 
 
 @register_class

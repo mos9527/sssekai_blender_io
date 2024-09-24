@@ -232,7 +232,7 @@ class _registry:
         self.classes.append(clazz)
 
     def register_all(self):
-        for clazz in self.classes:
+        for clazz in self.classes[::-1]:
             bpy.utils.register_class(clazz)
 
     def unregister_all(self):
