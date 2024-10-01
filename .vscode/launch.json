@@ -5,19 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: i18n AST Codegen",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/blender/i18n/codegen.py",
-            "console": "integratedTerminal"
-        },
-        {
             "name": "Python Debugger: Asset Loader Test",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/asset.test.py",
-            "console": "integratedTerminal",
+            "module": "tests.test_mesh",
             "justMyCode": false
-        }
+        },
+        {
+            "name": "Python Debugger: i18n AST Codegen",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/translations_codegen.py",
+            "console": "integratedTerminal"
+        },
     ]
 }

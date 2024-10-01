@@ -18,7 +18,7 @@ def search_env_meshes(env: Environment):
     transform_roots = []
     for obj in env.objects:
         if obj.type == ClassIDType.Transform:
-            data = obj.read(return_typetree_on_error=False)
+            data = obj.read()
             if hasattr(data, "m_Children") and not data.m_Father.path_id:
                 transform_roots.append(data)
     # Collect all skinned meshes as Armature[s], otherwise build articulations for
@@ -32,7 +32,7 @@ def search_env_meshes(env: Environment):
         path_id_tbl = dict()  # Only used locally
 
         def dfs(root: Transform, parent: Bone = None):
-            gameObject = root.m_GameObject.read(return_typetree_on_error=False)
+            gameObject = root.m_GameObject.read()
             name = gameObject.m_Name
             # Addtional properties
             # Skinned Mesh Renderer
@@ -55,22 +55,22 @@ def search_env_meshes(env: Environment):
                     component = component.read()
                     if component.m_Script:
                         physicsScript = component.m_Script.read()
-                        physics = component.read_typetree()
+                        physics = component.__dict__  # .read_typetree()
                         phy_type = None
-                        if physicsScript.name == "SpringSphereCollider":
+                        if physicsScript.m_Name == "SpringSphereCollider":
                             phy_type = BonePhysicsType.SphereCollider
-                        if physicsScript.name == "SpringCapsuleCollider":
+                        if physicsScript.m_Name == "SpringCapsuleCollider":
                             phy_type = BonePhysicsType.CapsuleCollider
-                        if physicsScript.name == "SekaiSpringBone":
+                        if physicsScript.m_Name == "SekaiSpringBone":
                             phy_type = BonePhysicsType.SpringBone
-                        if physicsScript.name == "SpringManager":
+                        if physicsScript.m_Name == "SpringManager":
                             phy_type = BonePhysicsType.SpringManager
                         if phy_type != None:
                             bonePhysics = BonePhysics.from_dict(physics)
                             bonePhysics.type = phy_type
                             if "pivotNode" in physics:
                                 bonePhysics.pivot = path_id_tbl.get(
-                                    physics["pivotNode"]["m_PathID"], None
+                                    physics["pivotNode"].m_PathID, None
                                 )
                                 bonePhysics.pivot = getattr(
                                     bonePhysics.pivot, "name", None
@@ -87,7 +87,7 @@ def search_env_meshes(env: Environment):
                 bonePhysics,
                 gameObject,
             )
-            path_id_tbl[root.path_id] = bone
+            path_id_tbl[root.m_GameObject.m_PathID] = bone
             armature.bone_name_tbl[name] = bone
             if not parent:
                 armature.root = bone
@@ -122,7 +122,7 @@ def search_env_animations(env: Environment):
     for asset in env.assets:
         for obj in asset.get_objects():
             if obj.type == ClassIDType.AnimationClip:
-                data = obj.read(return_typetree_on_error=False)
+                data = obj.read()
                 animations.append(data)
     return animations
 

@@ -342,9 +342,9 @@ class BonePhysics:
             if hasattr(phy, k):
                 setattr(phy, k, v)
         if phy.yAngleLimits:
-            phy.yAngleLimits = BoneAngularLimit(**phy.yAngleLimits)
+            phy.yAngleLimits = BoneAngularLimit(**phy.yAngleLimits.__dict__)
         if phy.zAngleLimits:
-            phy.zAngleLimits = BoneAngularLimit(**phy.zAngleLimits)
+            phy.zAngleLimits = BoneAngularLimit(**phy.zAngleLimits.__dict__)
         return phy
 
 

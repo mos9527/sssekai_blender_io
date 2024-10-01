@@ -31,9 +31,7 @@ for armature in armatures:
                     bone.gameObject.m_SkinnedMeshRenderer.read()
                 )
                 if getattr(mesh_rnd, "m_Mesh", None):
-                    mesh_data: Mesh = mesh_rnd.m_Mesh.read(
-                        return_typetree_on_error=False
-                    )
+                    mesh_data: Mesh = mesh_rnd.m_Mesh.read()
                     pass
         pass
 pass

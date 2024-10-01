@@ -731,9 +731,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     b.read().m_GameObject.read().name for b in mesh_rnd.m_Bones
                 ]
                 if getattr(mesh_rnd, "m_Mesh", None):
-                    mesh_data: Mesh = mesh_rnd.m_Mesh.read(
-                        return_typetree_on_error=False
-                    )
+                    mesh_data: Mesh = mesh_rnd.m_Mesh.read()
                     mesh, obj = import_mesh(
                         name, mesh_data, True, bone_hash_tbl, bone_order
                     )
@@ -748,7 +746,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 logger.debug("Found Static Mesh at %s" % gameObject.name)
                 mesh_filter: MeshFilter = gameObject.m_MeshFilter.read()
                 mesh_rnd: MeshRenderer = gameObject.m_MeshRenderer.read()
-                mesh_data = mesh_filter.m_Mesh.read(return_typetree_on_error=False)
+                mesh_data = mesh_filter.m_Mesh.read()
                 mesh, obj = import_mesh(mesh_data.name, mesh_data, False)
                 if parent_obj:
                     obj.parent = parent_obj
