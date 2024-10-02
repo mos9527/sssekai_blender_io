@@ -907,7 +907,9 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         logger.debug("Imported Camera animation %s" % animation.m_Name)
                 elif active_type == "ARMATURE":
                     if BLENDSHAPES_CRC in clip.FloatTracks:
-                        logger.debug("Importing Keyshape animation %s" % animation.m_Name)
+                        logger.debug(
+                            "Importing Keyshape animation %s" % animation.m_Name
+                        )
                         mesh_obj = None
                         for obj in bpy.context.active_object.children:
                             if KEY_SHAPEKEY_NAME_HASH_TBL in obj.data:
@@ -933,14 +935,18 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             action,
                             wm.sssekai_animation_import_use_nla,
                         )
-                        logger.debug("Imported Keyshape animation %s" % animation.m_Name)
+                        logger.debug(
+                            "Imported Keyshape animation %s" % animation.m_Name
+                        )
                     if (
                         clip.TransformTracks[TransformType.Translation]
                         or clip.TransformTracks[TransformType.Rotation]
                         or clip.TransformTracks[TransformType.EulerRotation]
                         or clip.TransformTracks[TransformType.Scaling]
                     ):
-                        logger.debug("Importing Armature animation %s" % animation.m_Name)
+                        logger.debug(
+                            "Importing Armature animation %s" % animation.m_Name
+                        )
                         action = load_armature_animation(
                             animation.m_Name,
                             clip,
@@ -957,7 +963,9 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             action,
                             wm.sssekai_animation_import_use_nla,
                         )
-                        logger.debug("Imported Armature animation %s" % animation.m_Name)
+                        logger.debug(
+                            "Imported Armature animation %s" % animation.m_Name
+                        )
                 elif active_type == "EMPTY":
                     if (
                         clip.TransformTracks[TransformType.Translation]

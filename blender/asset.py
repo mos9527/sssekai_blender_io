@@ -8,6 +8,7 @@ from . import *
 
 logger = logging.getLogger(__name__)
 
+
 # Backported from UnityPy 47b1bde027fd79d78af3de4d5e3bebd05f8ceeb8
 class MeshHelper:
     @staticmethod
@@ -126,12 +127,14 @@ class MeshHelper:
         else:
             return VertexFormat(format)
 
+
 class VertexChannelFormat(IntEnum):
     kChannelFormatFloat = 0
     kChannelFormatFloat16 = 1
     kChannelFormatColor = 2
     kChannelFormatByte = 3
     kChannelFormatUInt32 = 4
+
 
 class VertexFormat2017(IntEnum):
     kVertexFormatFloat = 0
@@ -148,6 +151,7 @@ class VertexFormat2017(IntEnum):
     kVertexFormatUInt32 = 11
     kVertexFormatSInt32 = 12
 
+
 class VertexFormat(IntEnum):
     kVertexFormatFloat = 0
     kVertexFormatFloat16 = 1
@@ -161,8 +165,10 @@ class VertexFormat(IntEnum):
     kVertexFormatSInt16 = 9
     kVertexFormatUInt32 = 10
     kVertexFormatSInt32 = 11
+
+
 # Monkey patch old helper functions into the new classes
-def VertexDataGetStreams(self, version):    
+def VertexDataGetStreams(self, version):
     streamCount = 1
     if self.m_Channels:
         streamCount += max(x.stream for x in self.m_Channels)
@@ -177,9 +183,7 @@ def VertexDataGetStreams(self, version):
                 if m_Channel.dimension > 0:
                     chnMask |= 1 << chn  # Shift 1UInt << chn
                     stride += m_Channel.dimension * MeshHelper.GetFormatSize(
-                        MeshHelper.ToVertexFormat(
-                            m_Channel.format, version
-                        )
+                        MeshHelper.ToVertexFormat(m_Channel.format, version)
                     )
         self.m_Streams[s] = StreamInfo(
             channelMask=chnMask,
@@ -190,17 +194,25 @@ def VertexDataGetStreams(self, version):
         )
         offset += self.m_VertexCount * stride
         # static size_t align_streamSize (size_t size) { return (size + (kVertexStreamAlign-1)) & ~(kVertexStreamAlign-1)
-        offset = (offset + (16 - 1)) & ~(
-            16 - 1
-        )  # (offset + (16u - 1u)) & ~(16u - 1u);
+        offset = (offset + (16 - 1)) & ~(16 - 1)  # (offset + (16u - 1u)) & ~(16u - 1u);
+
+
 VertexData.GetStreams = VertexDataGetStreams
+
+
 class BoneWeights4:
     def __init__(self):
         self.weight = [0.0] * 4
         self.boneIndex = [0] * 4
+
+
 def InitMSkin(self):
     self.m_Skin = [BoneWeights4() for _ in range(self.m_VertexCount)]
+
+
 Mesh.InitMSkin = InitMSkin
+
+
 def MeshReadVertexData(self: Mesh):
     version = self.object_reader.version
     m_VertexData = self.m_VertexData
@@ -221,14 +233,14 @@ def MeshReadVertexData(self: Mesh):
                 swap = self.object_reader.reader.endian == "<" and componentByteSize > 1
 
                 componentBytes = unpack_vertexdata_boost(
-                        bytes(m_VertexData.m_DataSize),
-                        componentByteSize,
-                        m_VertexCount,
-                        m_Stream.offset,
-                        m_Stream.stride,
-                        m_Channel.offset,
-                        m_Channel.dimension,
-                        swap,
+                    bytes(m_VertexData.m_DataSize),
+                    componentByteSize,
+                    m_VertexCount,
+                    m_Stream.offset,
+                    m_Stream.stride,
+                    m_Channel.offset,
+                    m_Channel.dimension,
+                    swap,
                 )
 
                 if MeshHelper.IsIntFormat(version, m_Channel.format):
@@ -269,7 +281,7 @@ def MeshReadVertexData(self: Mesh):
                         self.m_UV7 = componentsFloatArray
                     # 2018.2 and up
                     elif chn == 12:  # kShaderChannelBlendWeight
-                        if not self.m_Skin:                            
+                        if not self.m_Skin:
                             self.InitMSkin()
                         for i in range(m_VertexCount):
                             for j in range(m_Channel.dimension):
@@ -304,7 +316,11 @@ def MeshReadVertexData(self: Mesh):
                         self.m_UV3 = componentsFloatArray
                     elif chn == 7:  # kShaderChannelTangent
                         self.m_Tangents = componentsFloatArray
+
+
 Mesh.ReadVertexData = MeshReadVertexData
+
+
 def MeshRepackIndexBuffer(self):
     self.m_Use16BitIndices = self.m_IndexFormat == 0
     raw_indices = bytes(self.m_IndexBuffer)
@@ -318,7 +334,11 @@ def MeshRepackIndexBuffer(self):
     self.m_IndexBuffer = struct.unpack(
         f"<{len(raw_indices) // index_size}{char}", raw_indices
     )
+
+
 Mesh.RepackIndexBuffer = MeshRepackIndexBuffer
+
+
 def MeshGetTriangles(self):
     m_IndexBuffer = self.m_IndexBuffer
     m_Indices = self.m_Indices = getattr(self, "m_Indices", list())
@@ -336,8 +356,7 @@ def MeshGetTriangles(self):
             )
 
         elif (
-            self.version[0] < 4
-            or topology == GfxPrimitiveType.kPrimitiveTriangleStrip
+            self.version[0] < 4 or topology == GfxPrimitiveType.kPrimitiveTriangleStrip
         ):
             # de-stripify :
             triIndex = 0
@@ -373,7 +392,10 @@ def MeshGetTriangles(self):
             raise NotImplementedError(
                 "Failed getting triangles. Submesh topology is lines or points."
             )
+
+
 Mesh.GetTriangles = MeshGetTriangles
+
 
 def search_env_meshes(env: Environment):
     """(Partially) Loads the UnityPy Environment for further Mesh processing
@@ -497,6 +519,7 @@ def search_env_animations(env: Environment):
                 animations.append(data)
     return animations
 
+
 def import_mesh(
     name: str,
     data: Mesh,
@@ -527,7 +550,7 @@ def import_mesh(
         data.ReadVertexData()
         data.RepackIndexBuffer()
         data.GetTriangles()
-        data._processed = True        
+        data._processed = True
     mesh = bpy.data.meshes.new(name=data.m_Name)
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
@@ -587,7 +610,7 @@ def import_mesh(
             )  # UV rewinding
             face.smooth = True
         except ValueError as e:
-            logger.warning("Invalid face index %d (%s) - discarded." % (idx,e))
+            logger.warning("Invalid face index %d (%s) - discarded." % (idx, e))
     bm.to_mesh(mesh)
     # UV Map
     uv_layer = mesh.uv_layers.new()

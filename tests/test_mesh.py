@@ -10,7 +10,7 @@ def test_mesh():
         for mesh in armatures:
             go = mesh.skinnedMeshGameObject
             rnd = go.m_SkinnedMeshRenderer.read()
-            mesh = rnd.m_Mesh.read()      
+            mesh = rnd.m_Mesh.read()
             mesh.ReadVertexData()
             mesh.RepackIndexBuffer()
             mesh.GetTriangles()

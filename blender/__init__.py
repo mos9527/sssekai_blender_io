@@ -4,7 +4,12 @@ try:
     import bpy
     import bpy_extras
     import bmesh
-    from mathutils import Matrix as blMatrix, Quaternion as blQuaternion, Vector as blVector, Euler as blEuler
+    from mathutils import (
+        Matrix as blMatrix,
+        Quaternion as blQuaternion,
+        Vector as blVector,
+        Euler as blEuler,
+    )
 
     BLENDER = True
 except ImportError:
@@ -21,6 +26,7 @@ except ImportError:
 
     class blEucler:
         pass
+
     BLENDER = False
 
 import math
@@ -54,10 +60,11 @@ from sssekai.unity.AnimationClip import (
 )
 from sssekai.unity import sssekai_get_unity_version, sssekai_set_unity_version
 
+
 # Coordinate System | Forward |  Up  |  Left
 # Unity:   LH, Y Up |   Z     |   Y  |  -X
 # Blender: RH, Z Up |  -Y     |   Z  |   X
-def swizzle_vector_scale(vec : uVector3):
+def swizzle_vector_scale(vec: uVector3):
     return blVector((vec.x, vec.z, vec.y))
 
 
@@ -65,7 +72,7 @@ def swizzle_vector3(X, Y, Z):
     return blVector((-X, -Z, Y))
 
 
-def swizzle_vector(vec : uVector3):
+def swizzle_vector(vec: uVector3):
     return swizzle_vector3(vec.x, vec.y, vec.z)
 
 
@@ -73,7 +80,7 @@ def swizzle_euler3(X, Y, Z):
     return blEuler((X, Z, -Y), "YXZ")
 
 
-def swizzle_euler(euler : uVector3, isDegrees=True):
+def swizzle_euler(euler: uVector3, isDegrees=True):
     """mode -> YXZ on the objects that support it. see euler3_to_quat_swizzled"""
     if isDegrees:
         return swizzle_euler3(
@@ -87,7 +94,7 @@ def swizzle_quaternion4(X, Y, Z, W):
     return blQuaternion((W, X, Z, -Y))  # conjugate (W,-X,-Z,Y)
 
 
-def swizzle_quaternion(quat : uQuaternion):
+def swizzle_quaternion(quat: uQuaternion):
     return swizzle_quaternion4(quat.x, quat.y, quat.z, quat.w)
 
 
@@ -245,7 +252,9 @@ def clamp(value, mmin, mmax):
 
 def encode_asset_id(obj):
     prop = lambda x: "<%s %s>" % (x, getattr(obj, x, "<unk>"))
-    return f"""{prop('m_Name')},{prop('container')},{prop('m_PathID')},{prop('file_id')}"""
+    return (
+        f"""{prop('m_Name')},{prop('container')},{prop('m_PathID')},{prop('file_id')}"""
+    )
 
 
 # Import helpers

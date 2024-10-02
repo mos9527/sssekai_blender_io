@@ -224,7 +224,9 @@ def load_armature_animation(
     local_space_trans_rot = dict()  # i.e. parent space
     for bone in dest_arma.data.edit_bones:  # Must be done in edit mode
         local_mat = (
-            (bone.parent.matrix.inverted() @ bone.matrix) if bone.parent else blMatrix.Identity(4)
+            (bone.parent.matrix.inverted() @ bone.matrix)
+            if bone.parent
+            else blMatrix.Identity(4)
         )
         local_space_trans_rot[bone.name] = (
             local_mat.to_translation(),
