@@ -245,7 +245,7 @@ def clamp(value, mmin, mmax):
 
 def encode_asset_id(obj):
     prop = lambda x: "<%s %s>" % (x, getattr(obj, x, "<unk>"))
-    return f"""{prop('name')},{prop('container')},{prop('path_id')},{prop('file_id')}"""
+    return f"""{prop('m_Name')},{prop('container')},{prop('m_PathID')},{prop('file_id')}"""
 
 
 # Import helpers

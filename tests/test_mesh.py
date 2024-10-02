@@ -9,7 +9,10 @@ def test_mesh():
         articulations, armatures = search_env_meshes(env)
         for mesh in armatures:
             go = mesh.skinnedMeshGameObject
-            rnd = go.m_SkinnedMeshRenderer
+            rnd = go.m_SkinnedMeshRenderer.read()
+            mesh = rnd.m_Mesh.read()      
+            mesh.ReadVertexData()
+            mesh.GetTriangles()
             pass
         pass
 
