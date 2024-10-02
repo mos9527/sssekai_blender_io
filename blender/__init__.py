@@ -41,6 +41,7 @@ def swizzle_vector3(X, Y, Z):
 
 
 def swizzle_vector(vec):
+    print(type(vec))
     return swizzle_vector3(vec.X, vec.Y, vec.Z)
 
 

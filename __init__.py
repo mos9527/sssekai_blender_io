@@ -35,6 +35,8 @@ def register():
     logger.debug("*** SSSekai Blender IO ***")
     logger.debug("Script directory: %s", SCRIPT_DIR)
     logger.debug("Blender version: %s", bpy.app.version_string)
+    logger.debug("SSSekai version: %s", sssekai.__version__)
+    logger.debug("UnityPy version: %s", UnityPy.__version__)
     logger.info("Registering addon.")
     modules = []
     for addon in ADDONS:
