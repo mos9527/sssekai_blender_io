@@ -1,8 +1,8 @@
-from . import *
+import logging, json
 import tempfile
+from . import *
 
 logger = logging.getLogger(__name__)
-
 
 def search_env_meshes(env: Environment):
     """(Partially) Loads the UnityPy Environment for further Mesh processing
@@ -354,10 +354,10 @@ def import_armature(arma: Armature, name: str = None):
             # Treat the joints as extremely small bones
             # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198
             # TODO: Alternative shapes for bones
-            ebone.head = child.global_transform @ Vector((0, 0, 0))
-            ebone.tail = child.global_transform @ Vector((0, 1, 0))
+            ebone.head = child.global_transform @ blVector((0, 0, 0))
+            ebone.tail = child.global_transform @ blVector((0, 1, 0))
             ebone.length = 0.01
-            ebone.align_roll(child.global_transform @ Vector((0, 0, 1)) - ebone.head)
+            ebone.align_roll(child.global_transform @ blVector((0, 0, 1)) - ebone.head)
             if (
                 parent and parent.name != root.name
             ):  # Let the root be the armature itself
@@ -458,7 +458,7 @@ def import_armature_physics_constraints(armature, data: Armature):
             obj.name = name + "_rigidbody"
             # Align the cylinder to the bone
             obj.rotation_euler.rotate_axis("X", math.radians(-90))
-            obj.location += Vector((0, length / 2, 0))
+            obj.location += blVector((0, length / 2, 0))
             bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
             bpy.ops.rigidbody.object_add()
             obj.rigid_body.collision_shape = "CONVEX_HULL"
@@ -550,7 +550,7 @@ def import_armature_physics_constraints(armature, data: Armature):
                         length=bonesize_all[bone_name],
                     )
                     target.parent = joint
-                    target.matrix_local = Matrix.Identity(4)
+                    target.matrix_local = blMatrix.Identity(4)
 
                     rigidbodies[bone_name] = target
                     parent = rigidbodies[parent_all[bone_name]]
@@ -620,7 +620,7 @@ def import_armature_physics_constraints(armature, data: Armature):
                     rigidbodies[pivot_bone_name] = pivot
 
                     joint.parent = pivot
-                    joint.matrix_local = Matrix.Identity(4)
+                    joint.matrix_local = blMatrix.Identity(4)
         bpy.ops.object.mode_set(mode="OBJECT")
         rbs = list(rigidbodies.values())
         for i in range(len(rbs)):
@@ -749,7 +749,7 @@ def setup_sdfValue_driver(obj: object):
     # And now the (normalized) local position of the joint can act as the light vector...
     # With identity (0,0,1) as the (quite literally) face normal vector.
     bpy.ops.object.mode_set(mode="OBJECT")
-    joint.location = Vector((0.1, -0.1, 0.1))
+    joint.location = blVector((0.1, -0.1, 0.1))
     driver = obj.driver_add('["sdfValue"]')
     var_y = driver.driver.variables.new()
     var_y.name = "y"

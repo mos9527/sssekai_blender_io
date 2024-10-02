@@ -4,67 +4,91 @@ try:
     import bpy
     import bpy_extras
     import bmesh
-    from mathutils import Matrix, Quaternion as BlenderQuaternion, Vector, Euler
+    from mathutils import Matrix as blMatrix, Quaternion as blQuaternion, Vector as blVector, Euler as blEuler
 
     BLENDER = True
 except ImportError:
     # Stubs for debugging outside blender's python
     # pip install fake-bpy-module
-    class Matrix:
+    class blMatrix:
         pass
 
-    class BlenderQuaternion:
+    class blQuaternion:
         pass
 
-    class Vector:
+    class blVector:
         pass
 
+    class blEucler:
+        pass
     BLENDER = False
+
 import math
 import zlib
-import json
-import logging
 from typing import List, Dict, Set
 from dataclasses import dataclass
 from enum import IntEnum
 
+# UnityPy deps
+import UnityPy
+from UnityPy import Environment
+from UnityPy.enums import ClassIDType
+from UnityPy.classes import (
+    Mesh,
+    SkinnedMeshRenderer,
+    MeshRenderer,
+    MeshFilter,
+    GameObject,
+    Transform,
+    Texture2D,
+    Material,
+)
+from UnityPy.classes.math import Vector3f as uVector3, Quaternionf as uQuaternion
+
+# SSSekai deps
+from sssekai.unity.AnimationClip import (
+    read_animation,
+    Animation,
+    TransformType,
+    KeyFrame,
+)
+from sssekai.unity import sssekai_get_unity_version, sssekai_set_unity_version
 
 # Coordinate System | Forward |  Up  |  Left
 # Unity:   LH, Y Up |   Z     |   Y  |  -X
 # Blender: RH, Z Up |  -Y     |   Z  |   X
-def swizzle_vector_scale(vec):
-    return Vector((vec.X, vec.Z, vec.Y))
+def swizzle_vector_scale(vec : uVector3):
+    return blVector((vec.x, vec.z, vec.y))
 
 
 def swizzle_vector3(X, Y, Z):
-    return Vector((-X, -Z, Y))
+    return blVector((-X, -Z, Y))
 
 
-def swizzle_vector(vec):
-    print(type(vec))
-    return swizzle_vector3(vec.X, vec.Y, vec.Z)
+def swizzle_vector(vec : uVector3):
+    return swizzle_vector3(vec.x, vec.y, vec.z)
 
 
 def swizzle_euler3(X, Y, Z):
-    return Euler((X, Z, -Y), "YXZ")
+    return blEuler((X, Z, -Y), "YXZ")
 
 
-def swizzle_euler(euler, isDegrees=True):
+def swizzle_euler(euler : uVector3, isDegrees=True):
     """mode -> YXZ on the objects that support it. see euler3_to_quat_swizzled"""
     if isDegrees:
         return swizzle_euler3(
-            math.radians(euler.X), math.radians(euler.Y), math.radians(euler.Z)
+            math.radians(euler.x), math.radians(euler.y), math.radians(euler.z)
         )
     else:
-        return swizzle_euler3(euler.X, euler.Y, euler.Z)
+        return swizzle_euler3(euler.x, euler.y, euler.z)
 
 
 def swizzle_quaternion4(X, Y, Z, W):
-    return BlenderQuaternion((W, X, Z, -Y))  # conjugate (W,-X,-Z,Y)
+    return blQuaternion((W, X, Z, -Y))  # conjugate (W,-X,-Z,Y)
 
 
-def swizzle_quaternion(quat):
-    return swizzle_quaternion4(quat.X, quat.Y, quat.Z, quat.W)
+def swizzle_quaternion(quat : uQuaternion):
+    return swizzle_quaternion4(quat.x, quat.y, quat.z, quat.w)
 
 
 # See swizzle_quaternion4. This is the inverse of that since we're reproducing Unity's quaternion
@@ -72,11 +96,11 @@ def euler3_to_quat_swizzled(x, y, z):
     # See https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html
     # Unity uses ZXY rotation order
     quat = (
-        BlenderQuaternion((0, 0, 1), -y)
-        @ BlenderQuaternion((1, 0, 0), x)
-        @ BlenderQuaternion((0, 1, 0), z)
+        blQuaternion((0, 0, 1), -y)
+        @ blQuaternion((1, 0, 0), x)
+        @ blQuaternion((0, 1, 0), z)
     )  # Left multiplication
-    return UnityQuaternion(quat.x, -quat.z, quat.y, quat.w)
+    return uQuaternion(quat.x, -quat.z, quat.y, quat.w)
 
 
 # Used for bone path (boneName) and blend shape name inverse hashing
@@ -272,32 +296,6 @@ def register_wm_props(**kw):
     registry.add_register_wm(**kw)
 
 
-# UnityPy deps
-import UnityPy
-from UnityPy import Environment
-from UnityPy.enums import ClassIDType
-from UnityPy.classes import (
-    Mesh,
-    SkinnedMeshRenderer,
-    MeshRenderer,
-    MeshFilter,
-    GameObject,
-    Transform,
-    Texture2D,
-    Material,
-)
-from UnityPy.math import Vector3, Quaternion as UnityQuaternion
-
-# SSSekai deps
-from sssekai.unity.AnimationClip import (
-    read_animation,
-    Animation,
-    TransformType,
-    KeyFrame,
-)
-from sssekai.unity import sssekai_get_unity_version, sssekai_set_unity_version
-
-
 # Data Types
 class BonePhysicsType(IntEnum):
     NoPhysics = 0x00
@@ -352,14 +350,14 @@ class BonePhysics:
 @dataclass
 class Bone:
     name: str
-    localPosition: Vector3
-    localRotation: UnityQuaternion
-    localScale: Vector3
+    localPosition: uVector3
+    localRotation: uQuaternion
+    localScale: uVector3
     # Hierarchy. Built after asset import
     parent: object  # Bone
     children: list  # Bone
     global_path: str
-    global_transform: Matrix = None
+    global_transform: blMatrix = None
     # Physics
     physics: BonePhysics = None
     gameObject: object = None  # Unity GameObject
@@ -372,10 +370,10 @@ class Bone:
         return swizzle_quaternion(self.localRotation)
 
     def to_translation_matrix(self):
-        return Matrix.Translation(swizzle_vector(self.localPosition))
+        return blMatrix.Translation(swizzle_vector(self.localPosition))
 
     def to_trs_matrix(self):
-        return Matrix.LocRotScale(
+        return blMatrix.LocRotScale(
             swizzle_vector(self.localPosition),
             swizzle_quaternion(self.localRotation),
             swizzle_vector_scale(self.localScale),
@@ -392,7 +390,7 @@ class Bone:
     def calculate_global_transforms(self):
         """Calculates global transforms for this bone and all its children recursively."""
         if not self.global_transform:
-            self.global_transform = Matrix.Identity(4)
+            self.global_transform = blMatrix.Identity(4)
         for parent, child, _ in self.dfs_generator():
             if parent:
                 child.global_transform = parent.global_transform @ child.to_trs_matrix()

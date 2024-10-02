@@ -1186,15 +1186,15 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
                     KeyFrame(
                         0,
                         euler3_to_quat_swizzled(*boneEuler),
-                        UnityQuaternion(),
-                        UnityQuaternion(),
+                        uQuaternion(),
+                        uQuaternion(),
                         0,
                     )
                 )
         anim.TransformTracks[TransformType.Translation][
             inv_bone_hash_table[RLA_ROOT_BONE]
         ].add_keyframe(
-            KeyFrame(0, Vector3(*pose["bodyPosition"]), Vector3(), Vector3(), 0)
+            KeyFrame(0, uVector3(*pose["bodyPosition"]), uVector3(), uVector3(), 0)
         )
         anim.TransformTracks[TransformType.Rotation][
             inv_bone_hash_table[RLA_ROOT_BONE]
@@ -1202,8 +1202,8 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
             KeyFrame(
                 0,
                 euler3_to_quat_swizzled(*pose["bodyRotation"]),
-                UnityQuaternion(),
-                UnityQuaternion(),
+                uQuaternion(),
+                uQuaternion(),
                 0,
             )
         )
@@ -1289,8 +1289,8 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
                         KeyFrame(
                             timestamp,
                             euler3_to_quat_swizzled(*boneEuler),
-                            UnityQuaternion(),
-                            UnityQuaternion(),
+                            uQuaternion(),
+                            uQuaternion(),
                             0,
                         )
                     )
@@ -1299,14 +1299,14 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
             ].add_keyframe(
                 KeyFrame(
                     timestamp,
-                    Vector3(
+                    uVector3(
                         *(
                             v / active_chara_height
                             for v in segment["pose"]["bodyPosition"]
                         )
                     ),
-                    Vector3(),
-                    Vector3(),
+                    uVector3(),
+                    uVector3(),
                     0,
                 )
             )
@@ -1316,8 +1316,8 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
                 KeyFrame(
                     timestamp,
                     euler3_to_quat_swizzled(*segment["pose"]["bodyRotation"]),
-                    UnityQuaternion(),
-                    UnityQuaternion(),
+                    uQuaternion(),
+                    uQuaternion(),
                     0,
                 )
             )
@@ -1866,12 +1866,12 @@ register_wm_props(
     sssekai_animation_import_camera_scaling=FloatVectorProperty(
         name=T("Camera Scaling"),
         description=T("Scaling used when importing camera animations"),
-        default=Vector((1, 1, 1)),
+        default=blVector((1, 1, 1)),
     ),
     sssekai_animation_import_camera_offset=FloatVectorProperty(
         name=T("Camera Offset"),
         description=T("Offset used when importing camera animations"),
-        default=Vector((0, 0, 0)),
+        default=blVector((0, 0, 0)),
     ),
     sssekai_animation_import_camera_fov_offset=FloatProperty(
         name=T("Camera FOV Offset"),
