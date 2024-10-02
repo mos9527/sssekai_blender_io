@@ -12,6 +12,7 @@ def test_mesh():
             rnd = go.m_SkinnedMeshRenderer.read()
             mesh = rnd.m_Mesh.read()      
             mesh.ReadVertexData()
+            mesh.RepackIndexBuffer()
             mesh.GetTriangles()
             pass
         pass

@@ -269,8 +269,7 @@ def MeshReadVertexData(self: Mesh):
                         self.m_UV7 = componentsFloatArray
                     # 2018.2 and up
                     elif chn == 12:  # kShaderChannelBlendWeight
-                        if not self.m_Skin:
-                            # XXX: We shouldn't be doing this manually
+                        if not self.m_Skin:                            
                             self.InitMSkin()
                         for i in range(m_VertexCount):
                             for j in range(m_Channel.dimension):
@@ -306,6 +305,20 @@ def MeshReadVertexData(self: Mesh):
                     elif chn == 7:  # kShaderChannelTangent
                         self.m_Tangents = componentsFloatArray
 Mesh.ReadVertexData = MeshReadVertexData
+def MeshRepackIndexBuffer(self):
+    self.m_Use16BitIndices = self.m_IndexFormat == 0
+    raw_indices = bytes(self.m_IndexBuffer)
+    if self.m_Use16BitIndices:
+        char = "H"
+        index_size = 2
+    else:
+        char = "I"
+        index_size = 4
+
+    self.m_IndexBuffer = struct.unpack(
+        f"<{len(raw_indices) // index_size}{char}", raw_indices
+    )
+Mesh.RepackIndexBuffer = MeshRepackIndexBuffer
 def MeshGetTriangles(self):
     m_IndexBuffer = self.m_IndexBuffer
     m_Indices = self.m_Indices = getattr(self, "m_Indices", list())
@@ -512,6 +525,7 @@ def import_mesh(
     if not getattr(data, "_processed", False):
         logger.debug("Processing Mesh %s" % data.m_Name)
         data.ReadVertexData()
+        data.RepackIndexBuffer()
         data.GetTriangles()
         data._processed = True        
     mesh = bpy.data.meshes.new(name=data.m_Name)
