@@ -252,10 +252,15 @@ def clamp(value, mmin, mmax):
 
 def encode_asset_id(obj):
     prop = lambda x: "<%s %s>" % (x, getattr(obj, x, "<unk>"))
-    obj_prop = lambda x: "<%s %s>" % (x, getattr(obj.object_reader, x, "<unk>") if hasattr(obj, "object_reader") else "<unk>")
-    return (
-        f"""{prop('m_Name')},{obj_prop('container')},{obj_prop('path_id')}"""
+    obj_prop = lambda x: "<%s %s>" % (
+        x,
+        (
+            getattr(obj.object_reader, x, "<unk>")
+            if hasattr(obj, "object_reader")
+            else "<unk>"
+        ),
     )
+    return f"""{prop('m_Name')},{obj_prop('container')},{obj_prop('path_id')}"""
 
 
 # Import helpers

@@ -846,7 +846,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
 
         for animation in animations:
             if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
-                logger.debug("Reading AnimationClip: %s" % animation.m_Name)                
+                logger.debug("Reading AnimationClip: %s" % animation.m_Name)
                 logger.debug("Loading...")
                 clip = read_animation(animation)
                 logger.debug("Importing...")
