@@ -53,7 +53,6 @@ from UnityPy.classes.math import Vector3f as uVector3, Quaternionf as uQuaternio
 
 # SSSekai deps
 from sssekai.unity.AnimationClip import (
-    read_animation,
     Animation,
     TransformType,
     KeyFrame,
