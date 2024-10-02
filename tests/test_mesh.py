@@ -3,7 +3,7 @@ from blender.asset import search_env_meshes
 
 
 def test_mesh():
-    PATH = sample_file_path("model", "ladies_s")
+    PATH = sample_file_path("model", "face_31_0001")
     with open(PATH, "rb") as f:
         env = load_assetbundle(f)
         articulations, armatures = search_env_meshes(env)
