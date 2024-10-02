@@ -846,8 +846,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
 
         for animation in animations:
             if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
-                logger.debug("Reading AnimationClip: %s" % animation.m_Name)
-                logger.debug("Byte size: %d" % animation.byte_size)
+                logger.debug("Reading AnimationClip: %s" % animation.m_Name)                
                 logger.debug("Loading...")
                 clip = read_animation(animation)
                 logger.debug("Importing...")
@@ -1687,7 +1686,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
             for animation in sssekai_global.animations:
                 encoded = encode_asset_id(animation)
                 enum_items.append(
-                    (encoded, animation.name, encoded, "ANIM_DATA", index)
+                    (encoded, animation.m_Name, encoded, "ANIM_DATA", index)
                 )
                 index += 1
 

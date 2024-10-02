@@ -261,7 +261,7 @@ def load_armature_animation(
         erot_inv = erot.conjugated()
         return erot_inv @ (vec - etrans)
 
-    def to_pose_euler(name: bpy.types.PoseBone, euler: blEucler):
+    def to_pose_euler(name: bpy.types.PoseBone, euler: blEuler):
         etrans, erot = local_space_trans_rot[name]
         erot_inv = erot.conjugated()
         result = erot_inv @ euler.to_quaternion()
@@ -475,7 +475,7 @@ def load_camera_animation(
         result += blVector(scaling_offset)
         return result
 
-    def swizzle_euler_camera(euler: blEucler):
+    def swizzle_euler_camera(euler: blEuler):
         result = swizzle_euler(euler)
         result.y *= -1  # Invert Y (Unity's Roll)
         return result
