@@ -1,3 +1,4 @@
+import logging, json
 from . import *
 
 logger = logging.getLogger(__name__)
@@ -138,7 +139,7 @@ def import_fcurve(
 def import_fcurve_quatnerion(
     action: bpy.types.Action,
     data_path: str,
-    values: List[BlenderQuaternion],
+    values: List[blQuaternion],
     frames: list,
     interpolation: str = "LINEAR",
 ):
@@ -147,7 +148,7 @@ def import_fcurve_quatnerion(
     Args:
         action (bpy.types.Action): target action. keyframes will be merged into this action.
         data_path (str): data path
-        values (List[BlenderQuaternion]): values. size must be that of frames
+        values (List[blQuaternion]): values. size must be that of frames
         frames (list): frame indices. size must be that of values
         interpolation (str, optional): interpolation type. Defaults to 'LINEAR'.
 
@@ -174,7 +175,7 @@ def import_fcurve_quatnerion(
             curve_data = existing_data + curve_data
         curve_datas.append(curve_data)
     curve_quats = [
-        BlenderQuaternion(
+        blQuaternion(
             (curve_datas[0][i], curve_datas[1][i], curve_datas[2][i], curve_datas[3][i])
         )
         for i in range(1, len(curve_datas[i]), 2)
@@ -223,7 +224,9 @@ def load_armature_animation(
     local_space_trans_rot = dict()  # i.e. parent space
     for bone in dest_arma.data.edit_bones:  # Must be done in edit mode
         local_mat = (
-            (bone.parent.matrix.inverted() @ bone.matrix) if bone.parent else Matrix()
+            (bone.parent.matrix.inverted() @ bone.matrix)
+            if bone.parent
+            else blMatrix.Identity(4)
         )
         local_space_trans_rot[bone.name] = (
             local_mat.to_translation(),
@@ -248,17 +251,17 @@ def load_armature_animation(
     #     pr = er^{-1} fr
     #     ps = fs
     # ---
-    def to_pose_quaternion(name, quat: BlenderQuaternion):
+    def to_pose_quaternion(name, quat: blQuaternion):
         etrans, erot = local_space_trans_rot[name]
         erot_inv = erot.conjugated()
         return erot_inv @ quat
 
-    def to_pose_translation(name: bpy.types.PoseBone, vec: Vector):
+    def to_pose_translation(name: bpy.types.PoseBone, vec: blVector):
         etrans, erot = local_space_trans_rot[name]
         erot_inv = erot.conjugated()
         return erot_inv @ (vec - etrans)
 
-    def to_pose_euler(name: bpy.types.PoseBone, euler: Euler):
+    def to_pose_euler(name: bpy.types.PoseBone, euler: blEuler):
         etrans, erot = local_space_trans_rot[name]
         erot_inv = erot.conjugated()
         result = erot_inv @ euler.to_quaternion()
@@ -418,10 +421,10 @@ def prepare_camera_rig(camera: bpy.types.Object):
         rig = create_empty("Camera Rig", camera.parent)
         rig[KEY_CAMERA_RIG] = "<marker>"
         camera.parent = rig
-        camera.location = Vector((0, 0, 0))
-        camera.rotation_euler = Euler((math.radians(90), 0, math.radians(180)))
+        camera.location = blVector((0, 0, 0))
+        camera.rotation_euler = blEuler((math.radians(90), 0, math.radians(180)))
         camera.rotation_mode = "XYZ"
-        camera.scale = Vector((1, 1, 1))
+        camera.scale = blVector((1, 1, 1))
         # Driver for FOV
         driver = camera.data.driver_add("lens")
         driver.driver.type = "SCRIPTED"
@@ -442,8 +445,8 @@ def load_camera_animation(
     data: Animation,
     camera: bpy.types.Object,
     frame_offset: int,
-    scaling_factor: Vector,
-    scaling_offset: Vector,
+    scaling_factor: blVector,
+    scaling_offset: blVector,
     fov_offset: float,
     action: bpy.types.Action = None,
 ):
@@ -466,13 +469,13 @@ def load_camera_animation(
     rig.rotation_mode = "YXZ"
     action = action or create_action(name)
 
-    def swizzle_translation_camera(vector: Vector):
+    def swizzle_translation_camera(vector: blVector):
         result = swizzle_vector(vector)
-        result *= Vector(scaling_factor)
-        result += Vector(scaling_offset)
+        result *= blVector(scaling_factor)
+        result += blVector(scaling_offset)
         return result
 
-    def swizzle_euler_camera(euler: Euler):
+    def swizzle_euler_camera(euler: blEuler):
         result = swizzle_euler(euler)
         result.y *= -1  # Invert Y (Unity's Roll)
         return result
