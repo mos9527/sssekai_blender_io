@@ -14,6 +14,12 @@ bl_info = {
 try:
     import UnityPy
     import sssekai
+
+    assert (
+        sssekai.__VERSION_MAJOR__,
+        sssekai.__VERSION_MINOR__,
+        sssekai.__VERSION_PATCH__,
+    ) >= (0, 4, 2), "SSSekai version must be 0.4.2 or higher."
 except ImportError as e:
     raise Exception(
         "Dependencies incomplete. Refer to README.md for installation instructions."
