@@ -10,6 +10,7 @@ bl_info = {
     "tracker_url": "https://github.com/mos9527/sssekai_blender_io",
     "category": "Import-Export",
 }
+
 # Dependencies
 try:
     import UnityPy
