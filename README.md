@@ -29,6 +29,7 @@ Currently supported languages and maintainers:
 ## Install the dependencies
   - Navigate to your Blender installation path, and find the Python interperter of your version. (e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`)
     - ...and no, managing your Blender installation with Steam isn't recommended.
+    - (For Windows) It is recommended, however,to use the portable ZIP package instead of the MSI installer for your blender installation to avoid file permission issues 
   - In its working directory (i.e. `...\python\bin`), run the following (**in a command prompt**. In Windows you can press Shift+Mouse Right Click to open up a new Terminal/Powershell Prompt)
 ```bash
 .\python -m ensurepip
