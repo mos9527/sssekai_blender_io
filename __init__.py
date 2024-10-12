@@ -12,18 +12,27 @@ bl_info = {
 }
 
 # Dependencies
+import sys
+
 try:
+    print("* SSSekai: Blender Python Version:", sys.version)
+    print("* SSSekai: Blender Python Interperter Path:", sys.executable)
+
     import UnityPy
     import sssekai
 
+    print("* SSSekai: SSSekai Source Path:", sssekai.__file__)
     assert (
         sssekai.__VERSION_MAJOR__,
         sssekai.__VERSION_MINOR__,
         sssekai.__VERSION_PATCH__,
-    ) >= (0, 4, 2), "SSSekai version must be 0.4.2 or higher."
+    ) >= (0, 4, 2), (
+        "SSSekai version must be 0.4.2 or higher. (installed=%s)" % sssekai.__version__
+    )
 except ImportError as e:
     raise Exception(
-        "Dependencies incomplete. Refer to README.md for installation instructions."
+        "Dependencies requirements not met. Refer to README.md for installation instructions. (error=%s)"
+        % e
     )
 
 import importlib, bpy, logging

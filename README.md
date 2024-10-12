@@ -26,13 +26,34 @@ Currently supported languages and maintainers:
 - 简体中文 (zh_HANS, mos9527)
 
 # Installing & Updating
-- Install/Update depedencies in your Blender Python
-    - Navigate to your Blender installation path, and find the Python interperter of your version. (e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`)
-    - In its working directory (i.e. `...\python\bin`), run the following (**in a command prompt**. In Windows you can press Shift+Mouse Right Click to open up a new Terminal/Powershell Prompt)
+## Install the dependencies
+  - Navigate to your Blender installation path, and find the Python interperter of your version. (e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`)
+    - ...and no, managing your Blender installation with Steam isn't recommended.
+  - In its working directory (i.e. `...\python\bin`), run the following (**in a command prompt**. In Windows you can press Shift+Mouse Right Click to open up a new Terminal/Powershell Prompt)
 ```bash
 .\python -m ensurepip
 .\python -m pip install -U sssekai
 ```
+- **Make sure** the scripts are deployed to your **Blender** instance.
+  - Run `.\python.exe -m pip show sssekai` and look for the `Location` field. It should be in your Blender's Python `Scripts` directory.
+  ```bash
+  Name: sssekai
+  Version: 0.4.4
+  Summary: Project SEKAI Asset Utility / PJSK 资源下载 + Live2D, Spine, USM 提取
+  Home-page: https://github.com/mos9527/sssekai
+  Author: greats3an
+  Author-email: greats3an@gmail.com
+  License:
+  Location: C:\Program Files (x86)\Steam\steamapps\common\Blender\4.2\python\Lib\site-packages
+  Requires: coloredlogs, msgpack, pycryptodome, python-json-logger, requests, tqdm, unitypy, wannacri
+  Required-by:
+  ```
+- If Location mismatched
+  - This is most commonly introduced when the script deployed to the user installation directory, such as `C:\Users\mos9527\AppData\Roaming\Python\Python311\Scripts`, due to permission issues.
+    - On Windows - this could happen if your Blender instance is installed via the offical MSI installer **and** installing it in the `Program Files` directory. Without admin rights, the script will be installed in the user directory - which **cannot** be accessed by Blender.
+  - Uninstall the package with `.\python -m pip uninstall sssekai`
+  - With a **elevated shell** (e.g. `Win + X -> Terminal/Powershell (Admin)`), navigate to your Blender Python path again, and reinstall with `.\python -m pip install -U sssekai`
+## Install the addon
 - Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master)
 - In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just downloaded.
 - The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
