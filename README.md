@@ -49,9 +49,16 @@ Currently supported languages and maintainers:
   Required-by:
   ```
 - If Location mismatched
-  - This is most commonly introduced when the script deployed to the user installation directory, such as `C:\Users\mos9527\AppData\Roaming\Python\Python311\Scripts`, due to permission issues.
+  - This is most commonly introduced when the script deployed to the user installation directory, such as `C:\Users\mos9527\AppData\Roaming\Python\Python311`, due to permission issues.
     - On Windows - this could happen if your Blender instance is installed via the offical MSI installer **and** installing it in the `Program Files` directory. Without admin rights, the script will be installed in the user directory - which **cannot** be accessed by Blender.
-  - Uninstall the package with `.\python -m pip uninstall sssekai`
+  - Uninstall `sssekai`, **and** its dependencies
+    - This could be tricky. However, if the package are installed in the user directory, you can simply delete the entire user directory (`C:\Users\mos9527\AppData\Roaming\Python\Python311` in the example)
+    - Or, to uninstall it one by one:
+    ```powershell
+      .\python -m pip freeze sssekai > ~\sssekai.txt
+      .\python -m pip uninstall -r ~\sssekai.txt
+    ```
+    You may want to expand `~` to your actual user directory.
   - With a **elevated shell** (e.g. `Win + X -> Terminal/Powershell (Admin)`), navigate to your Blender Python path again, and reinstall with `.\python -m pip install -U sssekai`
 ## Install the addon
 - Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master)
