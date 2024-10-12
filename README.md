@@ -32,7 +32,7 @@ Currently supported languages and maintainers:
   - In its working directory (i.e. `...\python\bin`), run the following (**in a command prompt**. In Windows you can press Shift+Mouse Right Click to open up a new Terminal/Powershell Prompt)
 ```bash
 .\python -m ensurepip
-.\python -m pip install -U sssekai
+.\python -m pip install --no-user -U sssekai 
 ```
 - **Make sure** the scripts are deployed to your **Blender** instance.
   - Run `.\python.exe -m pip show sssekai` and look for the `Location` field. It should be in your Blender's Python `Scripts` directory.
@@ -49,7 +49,8 @@ Currently supported languages and maintainers:
   Required-by:
   ```
 - If Location mismatched
-  - This is most commonly introduced when the script deployed to the user installation directory, such as `C:\Users\mos9527\AppData\Roaming\Python\Python311`, due to permission issues.
+  - Specifying `--no-user` can help to avoid this issue
+  - This is most commonly introduced when the script deployed to the user installation directory, such as `C:\Users\mos9527\AppData\Roaming\Python\Python311`, due to permission issues
     - On Windows - this could happen if your Blender instance is installed via the offical MSI installer **and** installing it in the `Program Files` directory. Without admin rights, the script will be installed in the user directory - which **cannot** be accessed by Blender.
   - Uninstall `sssekai`, **and** its dependencies
     - This could be tricky. However, if the package are installed in the user directory, you can simply delete the entire user directory (`C:\Users\mos9527\AppData\Roaming\Python\Python311` in the example)
