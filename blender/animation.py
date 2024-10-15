@@ -503,7 +503,7 @@ def load_camera_animation(
             # [swizzle_euler(keyframe.outSlope) for keyframe in curve]
         )
     if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.Translation]:
-        logger.debug("Found Camera Translation track, scaling=%f" % scaling_factor)
+        logger.debug("Found Camera Translation track, scaling=%s" % scaling_factor)
         curve = data.TransformTracks[TransformType.Translation][
             CAMERA_TRANS_ROT_CRC_MAIN
         ].Curve
@@ -529,7 +529,7 @@ def load_camera_animation(
         import_fcurve(
             action,
             "scale",  # FOV on the X scale
-            [(fov_to_focal_length(keyframe.value.Z * 100), 1, 1) for keyframe in curve],
+            [(fov_to_focal_length(keyframe.value.z * 100), 1, 1) for keyframe in curve],
             [time_to_frame(keyframe.time, frame_offset) for keyframe in curve],
             3,
             "BEZIER",
