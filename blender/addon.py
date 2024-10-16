@@ -1531,7 +1531,9 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
                     for obj in rla_env.objects:
                         if obj.type in {ClassIDType.TextAsset}:
                             data = obj.read()
-                            datas[data.name] = data.script.tobytes()
+                            datas[data.name] = data.m_Script.encode(
+                                "utf-8", "surrogateescape"
+                            )
                 header = sssekai_global.rla_header = json.loads(
                     datas["sekai.rlh"].decode("utf-8")
                 )
