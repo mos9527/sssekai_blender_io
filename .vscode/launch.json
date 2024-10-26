@@ -8,7 +8,8 @@
             "name": "Python Debugger: Test Mesh (Offline)",
             "type": "debugpy",
             "request": "launch",
-            "module": "tests.test_mesh"
+            "module": "tests.test_mesh",
+            "justMyCode": false
         },
         {
             "name": "Python Debugger: Asset Loader Test",

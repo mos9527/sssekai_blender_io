@@ -23,6 +23,7 @@ def test_mesh():
                     tex: UnityTexEnv
                     ttex = tex.m_Texture.read()
                     ttex: Texture2D
+                    print(ttex)
                     ttex.image.save(os.path.join(TEMP_DIR, "sssekai_test_temp.tga"))
 
                 for k, tex in texs:

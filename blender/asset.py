@@ -670,7 +670,9 @@ def import_texture(name: str, data: Texture2D):
     """
     with tempfile.NamedTemporaryFile(suffix=".tga", delete=False) as temp:
         logger.debug("Saving Texture %s->%s" % (data.m_Name, temp.name))
-        data.image.save(temp)
+        image = data.image
+        # XXX: ASTC encoder AV
+        image.save(temp)
         temp.close()
         img = bpy.data.images.load(temp.name, check_existing=True)
         img.name = name
