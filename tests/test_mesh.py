@@ -10,8 +10,8 @@ def test_mesh():
     with open(PATH, "rb") as f:
         env = load_assetbundle(f)
         articulations, armatures = search_env_meshes(env)
-        for mesh in armatures:
-            go = mesh.skinnedMeshGameObject
+        for arma in armatures:
+            go = arma.skinnedMeshGameObject
             rnd: MeshRenderer = go.m_SkinnedMeshRenderer.read()
             mesh = rnd.m_Mesh.read()
             mesh = read_mesh(mesh)
@@ -31,7 +31,7 @@ def test_mesh():
                         logger.info("tex %s pass" % k)
                     except Exception as e:
                         logger.warning("tex %s fail: %s" % (k, e))
-            logger.info("ok. mesh was: %s" % go.m_Name)
+            logger.info("ok. armature was: %s" % arma.name)
 
 
 if __name__ == "__main__":

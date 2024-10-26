@@ -669,7 +669,7 @@ def import_texture(name: str, data: Texture2D):
         bpy.types.Image: Created image
     """
     with tempfile.NamedTemporaryFile(suffix=".tga", delete=False) as temp:
-        logger.debug("Saving Texture %s->%s" % (data.name, temp.name))
+        logger.debug("Saving Texture %s->%s" % (data.m_Name, temp.name))
         data.image.save(temp)
         temp.close()
         img = bpy.data.images.load(temp.name, check_existing=True)
@@ -703,10 +703,10 @@ def make_material_texture_node(
         uvRemap = uv_remap_override_node
     else:
         uvRemap = material.node_tree.nodes.new("ShaderNodeMapping")
-        uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.X
-        uvRemap.inputs[1].default_value[1] = ppTexture.m_Offset.Y
-        uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.X
-        uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.Y
+        uvRemap.inputs[1].default_value[0] = ppTexture.m_Offset.x
+        uvRemap.inputs[1].default_value[1] = ppTexture.m_Offset.y
+        uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.x
+        uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.y
     texNode = material.node_tree.nodes.new("ShaderNodeTexImage")
     try:
         texture: Texture2D = ppTexture.m_Texture.read()
@@ -786,7 +786,7 @@ def import_chara_face_v2_material(
         bpy.types.Material: Created material
     """
     ensure_sssekai_shader_blend()
-    textures = data.m_SavedProperties.m_TexEnvs
+    textures = dict(data.m_SavedProperties.m_TexEnvs)
     if not use_principled_bsdf:
         material = bpy.data.materials["SekaiShaderFace"].copy()
         material.name = name
@@ -863,7 +863,7 @@ def import_eyelight_material(
         bpy.types.Material: Created material
     """
     ensure_sssekai_shader_blend()
-    textures = data.m_SavedProperties.m_TexEnvs
+    textures = dict(data.m_SavedProperties.m_TexEnvs)
     if not use_principled_bsdf:
         material = bpy.data.materials["SekaiShaderEyelight"].copy()
         material.name = name
@@ -906,7 +906,7 @@ def import_eye_material(
         bpy.types.Material: Created material
     """
     ensure_sssekai_shader_blend()
-    textures = data.m_SavedProperties.m_TexEnvs
+    textures = dict(data.m_SavedProperties.m_TexEnvs)
     if not use_principled_bsdf:
         material = bpy.data.materials["SekaiShaderEye"].copy()
         material.name = name
@@ -951,8 +951,7 @@ def import_character_material(
         material.name = name
     else:
         material = create_principled_bsdf_material(name)
-
-    textures = data.m_SavedProperties.m_TexEnvs
+    textures = dict(data.m_SavedProperties.m_TexEnvs)
     if not use_principled_bsdf:
         sekaiShader = material.node_tree.nodes["Group"]
         if "_MainTex" in textures:
@@ -1010,7 +1009,7 @@ def import_scene_material(
         material.name = name
     else:
         material = create_principled_bsdf_material(name)
-    textures = data.m_SavedProperties.m_TexEnvs
+    textures = dict(data.m_SavedProperties.m_TexEnvs)
     if not use_principled_bsdf:
         sekaiShader = material.node_tree.nodes["Group"]
         if "_MainTex" in textures:

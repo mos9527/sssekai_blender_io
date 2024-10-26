@@ -769,6 +769,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     parser = defaultParser
                     # Override parser by name when not using blender's Principled BSDF
                     # These are introduced by v2 meshes
+                    texs = dict(material.m_SavedProperties.m_TexEnvs)
                     if not wm.sssekai_materials_use_principled_bsdf:
                         if "_eye" in material.m_Name:
                             parser = import_eye_material
@@ -776,7 +777,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             parser = import_eyelight_material
                         if (
                             "mtl_chr_00" in material.m_Name
-                            and "_FaceShadowTex" in material.m_SavedProperties.m_TexEnvs
+                            and "_FaceShadowTex" in texs
                         ):
                             setup_sdfValue_driver(obj)
                             parser = import_chara_face_v2_material
