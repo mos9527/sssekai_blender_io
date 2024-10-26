@@ -3,7 +3,7 @@ from blender.asset import search_env_animations
 from sssekai.unity.AnimationClip import read_animation
 
 
-def test_mesh():
+def test_animation():
     PATH = sample_file_path("animation", "pv001_character")
     with open(PATH, "rb") as f:
         env = load_assetbundle(f)
@@ -13,4 +13,5 @@ def test_mesh():
             print("ok. animation was: %s" % anim.m_Name)
 
 
-test_mesh()
+if __name__ == "__main__":
+    test_animation()

@@ -5,6 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Test Mesh (Offline)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "tests.test_mesh"
+        },
+        {
             "name": "Python Debugger: Asset Loader Test",
             "type": "debugpy",
             "request": "launch",

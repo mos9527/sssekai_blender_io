@@ -230,6 +230,7 @@ CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA = (
 
 # Utilities
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from sssekai.abcache import fromdict as dataclass_from_dict
 
 
 def get_addon_relative_path(*args):
@@ -350,14 +351,7 @@ class BonePhysics:
 
     @staticmethod
     def from_dict(data: dict):
-        phy = BonePhysics()
-        for k, v in data.items():
-            if hasattr(phy, k):
-                setattr(phy, k, v)
-        if phy.yAngleLimits:
-            phy.yAngleLimits = BoneAngularLimit(**phy.yAngleLimits.__dict__)
-        if phy.zAngleLimits:
-            phy.zAngleLimits = BoneAngularLimit(**phy.zAngleLimits.__dict__)
+        phy = dataclass_from_dict(BonePhysics, data, warn_missing_fields=False)
         return phy
 
 
