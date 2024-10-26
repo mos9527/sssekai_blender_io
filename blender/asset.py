@@ -5,6 +5,7 @@ from . import *
 
 logger = logging.getLogger(__name__)
 
+
 def search_env_meshes(env: Environment):
     """(Partially) Loads the UnityPy Environment for further Mesh processing
 
@@ -157,12 +158,6 @@ def import_mesh(
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
     bm = bmesh.new()
-    vtxFloats = int(len(data.m_Vertices) / data.m_VertexCount)
-    normalFloats = int(len(data.m_Normals) / data.m_VertexCount)
-    uvFloats = int(len(data.m_UV0) / data.m_VertexCount)
-    if data.m_UV1:
-        uv1Floats = int(len(data.m_UV1) / data.m_VertexCount)
-    colorFloats = int(len(data.m_Colors) / data.m_VertexCount)
     # Bone Indices + Bone Weights
     deform_layer = None
     if skinned:
@@ -178,21 +173,24 @@ def import_mesh(
         deform_layer = bm.verts.layers.deform.new()
     # Vertex position & vertex normal (pre-assign)
     for vtx in range(0, data.m_VertexCount):
+        vertex_floats = int(len(data.m_Vertices) / data.m_VertexCount)
         vert = bm.verts.new(
             swizzle_vector3(
-                data.m_Vertices[vtx * vtxFloats],  # x,y,z
-                data.m_Vertices[vtx * vtxFloats + 1],
-                data.m_Vertices[vtx * vtxFloats + 2],
+                data.m_Vertices[vtx * vertex_floats],  # x,y,z
+                data.m_Vertices[vtx * vertex_floats + 1],
+                data.m_Vertices[vtx * vertex_floats + 2],
             )
         )
         # Blender always generates normals automatically
         # Custom normals needs a bit more work
         # See below for normals_split... calls
-        vert.normal = swizzle_vector3(
-            data.m_Normals[vtx * normalFloats],
-            data.m_Normals[vtx * normalFloats + 1],
-            data.m_Normals[vtx * normalFloats + 2],
-        )
+        if data.m_Normals:
+            normalFloats = int(len(data.m_Normals) / data.m_VertexCount)
+            vert.normal = swizzle_vector3(
+                data.m_Normals[vtx * normalFloats],
+                data.m_Normals[vtx * normalFloats + 1],
+                data.m_Normals[vtx * normalFloats + 2],
+            )
         if deform_layer:
             for i in range(4):
                 skin = data.m_Skin[vtx]
@@ -214,37 +212,37 @@ def import_mesh(
         except ValueError as e:
             logger.warning("Invalid face index %d (%s) - discarded." % (idx, e))
     bm.to_mesh(mesh)
+
     # UV Map
-    uv_layer = mesh.uv_layers.new()
-    uv_layer.name = "UV0"
-    mesh.uv_layers.active = uv_layer
-    for face in mesh.polygons:
-        for vtx, loop in zip(face.vertices, face.loop_indices):
-            uv_layer.data[loop].uv = (
-                data.m_UV0[vtx * uvFloats],
-                data.m_UV0[vtx * uvFloats + 1],
-            )
-    if data.m_UV1:
-        # TODO: Figure out all uses cases for UV1 maps
-        # Discoveries so far:
-        # - Lightmaps for stage pre-baked lighting
-        # - Facial SDF shadows. See Reference section in the README
-        uv_layer1 = mesh.uv_layers.new()
-        uv_layer1.name = "UV1"
-        # mesh.uv_layers.active = uv_layer1
-        for face in mesh.polygons:
-            for vtx, loop in zip(face.vertices, face.loop_indices):
-                uv_layer1.data[loop].uv = (
-                    data.m_UV1[vtx * uv1Floats],
-                    data.m_UV1[vtx * uv1Floats + 1],
-                )
+    def add_uv_map(name, set_active=False):
+        src_layer = getattr(data, "m_" + name)
+        if src_layer:
+            uv_floats = int(len(src_layer) / data.m_VertexCount)
+            uv_layer = mesh.uv_layers.new()
+            uv_layer.name = name
+            if set_active:
+                mesh.uv_layers.active = uv_layer
+            for face in mesh.polygons:
+                for vtx, loop in zip(face.vertices, face.loop_indices):
+                    uv_layer.data[loop].uv = (
+                        src_layer[vtx * uv_floats],
+                        src_layer[vtx * uv_floats + 1],
+                    )
+
+    add_uv_map("UV0", set_active=True)
+    # TODO: Figure out all uses cases for UV1 maps
+    # Discoveries so far:
+    # - Lightmaps for stage pre-baked lighting
+    # - Facial SDF shadows. See Reference section in the README
+    add_uv_map("UV1")
     # Vertex Color
-    if colorFloats:
+    if data.m_Colors:
+        color_floats = int(len(data.m_Colors) / data.m_VertexCount)
         vertex_color = mesh.color_attributes.new(
             name="Vertex Color", type="FLOAT_COLOR", domain="POINT"
         )
         for vtx in range(0, data.m_VertexCount):
-            color = [data.m_Colors[vtx * colorFloats + i] for i in range(colorFloats)]
+            color = [data.m_Colors[vtx * color_floats + i] for i in range(color_floats)]
             vertex_color.data[vtx].color = color
     # Assign vertex normals
     try:
