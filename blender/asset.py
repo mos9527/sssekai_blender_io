@@ -669,9 +669,45 @@ def import_texture(name: str, data: Texture2D):
         bpy.types.Image: Created image
     """
     with tempfile.NamedTemporaryFile(suffix=".tga", delete=False) as temp:
-        logger.debug("Saving Texture %s->%s" % (data.m_Name, temp.name))
+        logger.debug("Savying Texture %s->%s" % (data.m_Name, temp.name))
         image = data.image
-        # XXX: ASTC encoder AV
+        # XXX: astc-encoder-py crashes on:
+        # * Blender 4.2.2 LTS Release build (MSVC)
+        # * Blender 4.3 Beta Release build (MSVC)
+        # ---
+        # - Preliminary debugging shows acquiring a mutex lock on the main thread causes the AV.
+        #   https://github.com/ARM-software/astc-encoder/blob/631fb04e1c4bca002a8b653f34e044dbb35b32b4/Source/astcenc_internal_entry.h#L287
+        # - The mutex in question seems to be not initialized, which shouldn't happen.
+        # - I've tried to debug this with my own debug build of Blender
+        #   (4.4 Alpha @ https://projects.blender.org/blender/blender/commit/e9298dced494)
+        #   And the debug build of the C extension
+        #   (https://github.com/mos9527/astc-encoder-py)
+        # - Which DOES NOT reproduce with the said build.
+        # ---
+        # NOTE: Minimal reproducible example (w/ astc-encoder-py 0.1.8 installed) in Blender Python Console:
+        """python
+            from astc_encoder import (
+                ASTCConfig,
+                ASTCContext,
+                ASTCImage,
+                ASTCProfile,
+                ASTCSwizzle,
+                ASTCType,
+            )
+            config = ASTCConfig(ASTCProfile.LDR_SRGB, 4, 4)
+            context = ASTCContext(config)
+            img = bytes(b'\x00' * 4 * 512 * 512)
+            size = (512,512,1)
+            image = ASTCImage(ASTCType.U8,*size, data=img)
+            swizzle = ASTCSwizzle.from_str("RGBA")
+
+            # --> acquires a lock, crashes
+            comp = context.compress(image, swizzle)
+            image_dec = ASTCImage(ASTCType.U8, *size)
+
+            # --> acquires a lock, crashes
+            context.decompress(comp, image_dec, swizzle)
+        """
         image.save(temp)
         temp.close()
         img = bpy.data.images.load(temp.name, check_existing=True)
