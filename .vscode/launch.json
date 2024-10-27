@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Test Private A (Offline)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "tests.private_test_a",
+            "justMyCode": false
+        },
+        {
             "name": "Python Debugger: Test Mesh (Offline)",
             "type": "debugpy",
             "request": "launch",

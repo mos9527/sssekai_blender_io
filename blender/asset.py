@@ -99,7 +99,7 @@ def search_env_meshes(env: Environment):
             bonePhysics = None
             for component in gameObject.m_Components:
                 if component.type == ClassIDType.MonoBehaviour:
-                    component = component.read()
+                    component = component.deref().read(check_read=False)
                     if component.m_Script:
                         physicsScript = component.m_Script.read()
                         physics = component.__dict__  # .read_typetree()

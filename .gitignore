@@ -7,3 +7,4 @@ dist
 *.blend1
 sssekai_blender_io-*.zip
 .temp
+private_test_*
