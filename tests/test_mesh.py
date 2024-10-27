@@ -1,5 +1,5 @@
 from tests import *
-from blender.asset import search_env_meshes
+from blender.asset import search_env_meshes, texture2d_to_image_safe
 from sssekai.unity.Mesh import read_mesh
 
 from UnityPy.classes import MeshRenderer, UnityTexEnv, Texture2D
@@ -23,8 +23,8 @@ def test_mesh():
                     tex: UnityTexEnv
                     ttex = tex.m_Texture.read()
                     ttex: Texture2D
-                    print(ttex)
-                    ttex.image.save(os.path.join(TEMP_DIR, "sssekai_test_temp.tga"))
+                    image = texture2d_to_image_safe(ttex)
+                    image.save(os.path.join(TEMP_DIR, "sssekai_test_temp.tga"))
 
                 for k, tex in texs:
                     try:

@@ -1,9 +1,53 @@
 import logging, json
 import tempfile
-
+import copy
 from . import *
 
 logger = logging.getLogger(__name__)
+
+from PIL import Image
+
+
+def _texture2d_to_image_safe_astc(
+    image_data: bytes, width: int, height: int, block_size: tuple
+) -> Image.Image:
+    from texture2ddecoder import decode_astc
+
+    image_data = decode_astc(image_data, width, height, *block_size)
+    return Image.frombytes("RGBA", (width, height), image_data, "raw", "BGRA")
+
+
+def texture2d_to_image_safe(tex: Texture2D):
+    from UnityPy.enums import TextureFormat as TF
+
+    ASTC_TBL = {
+        int(TF.ASTC_RGB_4x4): (4, 4),
+        int(TF.ASTC_RGB_5x5): (5, 5),
+        int(TF.ASTC_RGB_6x6): (6, 6),
+        int(TF.ASTC_RGB_8x8): (8, 8),
+        int(TF.ASTC_RGB_10x10): (10, 10),
+        int(TF.ASTC_RGB_12x12): (12, 12),
+        int(TF.ASTC_RGBA_4x4): (4, 4),
+        int(TF.ASTC_RGBA_5x5): (5, 5),
+        int(TF.ASTC_RGBA_6x6): (6, 6),
+        int(TF.ASTC_RGBA_8x8): (8, 8),
+        int(TF.ASTC_RGBA_10x10): (10, 10),
+        int(TF.ASTC_RGBA_12x12): (12, 12),
+        int(TF.ASTC_HDR_4x4): (4, 4),
+        int(TF.ASTC_HDR_5x5): (5, 5),
+        int(TF.ASTC_HDR_6x6): (6, 6),
+        int(TF.ASTC_HDR_8x8): (8, 8),
+        int(TF.ASTC_HDR_10x10): (10, 10),
+        int(TF.ASTC_HDR_12x12): (12, 12),
+    }
+    # Force Texture2DConverter to use the legacy ASTC decoder
+    # See https://github.com/mos9527/sssekai_blender_io/issues/11 for context as to why this is needed (or not)
+    if tex.m_TextureFormat in ASTC_TBL:
+        image_data = copy.copy(bytes(tex.get_image_data()))
+        return _texture2d_to_image_safe_astc(
+            image_data, tex.m_Width, tex.m_Height, ASTC_TBL[tex.m_TextureFormat]
+        )
+    return tex.image
 
 
 def search_env_meshes(env: Environment):
@@ -670,44 +714,7 @@ def import_texture(name: str, data: Texture2D):
     """
     with tempfile.NamedTemporaryFile(suffix=".tga", delete=False) as temp:
         logger.debug("Savying Texture %s->%s" % (data.m_Name, temp.name))
-        image = data.image
-        # XXX: astc-encoder-py crashes on:
-        # * Blender 4.2.2 LTS Release build (MSVC)
-        # * Blender 4.3 Beta Release build (MSVC)
-        # ---
-        # - Preliminary debugging shows acquiring a mutex lock on the main thread causes the AV.
-        #   https://github.com/ARM-software/astc-encoder/blob/631fb04e1c4bca002a8b653f34e044dbb35b32b4/Source/astcenc_internal_entry.h#L287
-        # - The mutex in question seems to be not initialized, which shouldn't happen.
-        # - I've tried to debug this with my own debug build of Blender
-        #   (4.4 Alpha @ https://projects.blender.org/blender/blender/commit/e9298dced494)
-        #   And the debug build of the C extension
-        #   (https://github.com/mos9527/astc-encoder-py)
-        # - Which DOES NOT reproduce with the said build.
-        # ---
-        # NOTE: Minimal reproducible example (w/ astc-encoder-py 0.1.8 installed) in Blender Python Console:
-        """python
-            from astc_encoder import (
-                ASTCConfig,
-                ASTCContext,
-                ASTCImage,
-                ASTCProfile,
-                ASTCSwizzle,
-                ASTCType,
-            )
-            config = ASTCConfig(ASTCProfile.LDR_SRGB, 4, 4)
-            context = ASTCContext(config)
-            img = bytes(b'\x00' * 4 * 512 * 512)
-            size = (512,512,1)
-            image = ASTCImage(ASTCType.U8,*size, data=img)
-            swizzle = ASTCSwizzle.from_str("RGBA")
-
-            # --> acquires a lock, crashes
-            comp = context.compress(image, swizzle)
-            image_dec = ASTCImage(ASTCType.U8, *size)
-
-            # --> acquires a lock, crashes
-            context.decompress(comp, image_dec, swizzle)
-        """
+        image = texture2d_to_image_safe(data)
         image.save(temp)
         temp.close()
         img = bpy.data.images.load(temp.name, check_existing=True)
