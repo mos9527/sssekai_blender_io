@@ -775,10 +775,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                             parser = import_eye_material
                         if "_ehl_" in material.m_Name:
                             parser = import_eyelight_material
-                        if (
-                            "mtl_chr_00" in material.m_Name
-                            and "_FaceShadowTex" in texs
-                        ):
+                        if "mtl_chr_00" in material.m_Name and "_FaceShadowTex" in texs:
                             setup_sdfValue_driver(obj)
                             parser = import_chara_face_v2_material
                     if material.m_Name in material_cache:
@@ -812,17 +809,31 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             joint_map, parent_object = import_articulation(articulation)
             for bone_name, joint in joint_map.items():
                 bone = articulation.get_bone_by_name(bone_name)
-                mesh = add_mesh(bone.gameObject, bone_name, joint)
+                try:
+                    mesh = add_mesh(bone.gameObject, bone_name, joint)
+                except Exception as e:
+                    logger.warning(
+                        "Could not import mesh at GameObject %s"
+                        % bone.gameObject.m_Name
+                    )
             logger.debug("Imported Articulation %s" % articulation.name)
 
         def add_armature(armature: Armature):
             armInst, armObj = import_armature(armature)
             for parent, bone, depth in armature.root.dfs_generator():
-                mesh = add_mesh(
-                    bone.gameObject, bone.name, armObj, armature.bone_path_hash_tbl
-                )
-                if mesh:
-                    mesh.modifiers.new("Armature", "ARMATURE").object = armObj
+                try:
+                    mesh = add_mesh(
+                        bone.gameObject, bone.name, armObj, armature.bone_path_hash_tbl
+                    )
+                    if mesh:
+                        mesh.modifiers.new("Armature", "ARMATURE").object = armObj
+                        mesh.parent_type = "BONE"
+                        mesh.parent_bone = bone.name
+                except Exception as e:
+                    logger.warning(
+                        "Could not import mesh at GameObject %s"
+                        % bone.gameObject.m_Name
+                    )
             logger.debug("Imported Armature %s" % armature.name)
 
         for articulation in articulations:
