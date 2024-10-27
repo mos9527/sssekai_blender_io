@@ -133,6 +133,37 @@ class SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator(bpy.types.Operator
 
 
 @register_class
+class SSSekaiBlenderUtilMiscBatchAddArmatureModifier(bpy.types.Operator):
+    bl_idname = "sssekai.util_misc_add_armature_modifer_batch_op"
+    bl_label = T("Add Armature Modifier")
+    bl_description = T(
+        "Add an Armature modifier to the selected objects, with the active object as the target armature"
+    )
+
+    def execute(self, context):
+        arma = context.window_manager.sssekai_util_batch_armature_mod_parent
+        assert arma, "Please select an armature as the target"
+        arma = context.scene.objects.get(arma.name)
+        for pa in bpy.context.selected_objects:
+            for obj in [pa] + pa.children_recursive:
+                if obj.type == "MESH":
+                    mod = [mod for mod in obj.modifiers if mod.type == "ARMATURE"]
+                    if mod:
+                        mod = mod[-1]
+                        mod.object = arma
+                        logger.debug("Updated Armature modifier for %s" % obj.name)
+                    else:
+                        mod = (
+                            obj.modifiers.new("Armature", "ARMATURE")
+                            if not mod
+                            else mod[-1]
+                        )
+                        mod.object = arma
+                        logger.debug("Added Armature modifier to %s" % obj.name)
+        return {"FINISHED"}
+
+
+@register_class
 class SSSekaiBlenderUtilApplyModifersOperator(bpy.types.Operator):
     # From: https://github.com/przemir/ApplyModifierForObjectWithShapeKeys/blob/master/ApplyModifierForObjectWithShapeKeys.py
     # NOTE: Only a subset of the original features are implemented here
@@ -394,6 +425,16 @@ class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
         row = layout.row()
         row.operator(
             SSSekaiBlenderUtilCharacterArmatureSimplifyOperator.bl_idname,
+            icon="TOOL_SETTINGS",
+        )
+        row = layout.row()
+        row.prop(
+            context.window_manager,
+            "sssekai_util_batch_armature_mod_parent",
+            icon_only=True,
+        )
+        row.operator(
+            SSSekaiBlenderUtilMiscBatchAddArmatureModifier.bl_idname,
             icon="TOOL_SETTINGS",
         )
         row = layout.row()
@@ -1914,6 +1955,9 @@ register_wm_props(
         update=lambda self, context: sssekai_set_unity_version(
             context.window_manager.sssekai_unity_version_override
         ),
+    ),
+    sssekai_util_batch_armature_mod_parent=bpy.props.PointerProperty(
+        name=T("Parent"), type=bpy.types.Armature
     ),
 )
 
