@@ -44,9 +44,10 @@ def texture2d_to_image_safe(tex: Texture2D):
     # See https://github.com/mos9527/sssekai_blender_io/issues/11 for context as to why this is needed (or not)
     if tex.m_TextureFormat in ASTC_TBL:
         image_data = copy.copy(bytes(tex.get_image_data()))
-        return _texture2d_to_image_safe_astc(
+        image = _texture2d_to_image_safe_astc(
             image_data, tex.m_Width, tex.m_Height, ASTC_TBL[tex.m_TextureFormat]
         )
+        return image.transpose(Image.FLIP_TOP_BOTTOM)
     return tex.image
 
 

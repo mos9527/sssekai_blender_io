@@ -1,7 +1,7 @@
 bl_info = {
     "name": "SSSekai Blender IO",
     "author": "mos9527",
-    "version": (0, 0, 1),
+    "version": (0, 0, 2),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > SSSekai",
     "description": "Project SEKAI Asset Importer for Blender 4.0+",
@@ -16,6 +16,7 @@ REQUIRED_SSSEKAI_MIN_VERSION = (0, 4, 5)
 import sys
 
 try:
+    print()
     print("* SSSekai: Blender Python Version:", sys.version)
     print("* SSSekai: Blender Python Interperter Path:", sys.executable)
 
@@ -49,7 +50,6 @@ def register():
     install(level="DEBUG", fmt="sssekai | %(levelname)s | %(module)s | %(message)s")
 
     ADDONS = ["addon"]
-    logger.debug("*** SSSekai Blender IO ***")
     logger.debug("Script directory: %s", SCRIPT_DIR)
     logger.debug("Blender version: %s", bpy.app.version_string)
     logger.debug("SSSekai version: %s", sssekai.__version__)
