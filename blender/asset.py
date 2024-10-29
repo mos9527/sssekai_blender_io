@@ -5,51 +5,6 @@ from . import *
 
 logger = logging.getLogger(__name__)
 
-from PIL import Image
-
-
-def _texture2d_to_image_safe_astc(
-    image_data: bytes, width: int, height: int, block_size: tuple
-) -> Image.Image:
-    from texture2ddecoder import decode_astc
-
-    image_data = decode_astc(image_data, width, height, *block_size)
-    return Image.frombytes("RGBA", (width, height), image_data, "raw", "BGRA")
-
-
-def texture2d_to_image_safe(tex: Texture2D):
-    from UnityPy.enums import TextureFormat as TF
-
-    ASTC_TBL = {
-        int(TF.ASTC_RGB_4x4): (4, 4),
-        int(TF.ASTC_RGB_5x5): (5, 5),
-        int(TF.ASTC_RGB_6x6): (6, 6),
-        int(TF.ASTC_RGB_8x8): (8, 8),
-        int(TF.ASTC_RGB_10x10): (10, 10),
-        int(TF.ASTC_RGB_12x12): (12, 12),
-        int(TF.ASTC_RGBA_4x4): (4, 4),
-        int(TF.ASTC_RGBA_5x5): (5, 5),
-        int(TF.ASTC_RGBA_6x6): (6, 6),
-        int(TF.ASTC_RGBA_8x8): (8, 8),
-        int(TF.ASTC_RGBA_10x10): (10, 10),
-        int(TF.ASTC_RGBA_12x12): (12, 12),
-        int(TF.ASTC_HDR_4x4): (4, 4),
-        int(TF.ASTC_HDR_5x5): (5, 5),
-        int(TF.ASTC_HDR_6x6): (6, 6),
-        int(TF.ASTC_HDR_8x8): (8, 8),
-        int(TF.ASTC_HDR_10x10): (10, 10),
-        int(TF.ASTC_HDR_12x12): (12, 12),
-    }
-    # Force Texture2DConverter to use the legacy ASTC decoder
-    # See https://github.com/mos9527/sssekai_blender_io/issues/11 for context as to why this is needed (or not)
-    if tex.m_TextureFormat in ASTC_TBL:
-        image_data = copy.copy(bytes(tex.get_image_data()))
-        image = _texture2d_to_image_safe_astc(
-            image_data, tex.m_Width, tex.m_Height, ASTC_TBL[tex.m_TextureFormat]
-        )
-        return image.transpose(Image.FLIP_TOP_BOTTOM)
-    return tex.image
-
 
 def search_env_meshes(env: Environment):
     """(Partially) Loads the UnityPy Environment for further Mesh processing
@@ -715,7 +670,7 @@ def import_texture(name: str, data: Texture2D):
     """
     with tempfile.NamedTemporaryFile(suffix=".tga", delete=False) as temp:
         logger.debug("Savying Texture %s->%s" % (data.m_Name, temp.name))
-        image = texture2d_to_image_safe(data)
+        image = data.image
         image.save(temp)
         temp.close()
         img = bpy.data.images.load(temp.name, check_existing=True)
