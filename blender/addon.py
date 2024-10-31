@@ -4,12 +4,11 @@ from logging import getLogger
 import zipfile
 
 import UnityPy.classes
-import UnityPy.classes
 from .asset import *
 from .animation import *
 from sssekai.unity.AnimationClip import Animation, Track, read_animation
 from sssekai.unity.AssetBundle import load_assetbundle
-from sssekai.unity.Mesh import read_mesh
+from UnityPy.helpers import MeshHelper
 import bpy
 import bpy.utils.previews
 from bpy.types import Context, WindowManager
@@ -772,7 +771,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     b.read().m_GameObject.read().m_Name for b in mesh_rnd.m_Bones
                 ]
                 if getattr(mesh_rnd, "m_Mesh", None):
-                    mesh_data: Mesh = read_mesh(mesh_rnd.m_Mesh.read())
+                    mesh_data: Mesh = mesh_rnd.m_Mesh.read()
                     mesh, obj = import_mesh(
                         name, mesh_data, True, bone_hash_tbl, bone_order
                     )
@@ -787,7 +786,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 logger.debug("Found Static Mesh at %s" % gameObject.m_Name)
                 mesh_filter: MeshFilter = gameObject.m_MeshFilter.read()
                 mesh_rnd: MeshRenderer = gameObject.m_MeshRenderer.read()
-                mesh_data = read_mesh(mesh_filter.m_Mesh.read())
+                mesh_data = mesh_filter.m_Mesh.read()
                 mesh, obj = import_mesh(mesh_data.m_Name, mesh_data, False)
                 if parent_obj:
                     obj.parent = parent_obj
@@ -854,8 +853,8 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     mesh = add_mesh(bone.gameObject, bone_name, joint)
                 except Exception as e:
                     logger.warning(
-                        "Could not import mesh at GameObject %s"
-                        % bone.gameObject.m_Name
+                        "Could not import mesh at GameObject %s: %s"
+                        % (bone.gameObject.m_Name, e)
                     )
             logger.debug("Imported Articulation %s" % articulation.name)
 
@@ -872,9 +871,10 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         mesh.parent_bone = bone.name
                 except Exception as e:
                     logger.warning(
-                        "Could not import mesh at GameObject %s"
-                        % bone.gameObject.m_Name
+                        "Could not import mesh at GameObject %s: %s"
+                        % (bone.gameObject.m_Name, e)
                     )
+                    raise e
             logger.debug("Imported Armature %s" % armature.name)
 
         for articulation in articulations:

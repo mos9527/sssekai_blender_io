@@ -3,6 +3,7 @@ from blender.asset import search_env_meshes, texture2d_to_image_safe
 from sssekai.unity.Mesh import read_mesh
 
 from UnityPy.classes import MeshRenderer, UnityTexEnv, Texture2D
+from UnityPy.helpers import MeshHelper
 
 
 def test_mesh():
@@ -14,7 +15,8 @@ def test_mesh():
             go = arma.skinnedMeshGameObject
             rnd: MeshRenderer = go.m_SkinnedMeshRenderer.read()
             mesh = rnd.m_Mesh.read()
-            mesh = read_mesh(mesh)
+            mesh = MeshHelper.MeshHandler(mesh)
+            mesh.process()
             for mat in rnd.m_Materials:
                 mmat = mat.read()
                 texs = mmat.m_SavedProperties.m_TexEnvs

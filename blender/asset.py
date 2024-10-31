@@ -1,6 +1,8 @@
 import logging, json
 import tempfile
 import copy
+
+from UnityPy.helpers.MeshHelper import MeshHandler
 from . import *
 
 logger = logging.getLogger(__name__)
@@ -200,6 +202,9 @@ def import_mesh(
     """
     logger.debug("Importing Mesh %s, Skinned=%s" % (data.m_Name, skinned))
     mesh = bpy.data.meshes.new(name=data.m_Name)
+    handler = MeshHandler(data)
+    handler.process()
+
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
     bm = bmesh.new()
@@ -217,78 +222,62 @@ def import_mesh(
                 obj.vertex_groups.new(name=boneName)
         deform_layer = bm.verts.layers.deform.new()
     # Vertex position & vertex normal (pre-assign)
-    for vtx in range(0, data.m_VertexCount):
-        vertex_floats = int(len(data.m_Vertices) / data.m_VertexCount)
-        vert = bm.verts.new(
-            swizzle_vector3(
-                data.m_Vertices[vtx * vertex_floats],  # x,y,z
-                data.m_Vertices[vtx * vertex_floats + 1],
-                data.m_Vertices[vtx * vertex_floats + 2],
-            )
-        )
+    for vtx in range(0, handler.m_VertexCount):
+        vert = bm.verts.new(swizzle_vector3(*handler.m_Vertices[vtx]))
         # Blender always generates normals automatically
         # Custom normals needs a bit more work
         # See below for normals_split... calls
-        if data.m_Normals:
-            normalFloats = int(len(data.m_Normals) / data.m_VertexCount)
-            vert.normal = swizzle_vector3(
-                data.m_Normals[vtx * normalFloats],
-                data.m_Normals[vtx * normalFloats + 1],
-                data.m_Normals[vtx * normalFloats + 2],
-            )
+        if handler.m_Normals:
+            vert.normal = swizzle_vector3(*handler.m_Normals[vtx])
         if deform_layer:
-            for i in range(4):
-                skin = data.m_Skin[vtx]
-                # if skin.weight[i] <= 0: continue
-                vertex_group_index = skin.boneIndex[i]
+            boneIndex = handler.m_BoneIndices[vtx]
+            boneWeight = handler.m_BoneWeights[vtx]
+            for i in range(len(boneIndex)):
+                vertex_group_index = boneIndex[i]
                 if not vertex_group_index in vert[deform_layer]:
-                    vert[deform_layer][vertex_group_index] = skin.weight[i]
+                    vert[deform_layer][vertex_group_index] = boneWeight[i]
                 vert[deform_layer][vertex_group_index] = max(
-                    vert[deform_layer][vertex_group_index], skin.weight[i]
+                    vert[deform_layer][vertex_group_index], boneWeight[i]
                 )
     bm.verts.ensure_lookup_table()
     # Indices
-    for idx in range(0, len(data.m_Indices), 3):
-        try:
-            face = bm.faces.new(
-                reversed([bm.verts[data.m_Indices[idx + j]] for j in range(3)])
-            )  # UV rewinding
-            face.smooth = True
-        except ValueError as e:
-            logger.warning("Invalid face index %d (%s) - discarded." % (idx, e))
+    trigs = handler.get_triangles()
+    for submesh in trigs:
+        for idx, trig in enumerate(submesh):
+            try:
+                face = bm.faces.new(
+                    [bm.verts[i] for i in reversed(trig)]
+                )  # UV rewinding
+                face.smooth = True
+            except ValueError as e:
+                logger.warning("Invalid face index %d (%s) - discarded." % (idx, e))
     bm.to_mesh(mesh)
 
     # UV Map
-    def add_uv_map(name, set_active=False):
-        src_layer = getattr(data, "m_" + name)
+    def try_add_uv_map(name, set_active=False):
+        src_layer = getattr(handler, "m_" + name)
         if src_layer:
-            uv_floats = int(len(src_layer) / data.m_VertexCount)
             uv_layer = mesh.uv_layers.new()
             uv_layer.name = name
             if set_active:
                 mesh.uv_layers.active = uv_layer
             for face in mesh.polygons:
                 for vtx, loop in zip(face.vertices, face.loop_indices):
-                    uv_layer.data[loop].uv = (
-                        src_layer[vtx * uv_floats],
-                        src_layer[vtx * uv_floats + 1],
-                    )
+                    uv_layer.data[loop].uv = src_layer[vtx]
 
-    add_uv_map("UV0", set_active=True)
+    try_add_uv_map("UV0", set_active=True)
     # TODO: Figure out all uses cases for UV1 maps
     # Discoveries so far:
     # - Lightmaps for stage pre-baked lighting
     # - Facial SDF shadows. See Reference section in the README
-    add_uv_map("UV1")
+    try_add_uv_map("UV1")
     # Vertex Color
-    if data.m_Colors:
-        color_floats = int(len(data.m_Colors) / data.m_VertexCount)
+    if handler.m_Colors:
         vertex_color = mesh.color_attributes.new(
             name="Vertex Color", type="FLOAT_COLOR", domain="POINT"
         )
-        for vtx in range(0, data.m_VertexCount):
-            color = [data.m_Colors[vtx * color_floats + i] for i in range(color_floats)]
-            vertex_color.data[vtx].color = color
+        for vtx in range(0, handler.m_VertexCount):
+            vertex_color.data[vtx].color = handler.m_Colors[vtx]
     # Assign vertex normals
     try:
         mesh.create_normals_split()
