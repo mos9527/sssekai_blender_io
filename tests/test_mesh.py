@@ -25,7 +25,7 @@ def test_mesh():
                     tex: UnityTexEnv
                     ttex = tex.m_Texture.read()
                     ttex: Texture2D
-                    image = texture2d_to_image_safe(ttex)
+                    image = ttex.image
                     image.save(os.path.join(TEMP_DIR, "sssekai_test_temp.tga"))
 
                 for k, tex in texs:
