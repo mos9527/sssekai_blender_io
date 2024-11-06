@@ -15,6 +15,6 @@ SOURCE_DIR = os.path.dirname(__file__)
 sample_file_path = lambda *args: os.path.join(SOURCE_DIR, *args)
 TEMP_DIR = sample_file_path(".temp")
 os.makedirs(TEMP_DIR, exist_ok=True)
-sys.path.append(sample_file_path(".."))
+sys.path.insert(0, sample_file_path(".."))
 
 from sssekai.unity.AssetBundle import load_assetbundle

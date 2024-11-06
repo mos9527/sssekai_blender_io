@@ -1,6 +1,5 @@
 from tests import *
 from blender.asset import search_env_meshes, texture2d_to_image_safe
-from sssekai.unity.Mesh import read_mesh
 
 from UnityPy.classes import MeshRenderer, UnityTexEnv, Texture2D
 from UnityPy.helpers import MeshHelper

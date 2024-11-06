@@ -11,7 +11,7 @@ bl_info = {
     "category": "Import-Export",
 }
 
-REQUIRED_SSSEKAI_MIN_VERSION = (0, 4, 5)
+REQUIRED_SSSEKAI_MIN_VERSION = (0, 4, 7)
 # Dependencies
 import sys
 
@@ -28,8 +28,9 @@ try:
         sssekai.__VERSION_MAJOR__,
         sssekai.__VERSION_MINOR__,
         sssekai.__VERSION_PATCH__,
-    ) >= REQUIRED_SSSEKAI_MIN_VERSION, (
-        "SSSekai version must be 0.4.2 or higher. (installed=%s)" % sssekai.__version__
+    ) >= REQUIRED_SSSEKAI_MIN_VERSION, "SSSekai version must be %d.%d.%d or higher. (installed=%s)" % (
+        *REQUIRED_SSSEKAI_MIN_VERSION,
+        sssekai.__version__,
     )
 except ImportError as e:
     raise Exception(
