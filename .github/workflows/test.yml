@@ -1,0 +1,18 @@
+name: Tests
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  Test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          pip install -U pytest
+          pip install -U sssekai
+      - name: Run tests
+        run: |
+          pytest -v -s
