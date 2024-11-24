@@ -229,7 +229,7 @@ CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA = (
 # --- END Sekai specific values
 
 # Utilities
-from .. import SCRIPT_DIR
+SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from sssekai.abcache import fromdict as dataclass_from_dict
 
 

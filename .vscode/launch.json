@@ -32,5 +32,13 @@
             "program": "${workspaceFolder}/translations_codegen.py",
             "console": "integratedTerminal"
         },
+        {
+            "name": "Python Debugger: Run Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["-v","-s"],   
+            "justMyCode": false         
+        }
     ]
 }

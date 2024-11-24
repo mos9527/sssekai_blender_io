@@ -3,16 +3,18 @@
 
 Blender asset importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク) asset bundles.
 
-Tested on Blender `4.0.3`, `4.2.0 Alpha`, `4.2.0 LTS`, `4.3.0 Alpha`
-
-# Importer Features
-  * Textures
-  * Character Toon Material (via [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/master/assets/SekaiShaderStandalone.blend))
-  * Static/Skinned Meshes
-  * Armatures
-  * Articulations (Scene rebuilt with Empty object and static meshes)
-  * Physics (WIP. Limited support for Rigidbodies, Colliders, and Spring Bones)
-  * Animations (Armatures, Articulations, BlendShape, Camera. From `live_pv` and `streaming_live` assets)
+# Features
+## Asset Types
+- Character (legacy and 'v2') armatures and stage objects (with hierarchy) from asset bundles are generally supported.
+- Animations from asset bundles (and [RLA/RTVL packets](https://github.com/mos9527/sssekai/wiki#streaming-live-rla-segments)) for characters and stage objects are generally supported
+- Hair/Cloth physics are approximated with the game's own definition, and implemented as rigid body simulations.
+## Shading
+NPR toon shading is approximated with [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/master/assets/SekaiShaderStandalone.blend), which supports
+- Customized diffuse/shadow textures
+- Artist authored outline strength
+- SDF face shadows from 'v2' assets
+## Documentation
+Read the [wiki page](https://github.com/mos9527/sssekai_blender_io/wiki) for more!
 
 # Supported Languages
 PRs are welcome for additions. 
@@ -26,60 +28,43 @@ Currently supported languages and maintainers:
 - 简体中文 (zh_HANS, mos9527)
 
 # Installing & Updating
-## Method A. Install dependencies with a self-packaged addon
-*XXX: Draft. Works but not recommended.*
+### 1. Dependencies
+`sssekai_blender_io` requires `sssekai` to function. Ensure `sssekai` is installed **correctly** before attempting to install the addon itself.
+#### Method A. Package the dependencies into the addon ZIP
+This is the **recommended** method for most users as it is the least intrusive or error-prone one.
 - Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master), and unzip it.
-- Locate your Blender's Python interperter (as in Method B)
-- Run `<path_to_blender_python> make_addon_zip.py <output_zip_name WITHOUT zip extension>`
+  - Or preferablly, clone this repo.
+- Locate your Blender's Python interperter (as stated in [Method B](#method-b-manage-dependencies-with-blender-pythons-pip))
+- Run `<path_to_blender_python> make_addon_zip.py <output_zip_name WITHOUT the zip extension>`
   - e.g. `/Applications/Blender.app/Contents/Resources/4.3/python/bin/python3.11 make_addon_zip.py sssekai_blender_io-master`
-- In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just created.
-## Method B. Install dependencies directly *into* Blender Python
-**ATTENTION**: This method **only** works when you can freely write to the Blender installation directory.
-  - Navigate to your Blender installation path, and find the Python interperter of your version. (e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`)
-    - ...and no, managing your Blender installation with Steam isn't recommended.
-    - (For Windows) It is recommended, however,to use the portable ZIP package instead of the MSI installer for your blender installation to avoid file permission issues 
-  - In its working directory (i.e. `...\python\bin`), run the following (**in a command prompt**. In Windows you can press Shift+Mouse Right Click to open up a new Terminal/Powershell Prompt)
-```bash
-./python -m ensurepip
-./python -m pip install --no-user -U sssekai 
-```
-- **Make sure** the scripts are deployed to your **Blender** instance.
-  - Run `.\python.exe -m pip show sssekai` and look for the `Location` field. It should be in your Blender's Python `Scripts` directory.
+- Install the *packaged* addon zip like any other Blender addon. (e.g. `sssekai_blender_io-master.zip` in the example).
+- You can now skip the rest and jump to [Install The Addon](#2-install-the-addon) section for help.
+
+#### Method B. Manage dependencies with Blender Python's `pip`
+Only recommended if you're interested in debugging/developing the addon yourself. This method is platform-dependent.
+
+**ATTENTION**: This method **only** works when you can freely write to the Blender installation directory on your system.
+  - Navigate to your Blender installation path, and find the Python interperter of your version. 
+    - e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`
+      - ...and no, managing your Blender installation with Steam isn't recommended.
+    - (For Windows, Linux) It is recommended to use the portable ZIP package instead of other versions to avoid permission issues
+      - i.e. MSI installer for Windows, Snap Store for some Linux distros
+    - (For macOS) Make sure that you can write to Blender's application path (e.g. `/Applications/Blender.app/`). The details shall be omitted here for the sake of sanity. <sigh>
+  - Install the dependencies with `pip` in-built with Blender's python.
   ```bash
-  Name: sssekai
-  Version: 0.4.4
-  Summary: Project SEKAI Asset Utility / PJSK 资源下载 + Live2D, Spine, USM 提取
-  Home-page: https://github.com/mos9527/sssekai
-  Author: greats3an
-  Author-email: greats3an@gmail.com
-  License:
-  Location: C:\Program Files (x86)\Steam\steamapps\common\Blender\4.2\python\Lib\site-packages
-  Requires: coloredlogs, msgpack, pycryptodome, python-json-logger, requests, tqdm, unitypy, wannacri
-  Required-by:
+  <blender_python_path> -m ensurepip
+  <blender_python_path> -m pip install --no-user -U sssekai 
   ```
-- If Location mismatched
-  - Specifying `--no-user` can help to avoid this issue
-  - This is most commonly introduced when the script deployed to the user installation directory, such as `C:\Users\mos9527\AppData\Roaming\Python\Python311`, due to permission issues
-    - On Windows - this could happen if your Blender instance is installed via the offical MSI installer **and** installing it in the `Program Files` directory. Without admin rights, the script will be installed in the user directory - which **cannot** be accessed by Blender.
-  - Uninstall `sssekai`, **and** its dependencies
-    - This could be tricky. However, if the package are installed in the user directory, you can simply delete the entire user directory (`C:\Users\mos9527\AppData\Roaming\Python\Python311` in the example)
-    - Or, to uninstall it one by one:
-    ```powershell
-      .\python -m pip freeze sssekai > ~\sssekai.txt
-      .\python -m pip uninstall -r ~\sssekai.txt
-    ```
-    You may want to expand `~` to your actual user directory.
-  - With a **elevated shell** (e.g. `Win + X -> Terminal/Powershell (Admin)`), navigate to your Blender Python path again, and reinstall with `.\python -m pip install -U sssekai`
-## Install the addon
-- Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master)
-- In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just downloaded.
+  - **Make sure** the scripts are deployed to your **Blender** instance.
+    - `--no-user` is an undocumented flag introduced in https://github.com/pypa/pip/commit/17e0d115e82fd195513b3a41736a13d122a5730b
+      - This is **strictly** required as it prevents the dependencies from installing into the User directory - Blender **cannot** read those. 
+      - If this happened, check if you can write to Blender's directory and start over.
+  - Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master) and jump to the [next section](#2-install-the-addon)
+
+### 2. Install the addon
+- In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just prepared/downloaded.
 - The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
 
-# Documentation
-See the [wiki page!](https://github.com/mos9527/sssekai_blender_io/wiki)
-
-# Notes
-The plugin is observed to work with other Unity games as well. But such compatibility is not guaranteed, and WILL NOT receive support from the author in full capacity.
 
 # License
 MIT
