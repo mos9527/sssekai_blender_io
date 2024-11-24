@@ -11,12 +11,14 @@ bl_info = {
     "category": "Import-Export",
 }
 
+import sys,os
 REQUIRED_SSSEKAI_MIN_VERSION = (0, 4, 7)
-# Dependencies
-import sys
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 try:
-    print()
+    # Dependencies
+    print("* Script directory:", SCRIPT_DIR)
+    sys.path.append(SCRIPT_DIR) # Enables us to load dependencies from the addon folder directly
     print("* SSSekai: Blender Python Version:", sys.version)
     print("* SSSekai: Blender Python Interperter Path:", sys.executable)
 
@@ -51,7 +53,6 @@ def register():
     install(level="DEBUG", fmt="sssekai | %(levelname)s | %(module)s | %(message)s")
 
     ADDONS = ["addon"]
-    logger.debug("Script directory: %s", SCRIPT_DIR)
     logger.debug("Blender version: %s", bpy.app.version_string)
     logger.debug("SSSekai version: %s", sssekai.__version__)
     logger.debug("UnityPy version: %s", UnityPy.__version__)

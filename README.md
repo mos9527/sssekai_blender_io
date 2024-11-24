@@ -26,14 +26,22 @@ Currently supported languages and maintainers:
 - 简体中文 (zh_HANS, mos9527)
 
 # Installing & Updating
-## Install the dependencies
+## Method A. Install dependencies with a self-packaged addon
+*XXX: Draft. Works but not recommended.*
+- Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master), and unzip it.
+- Locate your Blender's Python interperter (as in Method B)
+- Run `<path_to_blender_python> make_addon_zip.py <output_zip_name WITHOUT zip extension>`
+  - e.g. `/Applications/Blender.app/Contents/Resources/4.3/python/bin/python3.11 make_addon_zip.py sssekai_blender_io-master`
+- In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just created.
+## Method B. Install dependencies directly *into* Blender Python
+**ATTENTION**: This method **only** works when you can freely write to the Blender installation directory.
   - Navigate to your Blender installation path, and find the Python interperter of your version. (e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`)
     - ...and no, managing your Blender installation with Steam isn't recommended.
     - (For Windows) It is recommended, however,to use the portable ZIP package instead of the MSI installer for your blender installation to avoid file permission issues 
   - In its working directory (i.e. `...\python\bin`), run the following (**in a command prompt**. In Windows you can press Shift+Mouse Right Click to open up a new Terminal/Powershell Prompt)
 ```bash
-.\python -m ensurepip
-.\python -m pip install --no-user -U sssekai 
+./python -m ensurepip
+./python -m pip install --no-user -U sssekai 
 ```
 - **Make sure** the scripts are deployed to your **Blender** instance.
   - Run `.\python.exe -m pip show sssekai` and look for the `Location` field. It should be in your Blender's Python `Scripts` directory.
