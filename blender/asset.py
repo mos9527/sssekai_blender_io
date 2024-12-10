@@ -658,7 +658,7 @@ def import_texture(name: str, data: Texture2D):
         bpy.types.Image: Created image
     """
     with tempfile.NamedTemporaryFile(suffix=".tga", delete=False) as temp:
-        logger.debug("Savying Texture %s->%s" % (data.m_Name, temp.name))
+        logger.debug("Saving Texture %s->%s" % (data.m_Name, temp.name))
         image = data.image
         image.save(temp)
         temp.close()
