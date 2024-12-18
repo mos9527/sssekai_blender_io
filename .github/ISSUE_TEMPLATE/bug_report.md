@@ -14,11 +14,11 @@ assignees: ''
 
 **Runtime Information**
 - Blender version: [enter here]
-- `pip show sssekai` output (run this in Blender's python directory as per README):
+- `./python -m pip show sssekai` output (run this in Blender's Python directory as per README):
 ```bash
 [enter here]
 ```
-- `pip show UnityPy`(same as above): 
+- `./python -m pip show UnityPy`(same as above): 
 ```bash
 [enter here]
 ```
