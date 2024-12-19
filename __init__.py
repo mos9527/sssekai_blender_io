@@ -1,7 +1,7 @@
 bl_info = {
     "name": "SSSekai Blender IO",
     "author": "mos9527",
-    "version": (0, 0, 2),
+    "version": (0, 1, 0),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > SSSekai",
     "description": "Project SEKAI Asset Importer for Blender 4.0+",
@@ -11,14 +11,17 @@ bl_info = {
     "category": "Import-Export",
 }
 
-import sys,os
+import sys, os
+
 REQUIRED_SSSEKAI_MIN_VERSION = (0, 4, 7)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 try:
     # Dependencies
     print("* Script directory:", SCRIPT_DIR)
-    sys.path.append(SCRIPT_DIR) # Enables us to load dependencies from the addon folder directly
+    sys.path.append(
+        SCRIPT_DIR
+    )  # Enables us to load dependencies from the addon folder directly
     print("* SSSekai: Blender Python Version:", sys.version)
     print("* SSSekai: Blender Python Interperter Path:", sys.executable)
 
