@@ -50,6 +50,7 @@ Only recommended if you're interested in debugging/developing the addon yourself
     - (For Windows, Linux) It is recommended to use the portable ZIP package instead of other versions to avoid permission issues
       - i.e. MSI installer for Windows, Snap Store for some Linux distros
     - (For macOS) Make sure that you can write to Blender's application path (e.g. `/Applications/Blender.app/`). The details shall be omitted here for the sake of sanity. <sigh>
+      - Giving whichever terminal app you're using Full Disk Access in System Preferences > Security & Privacy > Privacy > Full Disk Access* worked for me
   - Install the dependencies with `pip` in-built with Blender's python.
   ```bash
   <blender_python_path> -m ensurepip
