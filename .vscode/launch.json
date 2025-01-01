@@ -45,6 +45,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/inv_crc32.py",
+            "args": ["nocsv"]
         }
     ]
 }

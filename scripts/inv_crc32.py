@@ -3,6 +3,9 @@
 # ---
 # A CSV file will be printed to stdout. collect with
 # `python inv_crc32.py > inv_crc32.csv`
+# Pass `nocsv` to disable the CSV output
+# `python inv_crc32.py nocsv`
+# ---
 from sssekai.unity.AnimationClip import read_animation, Animation
 from sssekai.unity.AssetBundle import load_assetbundle
 from UnityPy.enums import ClassIDType
@@ -48,6 +51,7 @@ kws = [
     "fogStart",
     "fogEnd",
     "quality",
+    # Misc
 ]
 kws = kws + [f"{attr}.{aux}" for attr in kws for aux in aux_kws]
 kws = {crc32(k.encode()): k for k in kws} | {0: "<transform>"}
@@ -71,6 +75,7 @@ logprint(
     " missing attribute(s): ",
     ",".join((str(k) for k in sorted(missing_kws))),
 )
-print("hash", "name", sep=",")
-for k in valid_kws:
-    print(k, kws[k], sep=",")
+if sys.argv[-1] != "nocsv":
+    print("hash", "name", sep=",")
+    for k in valid_kws:
+        print(k, kws[k], sep=",")
