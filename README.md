@@ -66,7 +66,24 @@ Only recommended if you're interested in debugging/developing the addon yourself
 - In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just prepared/downloaded.
 - The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
 
-
+## TODO
+### Lighting
+- 1-to-1 approximation of the game's lighting system
+  - Face light (SDF for v2, simple $N \cdot L$ for legacy) [?]
+    - *NOTE*: Current SDF implementation does not handle relative light directions
+  - Directional Light (`SekaiCharacterDirectionalLight`) [?]
+    - Not specialized at all and does not support colors as of now
+  - Rim Light (`SekaiCharacterRimLight`) []
+  - Ambient Light (`SekaiAmbientLight`,`SekaiCharacterAmbientLight`) []
+  - ...
+### Effects
+- Approximate the game's particle system []
+  - Some are observed to be implemented with simple articulated objects  
+### Animation
+- Approximate Unity's IK system []
+  - Since [My Sekai](https://pjsekai.sega.jp/news/archive/index.html?hash=ecca5cb23ea530edb669fc0d2ae302fd0f374a4b) is a thing now and the chibi models are rigged with Unity's IK system.  
+  - Also would be nice since basically all Unity games with humanoid characters use this system.
+  - This would also make retargeting trivial.
 # License
 MIT
 
