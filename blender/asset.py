@@ -186,7 +186,12 @@ def import_mesh(
             vert.normal = swizzle_vector3(*handler.m_Normals[vtx])
         if deform_layer:
             boneIndex = handler.m_BoneIndices[vtx]
-            boneWeight = handler.m_BoneWeights[vtx]
+            if handler.m_BoneWeights:
+                boneWeight = handler.m_BoneWeights[vtx]
+            else:
+                # Default to 1 otherwise the bone would not make any effect
+                # XXX: This is purly emprical to handle some edge cases.
+                boneWeight = [1.0] * len(boneIndex)
             for i in range(len(boneIndex)):
                 vertex_group_index = boneIndex[i]
                 if not vertex_group_index in vert[deform_layer]:
