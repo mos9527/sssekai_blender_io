@@ -1,7 +1,7 @@
 bl_info = {
     "name": "SSSekai Blender IO",
     "author": "mos9527",
-    "version": (0, 1, 1),
+    "version": (0, 1, 2),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > SSSekai",
     "description": "Project SEKAI Asset Importer for Blender 4.0+",
@@ -13,7 +13,7 @@ bl_info = {
 
 import sys, os
 
-REQUIRED_SSSEKAI_MIN_VERSION = (0, 5, 11)
+REQUIRED_SSSEKAI_MIN_VERSION = (0, 5, 15)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 try:
