@@ -675,10 +675,7 @@ def import_texture(name: str, data: Texture2D):
 
 def ensure_sssekai_shader_blend():
     SHADER_BLEND_FILE = get_addon_relative_path("assets", "SekaiShaderStandalone.blend")
-    if (
-        not "SekaiShaderChara" in bpy.data.materials
-        or not "SekaiShaderScene" in bpy.data.materials
-    ):
+    if not "SSSekaiWasHere" in bpy.data.materials:
         logger.warning("SekaiShader not loaded. Importing from %s" % SHADER_BLEND_FILE)
         with bpy.data.libraries.load(SHADER_BLEND_FILE, link=False) as (
             data_from,
@@ -686,11 +683,20 @@ def ensure_sssekai_shader_blend():
         ):
             data_to.materials = data_from.materials
             data_to.node_groups = data_from.node_groups
+            data_to.collections = data_from.collections
             logger.debug("Loaded shader blend file.")
+        bpy.context.scene.collection.children.link(
+            bpy.data.collections["SekaiShaderBase"]
+        )
 
 
 def make_material_texture_node(
-    material, ppTexture, texture_cache=None, uv_layer="UV0", uv_remap_override_node=None
+    material,
+    ppTexture,
+    texture_cache=None,
+    uv_layer="UV0",
+    uv_remap_override_node=None,
+    uv_remap_postprocess_node=None,
 ):
     uvMap = material.node_tree.nodes.new("ShaderNodeUVMap")
     uvMap.uv_map = uv_layer
@@ -715,8 +721,69 @@ def make_material_texture_node(
         logger.error("Failed to load texture - %s. Discarding." % e)
         return None
     material.node_tree.links.new(uvMap.outputs["UV"], uvRemap.inputs[0])
-    material.node_tree.links.new(uvRemap.outputs[0], texNode.inputs["Vector"])
+    if uv_remap_postprocess_node:
+        material.node_tree.links.new(
+            uvRemap.outputs[0], uv_remap_postprocess_node.inputs[0]
+        )
+        material.node_tree.links.new(
+            uv_remap_postprocess_node.outputs[0], texNode.inputs["Vector"]
+        )
+    else:
+        material.node_tree.links.new(uvRemap.outputs[0], texNode.inputs["Vector"])
     return texNode
+
+
+def auto_connect_shader_nodes_by_name(node_tree, lhs, rhs):
+    outputs = {k.name: i for i, k in enumerate(lhs.outputs)}
+    inputs = {k.name: i for i, k in enumerate(rhs.inputs)}
+    for output in outputs:
+        if output in inputs:
+            node_tree.links.new(
+                lhs.outputs[outputs[output]], rhs.inputs[inputs[output]]
+            )
+
+
+def auto_setup_shader_node_driver(node_group, target_obj):
+    def fcurves_for_input(node, input_path):
+        node.inputs[input_path].driver_remove("default_value")
+        return node.inputs[input_path].driver_add("default_value")
+
+    def fcurves_for_output(node, input_path):
+        node.outputs[input_path].driver_remove("default_value")
+        return node.outputs[input_path].driver_add("default_value")
+
+    def drivers_setup(fcurves, paths):
+        for fcurve, path in zip(fcurves, paths):
+            driver = fcurve.driver
+            driver.type = "SCRIPTED"
+            driver.expression = "var"
+            var = driver.variables.new()
+            var.name = "var"
+            var.targets[0].id = target_obj
+            var.targets[0].data_path = path
+
+    for node in node_group.nodes:
+        if node.type == "VECTOR_ROTATE":
+            fcurves = fcurves_for_input(node, "Rotation")
+            drivers_setup(
+                fcurves,
+                ["rotation_euler.x", "rotation_euler.y", "rotation_euler.z"],
+            )
+        elif node.name in target_obj:
+            if node.type == "VECT_MATH":
+                fcurves = fcurves_for_input(node, 0)
+                drivers_setup(
+                    fcurves,
+                    [
+                        f'["{node.name}"][0]',
+                        f'["{node.name}"][1]',
+                        f'["{node.name}"][2]',
+                    ],
+                )
+            if node.type == "VALUE":
+                fcurves = fcurves_for_output(node, 0)
+                drivers_setup([fcurves], [f'["{node.name}"]'])
+    pass
 
 
 def create_principled_bsdf_material(name: str):
@@ -729,125 +796,7 @@ def create_principled_bsdf_material(name: str):
     return material
 
 
-def setup_sdfValue_driver(obj: object):
-    obj["sdfValue"] = 0.0
-    # A joint providing the basis axis for the SDF shadow
-    joint = bpy.data.objects.new("SdfFaceLight", None)
-    joint.empty_display_size = 0.1
-    joint.empty_display_type = "ARROWS"
-    bpy.context.collection.objects.link(joint)
-    bpy.context.view_layer.objects.active = obj.parent
-    joint.parent = obj.parent
-    joint.parent_type = "BONE"
-    joint.parent_bone = "Head"  # This allows us to perform the calculations in the local space of the head
-    # And now the (normalized) local position of the joint can act as the light vector...
-    # With identity (0,0,1) as the (quite literally) face normal vector.
-    bpy.ops.object.mode_set(mode="OBJECT")
-    joint.location = blVector((0.1, -0.1, 0.1))
-    driver = obj.driver_add('["sdfValue"]')
-    var_y = driver.driver.variables.new()
-    var_y.name = "y"
-    var_y.type = "TRANSFORMS"
-    var_y.targets[0].id = joint
-    var_y.targets[0].transform_space = (
-        "TRANSFORM_SPACE"  # the nomeclature is surely confusing..
-    )
-    var_y.targets[0].transform_type = "LOC_Y"
-    var_z = driver.driver.variables.new()
-    var_z.name = "z"
-    var_z.type = "TRANSFORMS"
-    var_z.targets[0].id = joint
-    var_z.targets[0].transform_space = "TRANSFORM_SPACE"
-    var_z.targets[0].transform_type = "LOC_Z"
-    driver.driver.expression = (
-        "y/sqrt(z*z+ y*y) * (-1 if z > 0 else 1) * (0 if y > 0 else 1)"
-    )
-
-
-def import_chara_face_v2_material(
-    name: str, data: Material, use_principled_bsdf=False, texture_cache=None
-):
-    """Set up Material assets for V2 Mesh Face w/ SDF Shadow into blender.
-
-    Adapted from https://zhuanlan.zhihu.com/p/411188212
-
-    Bare with me, this is a bit... unintuitive.
-
-    Args:
-        name (str): material name
-        data (Material): UnityPy Material
-
-    Returns:
-        bpy.types.Material: Created material
-    """
-    ensure_sssekai_shader_blend()
-    textures = dict(data.m_SavedProperties.m_TexEnvs)
-    if not use_principled_bsdf:
-        material = bpy.data.materials["SekaiShaderFace"].copy()
-        material.name = name
-        sekaiShader = material.node_tree.nodes["Group"]
-        # Usual texture setup
-        mainTex = make_material_texture_node(
-            material, textures["_MainTex"], texture_cache
-        )
-        material.node_tree.links.new(
-            mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
-        )
-        shadowTex = make_material_texture_node(
-            material, textures["_ShadowTex"], texture_cache
-        )
-        material.node_tree.links.new(
-            shadowTex.outputs["Color"], sekaiShader.inputs["Sekai S"]
-        )
-        # We only need NdotL for the shadow clamped to [0,1]
-        # The direction is encoded into the sign of the value. See below.
-        valueNode = material.node_tree.nodes.new("ShaderNodeAttribute")
-        valueNode.attribute_type = "OBJECT"
-        valueNode.attribute_name = (
-            "sdfValue"  # <-- This is the magic word. Not setup here though.
-        )
-        # Texture mapping may need to be flipped horizontally
-        signNode = material.node_tree.nodes.new("ShaderNodeMath")
-        signNode.operation = "SIGN"
-        material.node_tree.links.new(valueNode.outputs["Fac"], signNode.inputs["Value"])
-        uvFlip = material.node_tree.nodes.new("ShaderNodeVectorMath")
-        uvFlip.operation = "MULTIPLY"
-        valueXYZ = material.node_tree.nodes.new("ShaderNodeCombineXYZ")
-        material.node_tree.links.new(signNode.outputs["Value"], valueXYZ.inputs["X"])
-        valueXYZ.inputs["Y"].default_value = 1
-        valueXYZ.inputs["Z"].default_value = 1
-        material.node_tree.links.new(valueXYZ.outputs[0], uvFlip.inputs[1])
-        # Finally, the threshold
-        sdfTex = make_material_texture_node(
-            material, textures["_FaceShadowTex"], texture_cache, "UV1", uvFlip
-        )
-        absNode = material.node_tree.nodes.new("ShaderNodeMath")
-        absNode.operation = "ABSOLUTE"
-        compareNode = material.node_tree.nodes.new("ShaderNodeMath")
-        compareNode.operation = "GREATER_THAN"
-        material.node_tree.links.new(valueNode.outputs["Fac"], absNode.inputs[0])
-        material.node_tree.links.new(absNode.outputs[0], compareNode.inputs[0])
-        material.node_tree.links.new(sdfTex.outputs["Color"], compareNode.inputs[1])
-        material.node_tree.links.new(
-            compareNode.outputs[0], sekaiShader.inputs["SDF Post Threshold"]
-        )
-    else:
-        material = create_principled_bsdf_material(name)
-        if "_MainTex" in textures:
-            mainTex = make_material_texture_node(
-                material, textures["_MainTex"], texture_cache
-            )
-            if mainTex:
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"],
-                    material.node_tree.nodes[0].inputs["Base Color"],
-                )
-    return material
-
-
-def import_eyelight_material(
-    name: str, data: Material, use_principled_bsdf=False, texture_cache=None, **kwargs
-):
+def import_eyelight_material(name: str, data: Material, texture_cache=None, **kwargs):
     """Imports Material assets for V2 Mesh Eye Highlight into blender.
 
     Args:
@@ -857,40 +806,27 @@ def import_eyelight_material(
     Returns:
         bpy.types.Material: Created material
     """
-    ensure_sssekai_shader_blend()
     textures = dict(data.m_SavedProperties.m_TexEnvs)
-    if not use_principled_bsdf:
-        material = bpy.data.materials["SekaiShaderEyelight"].copy()
-        material.name = name
-        sekaiShader = material.node_tree.nodes["Group"]
-        if "_MainTex" in textures:
-            mainTex = make_material_texture_node(
-                material, textures["_MainTex"], texture_cache
+    material = bpy.data.materials["SekaiShaderEyelightMaterial"].copy()
+    material.name = name
+    sekaiShader = material.node_tree.nodes["SekaiEyelightShader"]
+    if "_MainTex" in textures:
+        mainTex = make_material_texture_node(
+            material,
+            textures["_MainTex"],
+            texture_cache,
+            "UV0",
+            None,
+            material.node_tree.nodes["SekaiEyelightShaderDistortion"],
+        )
+        if mainTex:
+            material.node_tree.links.new(
+                mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
             )
-            if mainTex:
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
-                )
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"], sekaiShader.inputs["Alpha"]
-                )
-    else:
-        material = create_principled_bsdf_material(name)
-        if "_MainTex" in textures:
-            mainTex = make_material_texture_node(
-                material, textures["_MainTex"], texture_cache
-            )
-            if mainTex:
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"],
-                    material.node_tree.nodes[0].inputs["Base Color"],
-                )
     return material
 
 
-def import_eye_material(
-    name: str, data: Material, use_principled_bsdf=False, texture_cache=None, **kwargs
-):
+def import_eye_material(name: str, data: Material, texture_cache=None, **kwargs):
     """Imports Material assets for V2 Mesh Eye into blender.
 
     Args:
@@ -900,36 +836,23 @@ def import_eye_material(
     Returns:
         bpy.types.Material: Created material
     """
-    ensure_sssekai_shader_blend()
     textures = dict(data.m_SavedProperties.m_TexEnvs)
-    if not use_principled_bsdf:
-        material = bpy.data.materials["SekaiShaderEye"].copy()
-        material.name = name
-        sekaiShader = material.node_tree.nodes["Group"]
-        if "_MainTex" in textures:
-            mainTex = make_material_texture_node(
-                material, textures["_MainTex"], texture_cache
+    material = bpy.data.materials["SekaiShaderEyeMaterial"].copy()
+    material.name = name
+    sekaiShader = material.node_tree.nodes["SekaiEyeShader"]
+    if "_MainTex" in textures:
+        mainTex = make_material_texture_node(
+            material, textures["_MainTex"], texture_cache
+        )
+        if mainTex:
+            material.node_tree.links.new(
+                mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
             )
-            if mainTex:
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
-                )
-    else:
-        material = create_principled_bsdf_material(name)
-        if "_MainTex" in textures:
-            mainTex = make_material_texture_node(
-                material, textures["_MainTex"], texture_cache
-            )
-            if mainTex:
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"],
-                    material.node_tree.nodes[0].inputs["Base Color"],
-                )
     return material
 
 
 def import_character_material(
-    name: str, data: Material, use_principled_bsdf=False, texture_cache=None, **kwargs
+    name: str, data: Material, texture_cache=None, rim_light_controller=None, **kwargs
 ):
     """Imports Material assets for Characters into blender.
 
@@ -940,100 +863,46 @@ def import_character_material(
     Returns:
         bpy.types.Material: Created material
     """
-    ensure_sssekai_shader_blend()
-    if not use_principled_bsdf:
-        material = bpy.data.materials["SekaiShaderChara"].copy()
-        material.name = name
-    else:
-        material = create_principled_bsdf_material(name)
     textures = dict(data.m_SavedProperties.m_TexEnvs)
-    if not use_principled_bsdf:
-        sekaiShader = material.node_tree.nodes["Group"]
-        if "_MainTex" in textures:
-            mainTex = make_material_texture_node(
-                material, textures["_MainTex"], texture_cache
+    material = bpy.data.materials["SekaiShaderCharaMaterial"].copy()
+    material.name = name
+    sekaiShader = material.node_tree.nodes["SekaiCharaShader"]
+    if "_MainTex" in textures:
+        mainTex = make_material_texture_node(
+            material, textures["_MainTex"], texture_cache
+        )
+        if mainTex:
+            material.node_tree.links.new(
+                mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
             )
-            if mainTex:
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
-                )
-        if "_ShadowTex" in textures:
-            shadowTex = make_material_texture_node(
-                material, textures["_ShadowTex"], texture_cache
+    if "_ShadowTex" in textures:
+        shadowTex = make_material_texture_node(
+            material, textures["_ShadowTex"], texture_cache
+        )
+        if shadowTex:
+            material.node_tree.links.new(
+                shadowTex.outputs["Color"], sekaiShader.inputs["Sekai S"]
             )
-            if shadowTex:
-                material.node_tree.links.new(
-                    shadowTex.outputs["Color"], sekaiShader.inputs["Sekai S"]
-                )
-        if "_ValueTex" in textures:
-            valueTex = make_material_texture_node(
-                material, textures["_ValueTex"], texture_cache
+    if "_ValueTex" in textures:
+        valueTex = make_material_texture_node(
+            material, textures["_ValueTex"], texture_cache
+        )
+        if valueTex:
+            material.node_tree.links.new(
+                valueTex.outputs["Color"], sekaiShader.inputs["Sekai H"]
             )
-            if valueTex:
-                material.node_tree.links.new(
-                    valueTex.outputs["Color"], sekaiShader.inputs["Sekai H"]
-                )
+            material.node_tree.links.new(
+                valueTex.outputs["Alpha"], sekaiShader.inputs["Sekai H Alpha"]
+            )
+    if rim_light_controller:
+        rimController = material.node_tree.nodes.new("ShaderNodeGroup")
+        rimController.node_tree = bpy.data.node_groups["SekaiShaderRimDriver"].copy()
+        auto_setup_shader_node_driver(rimController.node_tree, rim_light_controller)
+        auto_connect_shader_nodes_by_name(
+            material.node_tree, rimController, sekaiShader
+        )
     else:
-        if "_MainTex" in textures:
-            mainTex = make_material_texture_node(
-                material, textures["_MainTex"], texture_cache
-            )
-            if mainTex:
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"],
-                    material.node_tree.nodes[0].inputs["Base Color"],
-                )
-    return material
-
-
-def import_scene_material(
-    name: str, data: Material, use_principled_bsdf=False, texture_cache=None, **kwargs
-):
-    """Imports Material assets for Non-Character (i.e. Stage) into blender.
-
-    Args:
-        name (str): material name
-        data (Material): UnityPy Material
-
-    Returns:
-        bpy.types.Material: Created material
-    """
-    ensure_sssekai_shader_blend()
-    if not use_principled_bsdf:
-        material = bpy.data.materials["SekaiShaderScene"].copy()
-        material.name = name
-    else:
-        material = create_principled_bsdf_material(name)
-    textures = dict(data.m_SavedProperties.m_TexEnvs)
-    if not use_principled_bsdf:
-        sekaiShader = material.node_tree.nodes["Group"]
-        if "_MainTex" in textures:
-            mainTex = make_material_texture_node(
-                material, textures["_MainTex"], texture_cache
-            )
-            if mainTex:
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
-                )
-                material.node_tree.links.new(
-                    mainTex.outputs["Alpha"], sekaiShader.inputs["Alpha"]
-                )
-        if "_LightMapTex" in textures:
-            lightMapTex = make_material_texture_node(
-                material, textures["_LightMapTex"], texture_cache, "UV1"
-            )
-            if lightMapTex:
-                material.node_tree.links.new(
-                    lightMapTex.outputs["Color"], sekaiShader.inputs["Sekai Lightmap"]
-                )
-    else:
-        if "_MainTex" in textures:
-            mainTex = make_material_texture_node(
-                material, textures["_MainTex"], texture_cache
-            )
-            if mainTex:
-                material.node_tree.links.new(
-                    mainTex.outputs["Color"],
-                    material.node_tree.nodes[0].inputs["Base Color"],
-                )
+        logger.warning(
+            "Trying to import character material without Rim Light Controller. This is probably not what you want."
+        )
     return material

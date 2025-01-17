@@ -9,6 +9,7 @@ from .animation import *
 from sssekai.unity.AnimationClip import Animation, Track, read_animation
 from sssekai.unity.AssetBundle import load_assetbundle
 from UnityPy.helpers import MeshHelper
+from UnityPy.classes import Mesh
 import bpy
 import bpy.utils.previews
 from bpy.types import Context, WindowManager
@@ -755,13 +756,60 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             sssekai_global.armatures,
             sssekai_global.animations,
         )
-
+        ensure_sssekai_shader_blend()
         logger.debug("Loading selected asset: %s" % wm.sssekai_assetbundle_selected)
         texture_cache = dict()
         material_cache = dict()
 
+        def add_material(
+            m_Materials: Material,
+            obj: bpy.types.Object,
+            mesh_data: Mesh,
+            default_parser=None,
+            **kwargs,
+        ):
+            for ppmat in m_Materials:
+                if ppmat:
+                    material: Material = ppmat.read()
+                    parser = default_parser
+                    # Override parser by name when not using blender's Principled BSDF
+                    # These are introduced by v2 meshes
+                    if "_eye" in material.m_Name:
+                        parser = import_eye_material
+                    if "_ehl_" in material.m_Name:
+                        parser = import_eyelight_material
+                    if material.m_Name in material_cache:
+                        asset = material_cache[material.m_Name]
+                        logger.debug("Reusing Material %s" % material.m_Name)
+                    else:
+                        asset = parser(
+                            material.m_Name,
+                            material,
+                            texture_cache=texture_cache,
+                            **kwargs,
+                        )
+                        material_cache[material.m_Name] = asset
+                        logger.debug("Imported new Material %s" % material.m_Name)
+                    obj.data.materials.append(asset)
+                    bpy.context.view_layer.objects.active = obj
+                    bpy.ops.object.mode_set(mode="OBJECT")
+                    mesh = obj.data
+                    for index, sub in enumerate(mesh_data.m_SubMeshes):
+                        start, count = sub.firstVertex, sub.vertexCount
+                        for i in range(start, start + count):
+                            mesh.vertices[i].select = True
+                        bpy.ops.object.mode_set(mode="EDIT")
+                        bpy.context.object.active_material_index = index
+                        bpy.ops.object.material_slot_assign()
+                        bpy.ops.mesh.select_all(action="DESELECT")
+                        bpy.ops.object.mode_set(mode="OBJECT")
+
         def add_mesh(
-            gameObject, name: str = None, parent_obj=None, bone_hash_tbl: dict = None
+            gameObject,
+            name: str = None,
+            parent_obj=None,
+            bone_hash_tbl: dict = None,
+            **material_kwargs,
         ):
             name = name or gameObject.m_Name
             if getattr(gameObject, "m_SkinnedMeshRenderer", None):
@@ -778,11 +826,16 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     if parent_obj:
                         obj.parent = parent_obj
                     add_material(
-                        mesh_rnd.m_Materials, obj, mesh_data, import_character_material
+                        mesh_rnd.m_Materials,
+                        obj,
+                        mesh_data,
+                        import_character_material,
+                        **material_kwargs,
                     )
                     logger.debug("Imported Skinned Mesh %s" % mesh_data.m_Name)
                     return obj
             elif getattr(gameObject, "m_MeshFilter", None):
+                # XXX Not implemented
                 logger.debug("Found Static Mesh at %s" % gameObject.m_Name)
                 mesh_filter: MeshFilter = gameObject.m_MeshFilter.read()
                 mesh_rnd: MeshRenderer = gameObject.m_MeshRenderer.read()
@@ -791,59 +844,14 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 if parent_obj:
                     obj.parent = parent_obj
                 add_material(
-                    mesh_rnd.m_Materials, obj, mesh_data, import_scene_material
+                    mesh_rnd.m_Materials,
+                    obj,
+                    mesh_data,
+                    import_stage_material,
+                    **material_kwargs,
                 )
                 logger.debug("Imported Static Mesh %s" % mesh_data.m_Name)
                 return obj
-            return None
-
-        def add_material(
-            m_Materials: Material,
-            obj: bpy.types.Object,
-            meshData: Mesh,
-            defaultParser=None,
-        ):
-            for ppmat in m_Materials:
-                if ppmat:
-                    material: Material = ppmat.read()
-                    parser = defaultParser
-                    # Override parser by name when not using blender's Principled BSDF
-                    # These are introduced by v2 meshes
-                    texs = dict(material.m_SavedProperties.m_TexEnvs)
-                    if not wm.sssekai_materials_use_principled_bsdf:
-                        if "_eye" in material.m_Name:
-                            parser = import_eye_material
-                        if "_ehl_" in material.m_Name:
-                            parser = import_eyelight_material
-                        if "mtl_chr_00" in material.m_Name and "_FaceShadowTex" in texs:
-                            setup_sdfValue_driver(obj)
-                            parser = import_chara_face_v2_material
-                    if material.m_Name in material_cache:
-                        asset = material_cache[material.m_Name]
-                        logger.debug("Reusing Material %s" % material.m_Name)
-                    else:
-                        asset = parser(
-                            material.m_Name,
-                            material,
-                            use_principled_bsdf=wm.sssekai_materials_use_principled_bsdf,
-                            texture_cache=texture_cache,
-                        )
-                        material_cache[material.m_Name] = asset
-                        logger.debug("Imported new Material %s" % material.m_Name)
-                    obj.data.materials.append(asset)
-
-            bpy.context.view_layer.objects.active = obj
-            bpy.ops.object.mode_set(mode="OBJECT")
-            mesh = obj.data
-            for index, sub in enumerate(meshData.m_SubMeshes):
-                start, count = sub.firstVertex, sub.vertexCount
-                for i in range(start, start + count):
-                    mesh.vertices[i].select = True
-                bpy.ops.object.mode_set(mode="EDIT")
-                bpy.context.object.active_material_index = index
-                bpy.ops.object.material_slot_assign()
-                bpy.ops.mesh.select_all(action="DESELECT")
-                bpy.ops.object.mode_set(mode="OBJECT")
 
         def add_articulation(articulation: Armature):
             joint_map, parent_object = import_articulation(articulation)
@@ -859,11 +867,38 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             logger.debug("Imported Articulation %s" % articulation.name)
 
         def add_armature(armature: Armature):
+            selected = context.active_object
             armInst, armObj = import_armature(armature)
+            # XXX: Assume *all* armatures are for characters
+            # -- Rim light setup
+            # Reuse rim light if we're importing whilst selecting an object that already has one
+            rim_controller = None
+            if selected:
+                rim_controller = next(
+                    filter(
+                        lambda o: o.name.startswith("SekaiCharaRimLight"),
+                        [selected, *selected.children_recursive],
+                    ),
+                    None,
+                )
+                if rim_controller:
+                    logger.debug("Reusing Rim Light %s" % rim_controller.name)
+            # Otherwise make a new one
+            if not rim_controller:
+                rim_controller = bpy.data.objects["SekaiCharaRimLight"].copy()
+                rim_controller.parent = armObj
+                bpy.context.collection.objects.link(rim_controller)
+                logger.debug(
+                    "Creating new Rim Light controller %s" % rim_controller.name
+                )
             for parent, bone, depth in armature.root.dfs_generator():
                 try:
                     mesh = add_mesh(
-                        bone.gameObject, bone.name, armObj, armature.bone_path_hash_tbl
+                        bone.gameObject,
+                        bone.name,
+                        armObj,
+                        armature.bone_path_hash_tbl,
+                        rim_light_controller=rim_controller,
                     )
                     if mesh:
                         mesh.modifiers.new("Armature", "ARMATURE").object = armObj
