@@ -3,9 +3,12 @@ import tempfile
 import copy
 
 from UnityPy.helpers.MeshHelper import MeshHandler
+from UnityPy.classes import ColorRGBA
 from . import *
 
 logger = logging.getLogger(__name__)
+
+rgba_to_rgb_tuple = lambda col: (col.r, col.g, col.b, col.a)
 
 
 def search_env_meshes(env: Environment):
@@ -894,6 +897,24 @@ def import_character_material(
             material.node_tree.links.new(
                 valueTex.outputs["Alpha"], sekaiShader.inputs["Sekai H Alpha"]
             )
+    properties = dict(data.m_SavedProperties.m_Floats)
+    sekaiShader.inputs["Specular Power"].default_value = (
+        1 if properties.get("_SpecularPower", 1) > 0 else 0
+    )
+    sekaiShader.inputs["Rim Threshold"].default_value = properties.get(
+        "_SpecularStrength", 0
+    )
+    properties = dict(data.m_SavedProperties.m_Colors)
+    sekaiShader.inputs["Skin Color Default"].default_value = rgba_to_rgb_tuple(
+        properties.get("_SkinColorDefault", ColorRGBA(0, 0, 0, 0))
+    )
+    sekaiShader.inputs["Skin Color 1"].default_value = rgba_to_rgb_tuple(
+        properties.get("_Shadow1SkinColor", ColorRGBA(0, 0, 0, 0))
+    )
+    sekaiShader.inputs["Skin Color 2"].default_value = rgba_to_rgb_tuple(
+        properties.get("_Shadow2SkinColor", ColorRGBA(0, 0, 0, 0))
+    )
+
     if rim_light_controller:
         rimController = material.node_tree.nodes.new("ShaderNodeGroup")
         rimController.node_tree = bpy.data.node_groups["SekaiShaderRimDriver"].copy()

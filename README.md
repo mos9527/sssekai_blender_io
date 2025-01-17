@@ -67,6 +67,9 @@ Only recommended if you're interested in debugging/developing the addon yourself
 - The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
 
 ## TODO
+### QoL
+- An actual updater
+- **Cleanup** temp files after importing.
 ### Lighting
 - 1-to-1 approximation of the game's lighting system
   - Face light (SDF for v2, simple $N \cdot L$ for legacy) [?]
