@@ -358,7 +358,7 @@ def import_armature(arma: Armature, name: str = None):
                 parent and parent.name != root.name
             ):  # Let the root be the armature itself
                 ebone.parent = parent.edit_bone
-
+    bpy.ops.object.mode_set(mode="OBJECT")
     return armature, obj
 
 
@@ -746,7 +746,7 @@ def auto_connect_shader_nodes_by_name(node_tree, lhs, rhs):
             )
 
 
-def auto_setup_shader_node_driver(node_group, target_obj):
+def auto_setup_shader_node_driver(node_group, target_obj, target_bone=None):
     def fcurves_for_input(node, input_path):
         node.inputs[input_path].driver_remove("default_value")
         return node.inputs[input_path].driver_add("default_value")
@@ -757,6 +757,7 @@ def auto_setup_shader_node_driver(node_group, target_obj):
 
     def drivers_setup(fcurves, paths):
         for fcurve, path in zip(fcurves, paths):
+            fcurve: bpy.types.FCurve
             driver = fcurve.driver
             driver.type = "SCRIPTED"
             driver.expression = "var"
@@ -764,14 +765,25 @@ def auto_setup_shader_node_driver(node_group, target_obj):
             var.name = "var"
             var.targets[0].id = target_obj
             var.targets[0].data_path = path
+            if target_bone:
+                var.type = "TRANSFORMS"
+                var.targets[0].bone_target = target_bone
+                var.targets[0].transform_space = "WORLD_SPACE"
+                var.targets[0].transform_type = path
 
     for node in node_group.nodes:
         if node.type == "VECTOR_ROTATE":
             fcurves = fcurves_for_input(node, "Rotation")
-            drivers_setup(
-                fcurves,
-                ["rotation_euler.x", "rotation_euler.y", "rotation_euler.z"],
-            )
+            if target_bone:
+                drivers_setup(
+                    fcurves,
+                    ["ROT_X", "ROT_Y", "ROT_Z"],
+                )
+            else:
+                drivers_setup(
+                    fcurves,
+                    ["rotation_euler.x", "rotation_euler.y", "rotation_euler.z"],
+                )
         elif node.name in target_obj:
             if node.type == "VECT_MATH":
                 fcurves = fcurves_for_input(node, 0)
@@ -925,5 +937,74 @@ def import_character_material(
     else:
         logger.warning(
             "Trying to import character material without Rim Light Controller. This is probably not what you want."
+        )
+    return material
+
+
+def import_character_face_sdf_material(
+    name: str,
+    data: Material,
+    texture_cache=None,
+    armature_obj=None,
+    head_bone_target=None,
+    **kwargs,
+):
+    """Imports Material assets for V2 Face SDF into blender.
+
+    Args:
+        name (str): material name
+        data (Material): UnityPy Material
+
+    Returns:
+        bpy.types.Material: Created material
+    """
+    textures = dict(data.m_SavedProperties.m_TexEnvs)
+    material = bpy.data.materials["SekaiShaderCharaFaceSDFMaterial"].copy()
+    material.name = name
+    sekaiShader = material.node_tree.nodes["SekaiShaderCharaFaceSDF"]
+    if "_MainTex" in textures:
+        mainTex = make_material_texture_node(
+            material, textures["_MainTex"], texture_cache
+        )
+        if mainTex:
+            material.node_tree.links.new(
+                mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
+            )
+    if "_ShadowTex" in textures:
+        shadowTex = make_material_texture_node(
+            material, textures["_ShadowTex"], texture_cache
+        )
+        if shadowTex:
+            material.node_tree.links.new(
+                shadowTex.outputs["Color"], sekaiShader.inputs["Sekai S"]
+            )
+
+    if armature_obj and head_bone_target:
+        boneDriver = material.node_tree.nodes.new("ShaderNodeGroup")
+        boneDriver.node_tree = bpy.data.node_groups["SekaiBoneBasisDriver"].copy()
+        auto_setup_shader_node_driver(
+            boneDriver.node_tree, armature_obj, head_bone_target
+        )
+        auto_connect_shader_nodes_by_name(
+            material.node_tree,
+            boneDriver,
+            material.node_tree.nodes["SekaiShaderCharaFaceSDFHelper"],
+        )
+        if "_FaceShadowTex" in textures:
+            faceShadowTex = make_material_texture_node(
+                material,
+                textures["_FaceShadowTex"],
+                texture_cache,
+                "UV1",
+                None,
+                material.node_tree.nodes["SekaiShaderTextureHelper"],
+            )
+            if faceShadowTex:
+                material.node_tree.links.new(
+                    faceShadowTex.outputs["Color"], sekaiShader.inputs["Sekai SDF"]
+                )
+    else:
+        logger.warning(
+            "Face SDF material imported without bone target. Face shadows will NOT work"
         )
     return material

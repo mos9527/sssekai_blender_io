@@ -774,10 +774,14 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     parser = default_parser
                     # Override parser by name when not using blender's Principled BSDF
                     # These are introduced by v2 meshes
+                    texEnvs = dict(material.m_SavedProperties.m_TexEnvs)
+                    texFloats = dict(material.m_SavedProperties.m_Floats)
                     if "_eye" in material.m_Name:
                         parser = import_eye_material
                     if "_ehl_" in material.m_Name:
                         parser = import_eyelight_material
+                    if "_FaceShadowTex" in texEnvs and texFloats.get("_UseFaceSDF", 0):
+                        parser = import_character_face_sdf_material
                     if material.m_Name in material_cache:
                         asset = material_cache[material.m_Name]
                         logger.debug("Reusing Material %s" % material.m_Name)
@@ -899,6 +903,8 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                         armObj,
                         armature.bone_path_hash_tbl,
                         rim_light_controller=rim_controller,
+                        armature_obj=armObj,
+                        head_bone_target="Head",
                     )
                     if mesh:
                         mesh.modifiers.new("Armature", "ARMATURE").object = armObj
