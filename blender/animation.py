@@ -1,5 +1,19 @@
-import logging, json
-from . import *
+import bpy
+import logging, json, math
+from typing import List
+from sssekai.unity.AnimationClip import Animation, AnimationClip, TransformType
+from .math import (
+    blEuler,
+    blQuaternion,
+    blVector,
+    blMatrix,
+    swizzle_euler,
+    swizzle_quaternion,
+    swizzle_vector,
+    swizzle_vector_scale,
+)
+from .helpers import create_empty
+from .consts import *
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +41,7 @@ def ensure_action(object, name: str, always_create_new: bool):
 
 
 def create_action(name: str):
+    """Creates a new action"""
     action = bpy.data.actions.new(name)
     return action
 
@@ -37,7 +52,15 @@ def apply_action(
     use_nla: bool = False,
     nla_always_new_track: bool = False,
 ):
-    """Applies an action to an object"""
+    """Applies an action to an object
+
+    Args:
+
+        object (bpy.types.Object): target object
+        action (bpy.types.Action): action to apply
+        use_nla (bool): whether to use NLA tracks
+        nla_always_new_track (bool): whether to always create a new track. otherwise, the NLA clip (is use_nla) will be appended to the last track
+    """
     if not object.animation_data:
         object.animation_data_create()
     if not use_nla:

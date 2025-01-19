@@ -1,5 +1,5 @@
 from tests import *
-from blender.asset import search_env_meshes
+from blender.asset import build_scene_hierarchy
 
 from UnityPy.classes import MeshRenderer, UnityTexEnv, Texture2D
 from UnityPy.helpers import MeshHelper
@@ -9,7 +9,7 @@ def test_mesh():
     PATH = sample_file_path("mesh", "face_31_0001")
     with open(PATH, "rb") as f:
         env = load_assetbundle(f)
-        articulations, armatures = search_env_meshes(env)
+        articulations, armatures = build_scene_hierarchy(env)
         for arma in armatures:
             go = arma.skinnedMeshGameObject
             rnd: MeshRenderer = go.m_SkinnedMeshRenderer.read()

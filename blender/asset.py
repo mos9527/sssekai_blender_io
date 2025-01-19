@@ -1,17 +1,33 @@
-import logging, json
+import bpy, bmesh
+import json, math
 import tempfile
-import copy
-
+from typing import Dict
+from UnityPy.enums import ClassIDType
 from UnityPy.helpers.MeshHelper import MeshHandler
-from UnityPy.classes import ColorRGBA
-from . import *
+from UnityPy.classes import ColorRGBA, Texture2D, Material, Mesh, Transform
+from UnityPy import Environment
+from .types import Armature, Bone, BonePhysics, SekaiBonePhysicsType
+from .utils import get_name_hash
+from .helpers import (
+    ensure_sssekai_shader_blend,
+    create_empty,
+    rgba_to_rgb_tuple,
+    auto_connect_shader_nodes_by_name,
+    auto_setup_shader_node_driver,
+)
+from .math import (
+    swizzle_vector,
+    swizzle_quaternion,
+    swizzle_vector_scale,
+    swizzle_vector3,
+    blVector,
+    blMatrix,
+)
+from .consts import *
+from . import logger
 
-logger = logging.getLogger(__name__)
 
-rgba_to_rgb_tuple = lambda col: (col.r, col.g, col.b, col.a)
-
-
-def search_env_meshes(env: Environment):
+def build_scene_hierarchy(env: Environment):
     """(Partially) Loads the UnityPy Environment for further Mesh processing
 
     Args:
@@ -65,13 +81,13 @@ def search_env_meshes(env: Environment):
                         physics = component.__dict__  # .read_typetree()
                         phy_type = None
                         if physicsScript.m_Name == "SpringSphereCollider":
-                            phy_type = BonePhysicsType.SphereCollider
+                            phy_type = SekaiBonePhysicsType.SphereCollider
                         if physicsScript.m_Name == "SpringCapsuleCollider":
-                            phy_type = BonePhysicsType.CapsuleCollider
+                            phy_type = SekaiBonePhysicsType.CapsuleCollider
                         if physicsScript.m_Name == "SekaiSpringBone":
-                            phy_type = BonePhysicsType.SpringBone
+                            phy_type = SekaiBonePhysicsType.SpringBone
                         if physicsScript.m_Name == "SpringManager":
-                            phy_type = BonePhysicsType.SpringManager
+                            phy_type = SekaiBonePhysicsType.SpringManager
                         if phy_type != None:
                             bonePhysics = BonePhysics.from_dict(physics)
                             bonePhysics.type = phy_type
@@ -114,24 +130,6 @@ def search_env_meshes(env: Environment):
     articulations = sorted(articulations, key=lambda x: x.name)
     armatures = sorted(armatures, key=lambda x: x.name)
     return articulations, armatures
-
-
-def search_env_animations(env: Environment):
-    """Searches the Environment for AnimationClips
-
-    Args:
-        env (Environment): UnityPy Environment
-
-    Returns:
-        List[AnimationClip]: AnimationClips
-    """
-    animations = []
-    for asset in env.assets:
-        for obj in asset.get_objects():
-            if obj.type == ClassIDType.AnimationClip:
-                data = obj.read()
-                animations.append(data)
-    return animations
 
 
 def import_mesh(
@@ -397,7 +395,10 @@ def import_armature_physics_constraints(armature, data: Armature):
 
         def connect_spring_bones(bone: Bone, parent=None):
             if not parent:
-                if bone.physics and bone.physics.type == BonePhysicsType.SpringBone:
+                if (
+                    bone.physics
+                    and bone.physics.type == SekaiBonePhysicsType.SpringBone
+                ):
                     parent = bone
                 if parent:
                     # First Physics bone in the chain
@@ -624,10 +625,10 @@ def import_armature_physics_constraints(armature, data: Armature):
                 set_no_collision(rbs[i], rbs[j])
         for parent, child, _ in root_bone.dfs_generator():
             if child.physics:
-                if child.physics.type & BonePhysicsType.Collider:
+                if child.physics.type & SekaiBonePhysicsType.Collider:
                     # Add colliders
                     obj = None
-                    if child.physics.type == BonePhysicsType.SphereCollider:
+                    if child.physics.type == SekaiBonePhysicsType.SphereCollider:
                         bpy.ops.mesh.primitive_uv_sphere_add(
                             radius=child.physics.radius * SPHERE_RADIUS_FACTOR
                         )
@@ -636,7 +637,7 @@ def import_armature_physics_constraints(armature, data: Armature):
                         bpy.ops.rigidbody.object_add()
                         obj.rigid_body.type = "PASSIVE"
                         obj.rigid_body.collision_shape = "SPHERE"
-                    if child.physics.type == BonePhysicsType.CapsuleCollider:
+                    if child.physics.type == SekaiBonePhysicsType.CapsuleCollider:
                         bpy.ops.mesh.primitive_cylinder_add(
                             radius=child.physics.radius * CAPSULE_RADIUS_FACTOR,
                             depth=child.physics.height * CAPSULE_HEIGHT_FACTOR,
@@ -674,23 +675,6 @@ def import_texture(name: str, data: Texture2D):
         img.name = name
         logger.debug("Imported Texture %s" % name)
         return img
-
-
-def ensure_sssekai_shader_blend():
-    SHADER_BLEND_FILE = get_addon_relative_path("assets", "SekaiShaderStandalone.blend")
-    if not "SSSekaiWasHere" in bpy.data.materials:
-        logger.warning("SekaiShader not loaded. Importing from %s" % SHADER_BLEND_FILE)
-        with bpy.data.libraries.load(SHADER_BLEND_FILE, link=False) as (
-            data_from,
-            data_to,
-        ):
-            data_to.materials = data_from.materials
-            data_to.node_groups = data_from.node_groups
-            data_to.collections = data_from.collections
-            logger.debug("Loaded shader blend file.")
-        bpy.context.scene.collection.children.link(
-            bpy.data.collections["SekaiShaderBase"]
-        )
 
 
 def make_material_texture_node(
@@ -734,81 +718,6 @@ def make_material_texture_node(
     else:
         material.node_tree.links.new(uvRemap.outputs[0], texNode.inputs["Vector"])
     return texNode
-
-
-def auto_connect_shader_nodes_by_name(node_tree, lhs, rhs):
-    outputs = {k.name: i for i, k in enumerate(lhs.outputs)}
-    inputs = {k.name: i for i, k in enumerate(rhs.inputs)}
-    for output in outputs:
-        if output in inputs:
-            node_tree.links.new(
-                lhs.outputs[outputs[output]], rhs.inputs[inputs[output]]
-            )
-
-
-def auto_setup_shader_node_driver(node_group, target_obj, target_bone=None):
-    def fcurves_for_input(node, input_path):
-        node.inputs[input_path].driver_remove("default_value")
-        return node.inputs[input_path].driver_add("default_value")
-
-    def fcurves_for_output(node, input_path):
-        node.outputs[input_path].driver_remove("default_value")
-        return node.outputs[input_path].driver_add("default_value")
-
-    def drivers_setup(fcurves, paths):
-        for fcurve, path in zip(fcurves, paths):
-            fcurve: bpy.types.FCurve
-            driver = fcurve.driver
-            driver.type = "SCRIPTED"
-            driver.expression = "var"
-            var = driver.variables.new()
-            var.name = "var"
-            var.targets[0].id = target_obj
-            var.targets[0].data_path = path
-            if target_bone:
-                var.type = "TRANSFORMS"
-                var.targets[0].bone_target = target_bone
-                var.targets[0].transform_space = "WORLD_SPACE"
-                var.targets[0].transform_type = path
-
-    for node in node_group.nodes:
-        if node.type == "VECTOR_ROTATE":
-            fcurves = fcurves_for_input(node, "Rotation")
-            if target_bone:
-                drivers_setup(
-                    fcurves,
-                    ["ROT_X", "ROT_Y", "ROT_Z"],
-                )
-            else:
-                drivers_setup(
-                    fcurves,
-                    ["rotation_euler.x", "rotation_euler.y", "rotation_euler.z"],
-                )
-        elif node.name in target_obj:
-            if node.type == "VECT_MATH":
-                fcurves = fcurves_for_input(node, 0)
-                drivers_setup(
-                    fcurves,
-                    [
-                        f'["{node.name}"][0]',
-                        f'["{node.name}"][1]',
-                        f'["{node.name}"][2]',
-                    ],
-                )
-            if node.type == "VALUE":
-                fcurves = fcurves_for_output(node, 0)
-                drivers_setup([fcurves], [f'["{node.name}"]'])
-    pass
-
-
-def create_principled_bsdf_material(name: str):
-    material = bpy.data.materials.new(name)
-    material.use_nodes = True
-    material.use_backface_culling = True
-    # material.blend_method = ("BLEND")
-    # Alpha blending is always costly. This should be opt-in when there's alpha channel in the texture
-    # TODO: Can we know in advance if the texture has alpha?
-    return material
 
 
 def import_eyelight_material(name: str, data: Material, texture_cache=None, **kwargs):

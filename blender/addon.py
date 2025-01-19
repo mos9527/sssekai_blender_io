@@ -1,18 +1,4 @@
-# TODO: Seperate the operators/panels into different files
-from os import path
-from logging import getLogger
-import zipfile
-
-import UnityPy.classes
-from .asset import *
-from .animation import *
-from sssekai.unity.AnimationClip import Animation, Track, read_animation
-from sssekai.unity.AssetBundle import load_assetbundle
-from UnityPy.helpers import MeshHelper
-from UnityPy.classes import Mesh
-import bpy
-import bpy.utils.previews
-from bpy.types import Context, WindowManager
+from bpy.types import Context
 from bpy.props import (
     StringProperty,
     EnumProperty,
@@ -23,8 +9,58 @@ from bpy.props import (
     FloatVectorProperty,
 )
 from bpy.app.translations import pgettext as T
+import bpy, bpy.utils.previews, bpy_extras
+import zipfile, json, os
 
-logger = getLogger(__name__)
+from sssekai.unity.AnimationClip import (
+    Animation,
+    Track,
+    TransformType,
+    KeyFrame,
+    read_animation,
+)
+from sssekai.unity.AssetBundle import load_assetbundle
+from sssekai.unity import sssekai_get_unity_version, sssekai_set_unity_version
+
+import UnityPy
+from UnityPy.enums import ClassIDType
+from UnityPy.classes import (
+    Mesh,
+    Material,
+    SkinnedMeshRenderer,
+    MeshFilter,
+    MeshRenderer,
+)
+
+from .consts import *
+from .utils import get_name_hash, encode_asset_id
+from .helpers import create_empty, ensure_sssekai_shader_blend
+from .math import uVector3, uQuaternion, blVector
+from .math import euler3_to_quat_swizzled
+from . import register_class, register_wm_props, logger
+
+from .asset import (
+    build_scene_hierarchy,
+    import_eye_material,
+    import_eyelight_material,
+    import_character_material,
+    import_character_face_sdf_material,
+    import_mesh,
+    import_articulation,
+    import_armature,
+    import_armature_physics_constraints,
+    import_stage_lightmap_material,
+)
+from .animation import (
+    load_armature_animation,
+    load_camera_animation,
+    load_keyshape_animation,
+    retrive_action,
+    apply_action,
+    import_articulation_animation,
+)
+from .types import Armature
+from . import sssekai_global
 
 
 @register_class
@@ -839,7 +875,6 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     logger.debug("Imported Skinned Mesh %s" % mesh_data.m_Name)
                     return obj
             elif getattr(gameObject, "m_MeshFilter", None):
-                # XXX Not implemented
                 logger.debug("Found Static Mesh at %s" % gameObject.m_Name)
                 mesh_filter: MeshFilter = gameObject.m_MeshFilter.read()
                 mesh_rnd: MeshRenderer = gameObject.m_MeshRenderer.read()
@@ -851,7 +886,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     mesh_rnd.m_Materials,
                     obj,
                     mesh_data,
-                    import_stage_material,
+                    import_stage_lightmap_material,
                     **material_kwargs,
                 )
                 logger.debug("Imported Static Mesh %s" % mesh_data.m_Name)
@@ -1171,7 +1206,7 @@ class SSSekaiBlenderExportAnimationTypeTree(
 
     filename_ext = ".anim"
 
-    filter_glob: bpy.props.StringProperty(default="*.anim;", options={"HIDDEN"})
+    filter_glob: bpy.props.StringProperty(default="*.anim;", options={"HIDDEN"})  # type: ignore
 
     def execute(self, context):
         global sssekai_global
@@ -1603,7 +1638,7 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
 
         filename = wm.sssekai_streaming_live_archive_bundle
         if (
-            not path.isfile(filename)
+            not os.path.isfile(filename)
             or filename == sssekai_global.rla_sekai_streaming_live_bundle_path
         ):
             return sssekai_global.rla_enum_entries or [("NONE", "None", "", 0)]
@@ -1754,8 +1789,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
             UnityPy.config.FALLBACK_VERSION_WARNED = True
             UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()
             sssekai_global.env = UnityPy.load(dirname)
-            sssekai_global.articulations, sssekai_global.armatures = search_env_meshes(
-                sssekai_global.env
+            sssekai_global.articulations, sssekai_global.armatures = (
+                build_scene_hierarchy(sssekai_global.env)
             )
             logger.debug(
                 "Found %d articulations and %d armatures"
@@ -1778,7 +1813,12 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 )
                 index += 1
 
-            sssekai_global.animations = search_env_animations(sssekai_global.env)
+            sssekai_global.animations = list(
+                filter(
+                    lambda obj: obj.type == ClassIDType.AnimationClip,
+                    sssekai_global.env.objects,
+                )
+            )
             for animation in sssekai_global.animations:
                 encoded = encode_asset_id(animation)
                 enum_items.append(
@@ -1871,7 +1911,7 @@ class SSSekaiBlenderAssetSearchOperator(bpy.types.Operator):
         name="Asset",
         description="Selected Asset",
         items=SSSekaiBlenderImportPanel.enumerate_assets,
-    )
+    )  # type: ignore
 
     def execute(self, context):
         wm = context.window_manager
