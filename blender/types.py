@@ -1,6 +1,6 @@
 from enum import IntEnum
-from dataclasses import dataclass
-from typing import Dict
+from dataclasses import dataclass, field
+from typing import Dict, List
 from .utils import dataclass_from_dict, get_name_hash
 from .math import (
     swizzle_vector,
@@ -13,7 +13,7 @@ from .math import (
 from UnityPy.classes import GameObject
 
 
-class BonePhysicsType(IntEnum):
+class SekaiBonePhysicsType(IntEnum):
     NoPhysics = 0x00
 
     Bone = 0x10
@@ -28,7 +28,7 @@ class BonePhysicsType(IntEnum):
 
 
 @dataclass
-class BoneAngularLimit:
+class SekaiBoneAngularLimit:
     active: bool = 0
     # In degrees
     min: float = 0
@@ -36,8 +36,8 @@ class BoneAngularLimit:
 
 
 @dataclass
-class BonePhysics:
-    type: BonePhysicsType = BonePhysicsType.NoPhysics
+class SekaiBonePhysics:
+    type: SekaiBonePhysicsType = SekaiBonePhysicsType.NoPhysics
 
     radius: float = 0
     height: float = 0
@@ -47,49 +47,53 @@ class BonePhysics:
     springForce: float = 0
     dragForce: float = 0
     angularStiffness: float = 0
-    yAngleLimits: BoneAngularLimit = None
-    zAngleLimits: BoneAngularLimit = None
+    yAngleLimits: SekaiBoneAngularLimit = None
+    zAngleLimits: SekaiBoneAngularLimit = None
 
     @staticmethod
     def from_dict(data: dict):
-        phy = dataclass_from_dict(BonePhysics, data, warn_missing_fields=False)
+        phy = dataclass_from_dict(SekaiBonePhysics, data, warn_missing_fields=False)
         return phy
 
 
 @dataclass
-class Bone:
+class HierarchyNode:
     name: str
-    localPosition: uVector3
-    localRotation: uQuaternion
-    localScale: uVector3
-    # Hierarchy. Built after asset import
-    parent: object  # Bone
-    children: list  # Bone
-    global_path: str
-    global_transform: blMatrix = None
-    # Physics
-    physics: BonePhysics = None
-    gameObject: object = None  # Unity GameObject
+
+    # Transform (in Local Space)
+    position: uVector3
+    rotation: uQuaternion
+    scale: uVector3
+    # Graph relations
+    parent: object = None  # HierarchyNode
+    children: List[object] = field(default_factory=list)  # HierarchyNode
+    # Cached global attributes
+    global_path: List[str] = field(default_factory=list)
+    global_transform: blMatrix = blMatrix.Identity(4)
+    # Attributes
+    game_object: GameObject = None
+    # Sekai Specific
+    sekai_physics: SekaiBonePhysics = None
 
     # Helpers
     def get_blender_local_position(self):
-        return swizzle_vector(self.localPosition)
+        return swizzle_vector(self.position)
 
     def get_blender_local_rotation(self):
-        return swizzle_quaternion(self.localRotation)
+        return swizzle_quaternion(self.rotation)
 
     def to_translation_matrix(self):
-        return blMatrix.Translation(swizzle_vector(self.localPosition))
+        return blMatrix.Translation(swizzle_vector(self.position))
 
     def to_trs_matrix(self):
         return blMatrix.LocRotScale(
-            swizzle_vector(self.localPosition),
-            swizzle_quaternion(self.localRotation),
-            swizzle_vector_scale(self.localScale),
+            swizzle_vector(self.position),
+            swizzle_quaternion(self.rotation),
+            swizzle_vector_scale(self.scale),
         )
 
     def dfs_generator(self, root=None):
-        def dfs(bone: Bone, parent: Bone = None, depth=0):
+        def dfs(bone: HierarchyNode, parent: HierarchyNode = None, depth=0):
             yield parent, bone, depth
             for child in bone.children:
                 yield from dfs(child, bone, depth + 1)
@@ -123,18 +127,19 @@ class Bone:
 
 
 @dataclass
-class Armature:
+class Hierarchy:
     name: str
-    is_articulation: bool = False
-    skinnedMeshGameObject: GameObject = None
-    root: Bone = None
+
+    root: HierarchyNode = None
+    nodes: Dict[str, HierarchyNode] = None
+
     # Tables
-    bone_path_hash_tbl: Dict[int, Bone] = None
-    bone_name_tbl: Dict[str, Bone] = None
+    # CRC32 hash table of global path concatenated with / (e.g. Position/Body/Neck/Head)
+    global_path_hash_table: Dict[int, HierarchyNode] = None
 
     # Helpers
     def get_bone_by_path(self, path: str):
-        return self.bone_path_hash_tbl[get_name_hash(path)]
+        return self.global_path_hash_table[get_name_hash(path)]
 
     def get_bone_by_name(self, name: str):
-        return self.bone_name_tbl[name]
+        return self.nodes[name]

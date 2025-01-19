@@ -59,7 +59,7 @@ from .animation import (
     apply_action,
     import_articulation_animation,
 )
-from .types import Armature
+from .types import Hierarchy
 from . import sssekai_global
 
 
@@ -75,7 +75,7 @@ class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator)
         assert context.mode == "OBJECT", "Please select an armature in Object Mode!"
         obj = bpy.context.active_object
         if obj.data and KEY_BONE_NAME_HASH_TBL in obj.data:
-            bone_path_hash_tbl = dict()
+            global_path_hash_table = dict()
             bone_path_tbl = dict()
 
             def dfs(bone):
@@ -85,7 +85,7 @@ class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator)
                     )
                 else:
                     bone_path_tbl[bone.name] = bone.name
-                bone_path_hash_tbl[str(get_name_hash(bone_path_tbl[bone.name]))] = (
+                global_path_hash_table[str(get_name_hash(bone_path_tbl[bone.name]))] = (
                     bone.name
                 )
                 for child in bone.children:
@@ -94,7 +94,7 @@ class SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator(bpy.types.Operator)
             for bone in obj.data.bones:
                 dfs(bone)
             obj.data[KEY_BONE_NAME_HASH_TBL] = json.dumps(
-                bone_path_hash_tbl, ensure_ascii=False
+                global_path_hash_table, ensure_ascii=False
             )
         elif KEY_ARTICULATION_NAME_HASH_TBL in obj:
             joint_path_hash_tbl = dict()
@@ -892,20 +892,20 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 logger.debug("Imported Static Mesh %s" % mesh_data.m_Name)
                 return obj
 
-        def add_articulation(articulation: Armature):
+        def add_articulation(articulation: Hierarchy):
             joint_map, parent_object = import_articulation(articulation)
             for bone_name, joint in joint_map.items():
                 bone = articulation.get_bone_by_name(bone_name)
                 try:
-                    mesh = add_mesh(bone.gameObject, bone_name, joint)
+                    mesh = add_mesh(bone.game_object, bone_name, joint)
                 except Exception as e:
                     logger.warning(
                         "Could not import mesh at GameObject %s: %s"
-                        % (bone.gameObject.m_Name, e)
+                        % (bone.game_object.m_Name, e)
                     )
             logger.debug("Imported Articulation %s" % articulation.name)
 
-        def add_armature(armature: Armature):
+        def add_armature(armature: Hierarchy):
             selected = context.active_object
             armInst, armObj = import_armature(armature)
             # XXX: Assume *all* armatures are for characters
@@ -933,10 +933,10 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
             for parent, bone, depth in armature.root.dfs_generator():
                 try:
                     mesh = add_mesh(
-                        bone.gameObject,
+                        bone.game_object,
                         bone.name,
                         armObj,
-                        armature.bone_path_hash_tbl,
+                        armature.global_path_hash_table,
                         rim_light_controller=rim_controller,
                         armature_obj=armObj,
                         head_bone_target="Head",
@@ -948,14 +948,14 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 except Exception as e:
                     logger.warning(
                         "Could not import mesh at GameObject %s: %s"
-                        % (bone.gameObject.m_Name, e)
+                        % (bone.game_object.m_Name, e)
                     )
                     raise e
             logger.debug("Imported Armature %s" % armature.name)
 
         for articulation in articulations:
             if (
-                encode_asset_id(articulation.root.gameObject)
+                encode_asset_id(articulation.root.game_object)
                 == wm.sssekai_assetbundle_selected
             ):
                 add_articulation(articulation)
@@ -963,7 +963,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
 
         for armature in armatures:
             if (
-                encode_asset_id(armature.root.gameObject)
+                encode_asset_id(armature.root.game_object)
                 == wm.sssekai_assetbundle_selected
             ):
                 if wm.sssekai_armatures_as_articulations:
@@ -1139,7 +1139,7 @@ class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
         )
         for armature in armatures:
             if (
-                encode_asset_id(armature.root.gameObject)
+                encode_asset_id(armature.root.game_object)
                 == wm.sssekai_assetbundle_selected
             ):
                 bpy.context.scene.frame_current = 0
@@ -1243,17 +1243,17 @@ class SSSekaiBlenderExportAnimationTypeTree(
 
         for articulation in articulations:
             if (
-                encode_asset_id(articulation.root.gameObject)
+                encode_asset_id(articulation.root.game_object)
                 == wm.sssekai_assetbundle_selected
             ):
-                export_typetree(articulation.root.gameObject)
+                export_typetree(articulation.root.game_object)
                 return {"FINISHED"}
         for armature in armatures:
             if (
-                encode_asset_id(armature.root.gameObject)
+                encode_asset_id(armature.root.game_object)
                 == wm.sssekai_assetbundle_selected
             ):
-                export_typetree(armature.root.gameObject)
+                export_typetree(armature.root.game_object)
                 return {"FINISHED"}
         for animation in animations:
             if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
@@ -1800,23 +1800,26 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
             # enum_items = [(identifier, name, description, icon, number),...]
             # Note that `identifier` is the value that will be stored (and read) in the property
             for articulation in sssekai_global.articulations:
-                encoded = encode_asset_id(articulation.root.gameObject)
+                encoded = encode_asset_id(articulation.root.game_object)
                 enum_items.append(
                     (encoded, articulation.name, encoded, "MESH_DATA", index)
                 )
                 index += 1
 
             for armature in sssekai_global.armatures:
-                encoded = encode_asset_id(armature.root.gameObject)
+                encoded = encode_asset_id(armature.root.game_object)
                 enum_items.append(
                     (encoded, armature.name, encoded, "ARMATURE_DATA", index)
                 )
                 index += 1
 
             sssekai_global.animations = list(
-                filter(
-                    lambda obj: obj.type == ClassIDType.AnimationClip,
-                    sssekai_global.env.objects,
+                (
+                    obj.read()
+                    for obj in filter(
+                        lambda obj: obj.type == ClassIDType.AnimationClip,
+                        sssekai_global.env.objects,
+                    )
                 )
             )
             for animation in sssekai_global.animations:

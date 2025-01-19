@@ -1,15 +1,14 @@
 import bpy, bmesh
 import json, math
-import tempfile
-from typing import Dict
+import tempfile, copy
+from typing import Dict, Tuple, List
 from UnityPy.enums import ClassIDType
 from UnityPy.helpers.MeshHelper import MeshHandler
 from UnityPy.classes import ColorRGBA, Texture2D, Material, Mesh, Transform
 from UnityPy import Environment
-from .types import Armature, Bone, BonePhysics, SekaiBonePhysicsType
+from .types import Hierarchy, HierarchyNode, SekaiBonePhysics, SekaiBonePhysicsType
 from .utils import get_name_hash
 from .helpers import (
-    ensure_sssekai_shader_blend,
     create_empty,
     rgba_to_rgb_tuple,
     auto_connect_shader_nodes_by_name,
@@ -27,15 +26,8 @@ from .consts import *
 from . import logger
 
 
-def build_scene_hierarchy(env: Environment):
-    """(Partially) Loads the UnityPy Environment for further Mesh processing
-
-    Args:
-        env (Environment): UnityPy Environment
-
-    Returns:
-        Tuple[List[GameObject], Dict[str,Armature]]: Static Mesh GameObjects and Armatures
-    """
+def build_scene_hierarchy(env: Environment) -> Tuple[List[Hierarchy], List[Hierarchy]]:
+    """Builds the scene hierarchy from the Unity Environment"""
     # Collect all static meshes and skinned meshes's *root transform* object
     # UnityPy does not construct the Bone Hierarchy so we have to do it ourselves
     transform_roots = []
@@ -49,31 +41,29 @@ def build_scene_hierarchy(env: Environment):
     articulations = []
     armatures = []
     for root in transform_roots:
-        armature = Armature(root.m_GameObject.read().m_Name)
-        armature.bone_path_hash_tbl = dict()
-        armature.bone_name_tbl = dict()
+        armature = Hierarchy(root.m_GameObject.read().m_Name)
+        armature.global_path_hash_table = dict()
+        armature.nodes = dict()
         path_id_tbl = dict()  # Only used locally
+        is_skinned = False
 
-        def dfs(root: Transform, parent: Bone = None):
-            gameObject = root.m_GameObject.read()
-            name = gameObject.m_Name
-            # Addtional properties
-            # Skinned Mesh Renderer
-            if getattr(gameObject, "m_SkinnedMeshRenderer", None):
-                armature.skinnedMeshGameObject = gameObject
-            # Complete path. Used for CRC hash later on
-            if parent:
-                if parent.global_path:
-                    path_from_root = parent.global_path + "/" + name
-                else:
-                    path_from_root = name
-            else:
-                path_from_root = ""
+        def dfs(root: Transform, parent: HierarchyNode = None):
+            nonlocal is_skinned
+
+            game_object = root.m_GameObject.read()
+            name = game_object.m_Name
+            global_path = [name]
+            if parent and parent.global_path:
+                # Copies implicitly
+                global_path = parent.global_path + [name]
+            print(name, global_path)
+            # --- FIRE HAZARD AHEAD
             # Reads:
             # - Physics Rb + Collider
             # XXX: Some properties are not implemented yet
-            bonePhysics = None
-            for component in gameObject.m_Components:
+            # TODO: This...is so ugly
+            sekai_physics = None
+            for component in game_object.m_Components:
                 if component.type == ClassIDType.MonoBehaviour:
                     component = component.deref().read(check_read=False)
                     if component.m_Script:
@@ -89,39 +79,46 @@ def build_scene_hierarchy(env: Environment):
                         if physicsScript.m_Name == "SpringManager":
                             phy_type = SekaiBonePhysicsType.SpringManager
                         if phy_type != None:
-                            bonePhysics = BonePhysics.from_dict(physics)
-                            bonePhysics.type = phy_type
+                            sekai_physics = SekaiBonePhysics.from_dict(physics)
+                            sekai_physics.type = phy_type
                             if "pivotNode" in physics:
-                                bonePhysics.pivot = path_id_tbl.get(
+                                sekai_physics.pivot = path_id_tbl.get(
                                     physics["pivotNode"].m_PathID, None
                                 )
-                                bonePhysics.pivot = getattr(
-                                    bonePhysics.pivot, "name", None
+                                sekai_physics.pivot = getattr(
+                                    sekai_physics.pivot, "name", None
                                 )
-            bone = Bone(
+            # ---
+
+            node = HierarchyNode(
                 name,
                 root.m_LocalPosition,
                 root.m_LocalRotation,
                 root.m_LocalScale,
-                parent,
-                list(),
-                path_from_root,
-                None,
-                bonePhysics,
-                gameObject,
+                # Keywords
+                parent=parent,
+                global_path=global_path,
+                game_object=game_object,
+                sekai_physics=sekai_physics,
             )
-            path_id_tbl[root.m_GameObject.m_PathID] = bone
-            armature.bone_name_tbl[name] = bone
+            path_id_tbl[root.m_GameObject.m_PathID] = node
+            armature.nodes[name] = node
             if not parent:
-                armature.root = bone
+                armature.root = node
             else:
-                armature.bone_path_hash_tbl[get_name_hash(path_from_root)] = bone
-                parent.children.append(bone)
+                name_hash = get_name_hash(
+                    "/".join(global_path[1:])
+                )  # Root would be the armature itself, so skip
+                armature.global_path_hash_table[name_hash] = node
+                parent.children.append(node)
+            # Skinned Mesh Renderer
+            if getattr(game_object, "m_SkinnedMeshRenderer", None):
+                is_skinned = True
             for child in root.m_Children:
-                dfs(child.read(), bone)
+                dfs(child.read(), node)
 
         dfs(root)
-        if armature.skinnedMeshGameObject:
+        if is_skinned:
             armature.is_articulation = False
             armatures.append(armature)
         else:
@@ -136,7 +133,7 @@ def import_mesh(
     name: str,
     data: Mesh,
     skinned: bool = False,
-    bone_path_tbl: Dict[str, Bone] = None,
+    bone_path_tbl: Dict[str, HierarchyNode] = None,
     bone_order: list[str] = None,
 ):
     """Imports the mesh data into blender.
@@ -277,7 +274,7 @@ def import_mesh(
     return mesh, obj
 
 
-def import_articulation(arma: Armature, name: str = None):
+def import_articulation(arma: Hierarchy, name: str = None):
     """Imports the Articulation hierarchy described by the Armature data into Blender as a set of Empty objects
 
     Args:
@@ -295,10 +292,10 @@ def import_articulation(arma: Armature, name: str = None):
             bone.name, joint_map[parent.name] if parent else parent_joint
         )
         # Set the global transform
-        joint.location = swizzle_vector(bone.localPosition)
+        joint.location = swizzle_vector(bone.position)
         joint.rotation_mode = "QUATERNION"
-        joint.rotation_quaternion = swizzle_quaternion(bone.localRotation)
-        joint.scale = swizzle_vector_scale(bone.localScale)
+        joint.rotation_quaternion = swizzle_quaternion(bone.rotation)
+        joint.scale = swizzle_vector_scale(bone.scale)
         joint_map[bone.name] = joint
         if parent:
             joint[KEY_JOINT_BONE_NAME] = bone.name
@@ -306,13 +303,13 @@ def import_articulation(arma: Armature, name: str = None):
             parent_joint = joint
             joint.name = name
             joint[KEY_ARTICULATION_NAME_HASH_TBL] = json.dumps(
-                {k: v.name for k, v in arma.bone_path_hash_tbl.items()},
+                {k: v.name for k, v in arma.global_path_hash_table.items()},
                 ensure_ascii=False,
             )
     return joint_map, parent_joint
 
 
-def import_armature(arma: Armature, name: str = None):
+def import_armature(arma: Hierarchy, name: str = None):
     """Imports the Armature hierarcht described by the Armature data into Blender as an Armature object
 
     Args:
@@ -327,7 +324,7 @@ def import_armature(arma: Armature, name: str = None):
     armature.display_type = "OCTAHEDRAL"
     armature.relation_line_position = "HEAD"
     armature[KEY_BONE_NAME_HASH_TBL] = json.dumps(
-        {k: v.name for k, v in arma.bone_path_hash_tbl.items()}, ensure_ascii=False
+        {k: v.name for k, v in arma.global_path_hash_table.items()}, ensure_ascii=False
     )
     obj = bpy.data.objects.new(name, armature)
     bpy.context.collection.objects.link(obj)
@@ -365,7 +362,7 @@ def import_armature(arma: Armature, name: str = None):
 #      One should import all physics constraints before importing animations
 #      Since the import only works on rest pose for some reason?
 #      Maybe this is enough for now..
-def import_armature_physics_constraints(armature, data: Armature):
+def import_armature_physics_constraints(armature, data: Hierarchy):
     """Imports the rigid body constraints for the armature
 
     Args:
@@ -388,16 +385,16 @@ def import_armature_physics_constraints(armature, data: Armature):
         bpy.ops.object.mode_set(mode="EDIT")
 
         class SpringBoneChain:
-            begin: Bone = None
-            end: Bone = None
+            begin: HierarchyNode = None
+            end: HierarchyNode = None
 
         springbone_chains: Dict[str, SpringBoneChain] = dict()
 
-        def connect_spring_bones(bone: Bone, parent=None):
+        def connect_spring_bones(bone: HierarchyNode, parent=None):
             if not parent:
                 if (
-                    bone.physics
-                    and bone.physics.type == SekaiBonePhysicsType.SpringBone
+                    bone.sekai_physics
+                    and bone.sekai_physics.type == SekaiBonePhysicsType.SpringBone
                 ):
                     parent = bone
                 if parent:
@@ -535,7 +532,7 @@ def import_armature_physics_constraints(armature, data: Armature):
                         world_all[parent].inverted() @ world_all[bone_name]
                     )
 
-                    phys_data = data.bone_name_tbl[bone_name].physics
+                    phys_data = data.nodes[bone_name].sekai_physics
                     if phys_data:
                         prev_radius = phys_data.radius
                     target = create_bone_rigidbody(
@@ -624,23 +621,23 @@ def import_armature_physics_constraints(armature, data: Armature):
             for j in range(i + 1, len(rbs)):
                 set_no_collision(rbs[i], rbs[j])
         for parent, child, _ in root_bone.dfs_generator():
-            if child.physics:
-                if child.physics.type & SekaiBonePhysicsType.Collider:
+            if child.sekai_physics:
+                if child.sekai_physics.type & SekaiBonePhysicsType.Collider:
                     # Add colliders
                     obj = None
-                    if child.physics.type == SekaiBonePhysicsType.SphereCollider:
+                    if child.sekai_physics.type == SekaiBonePhysicsType.SphereCollider:
                         bpy.ops.mesh.primitive_uv_sphere_add(
-                            radius=child.physics.radius * SPHERE_RADIUS_FACTOR
+                            radius=child.sekai_physics.radius * SPHERE_RADIUS_FACTOR
                         )
                         obj = bpy.context.object
                         obj.name = child.name + "_rigidbody"
                         bpy.ops.rigidbody.object_add()
                         obj.rigid_body.type = "PASSIVE"
                         obj.rigid_body.collision_shape = "SPHERE"
-                    if child.physics.type == SekaiBonePhysicsType.CapsuleCollider:
+                    if child.sekai_physics.type == SekaiBonePhysicsType.CapsuleCollider:
                         bpy.ops.mesh.primitive_cylinder_add(
-                            radius=child.physics.radius * CAPSULE_RADIUS_FACTOR,
-                            depth=child.physics.height * CAPSULE_HEIGHT_FACTOR,
+                            radius=child.sekai_physics.radius * CAPSULE_RADIUS_FACTOR,
+                            depth=child.sekai_physics.height * CAPSULE_HEIGHT_FACTOR,
                         )
                         obj = bpy.context.object
                         obj.name = child.name + "_rigidbody"

@@ -64,7 +64,7 @@ def register_wm_props(**kw):
 from typing import Set
 from UnityPy import Environment
 from UnityPy.classes import AnimationClip
-from .types import Armature
+from .types import Hierarchy
 
 
 class SSSekaiGlobalEnvironment:
@@ -72,9 +72,9 @@ class SSSekaiGlobalEnvironment:
     current_enum_entries: list = None
     # --- SSSekai exclusive
     env: Environment
-    articulations: Set[Armature]
-    armatures: Set[Armature]
-    animations: Set[AnimationClip]
+    articulations: List[Hierarchy]
+    armatures: List[Hierarchy]
+    animations: List[AnimationClip]
     # --- RLA exclusive
     rla_sekai_streaming_live_bundle_path: str = None
     rla_header: dict = dict()
