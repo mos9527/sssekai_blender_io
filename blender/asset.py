@@ -1008,3 +1008,41 @@ def import_character_face_sdf_material(
             "Face SDF material imported without bone target. Face shadows will NOT work"
         )
     return material
+
+
+def import_stage_lightmap_material(
+    name: str, data: Material, texture_cache=None, **kwargs
+):
+    """Imports Material assets for stage (w/ baked lightmap) into blender.
+
+    Args:
+        name (str): material name
+        data (Material): UnityPy Material
+
+    Returns:
+        bpy.types.Material: Created material
+    """
+    textures = dict(data.m_SavedProperties.m_TexEnvs)
+    material = bpy.data.materials["SekaiShaderStageLightmapMaterial"].copy()
+    material.name = name
+    sekaiShader = material.node_tree.nodes["SekaiStageLightmapShader"]
+    if "_MainTex" in textures:
+        mainTex = make_material_texture_node(
+            material, textures["_MainTex"], texture_cache
+        )
+        if mainTex:
+            material.node_tree.links.new(
+                mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
+            )
+            material.node_tree.links.new(
+                mainTex.outputs["Alpha"], sekaiShader.inputs["Alpha"]
+            )
+    if "_LightMapTex" in textures:
+        lightMapTex = make_material_texture_node(
+            material, textures["_LightMapTex"], texture_cache, "UV1"
+        )
+        if lightMapTex:
+            material.node_tree.links.new(
+                lightMapTex.outputs["Color"], sekaiShader.inputs["Sekai Lightmap"]
+            )
+    return material
