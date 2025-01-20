@@ -12,79 +12,13 @@ from .math import (
     swizzle_vector,
     swizzle_vector_scale,
 )
-from .helpers import create_empty
+from .helpers import create_empty, time_to_frame, ensure_action, create_action
 from .consts import *
 
 logger = logging.getLogger(__name__)
 
 
-def time_to_frame(time: float, frame_offset: int):
-    return int(time * bpy.context.scene.render.fps) + 1 + frame_offset
-
-
-def retrive_action(object: bpy.types.Object):
-    """Retrieves the action bound to an object, if any"""
-    return object.animation_data.action if object.animation_data else None
-
-
-def ensure_action(object, name: str, always_create_new: bool):
-    """Creates (or retrieves) an action for an object, whilst ensuring that the action is bound to animation_data"""
-    existing_action = retrive_action(object)
-    if always_create_new or not existing_action:
-        object.animation_data_clear()
-        object.animation_data_create()
-        action = bpy.data.actions.new(name)
-        object.animation_data.action = action
-        return action
-    else:
-        return object.animation_data.action
-
-
-def create_action(name: str):
-    """Creates a new action"""
-    action = bpy.data.actions.new(name)
-    return action
-
-
-def apply_action(
-    object: bpy.types.Object,
-    action: bpy.types.Action,
-    use_nla: bool = False,
-    nla_always_new_track: bool = False,
-):
-    """Applies an action to an object
-
-    Args:
-
-        object (bpy.types.Object): target object
-        action (bpy.types.Action): action to apply
-        use_nla (bool): whether to use NLA tracks
-        nla_always_new_track (bool): whether to always create a new track. otherwise, the NLA clip (is use_nla) will be appended to the last track
-    """
-    if not object.animation_data:
-        object.animation_data_create()
-    if not use_nla:
-        object.animation_data_clear()
-        object.animation_data_create()
-        object.animation_data.action = action
-    else:
-        nla_tracks = object.animation_data.nla_tracks
-        if not len(nla_tracks):
-            object.animation_data_clear()
-            object.animation_data_create()
-            nla_tracks = object.animation_data.nla_tracks
-            nla_tracks.new()
-            nla_always_new_track = False
-        if nla_always_new_track:
-            nla_track = nla_tracks.new()
-        else:
-            nla_track = nla_tracks[-1]  # Use the last track if available
-        nla_track.name = action.name
-        frame_begin = max(0, action.frame_range[0])
-        strip = nla_track.strips.new(action.name, int(frame_begin), action)
-        strip.action_frame_start = max(0, frame_begin)
-
-
+# TODO: Handle Bezier control points
 def import_fcurve(
     action: bpy.types.Action,
     data_path: str,
@@ -225,27 +159,29 @@ def import_fcurve_quatnerion(
 def load_armature_animation(
     name: str,
     data: Animation,
-    dest_arma: bpy.types.Object,
+    target_armature: bpy.types.Object,
     frame_offset: int,
     action: bpy.types.Action = None,
 ):
-    """Converts an Animation object into Blender Action **without** applying it to the armature
+    """Converts an Animation object into Blender Action WITHOUT applying it to the armature
+
+    To apply the animation, you must call `apply_action` with the returned action.
 
     Args:
         name (str): name of the action
         data (Animation): animation data
-        dest_arma (bpy.types.Object): target armature object
+        target_armature (bpy.types.Object): target armature object
         frame_offset (int): frame offset
         action (bpy.types.Action, optional): existing action to append to. Defaults
 
     Returns:
         bpy.types.Action: the created action
     """
-    bone_table = json.loads(dest_arma.data[KEY_BONE_NAME_HASH_TBL])
+    bone_table = json.loads(target_armature.data[KEY_BONE_NAME_HASH_TBL])
     bpy.ops.object.mode_set(mode="EDIT")
     # Collect bone space <-> local space transforms
     local_space_trans_rot = dict()  # i.e. parent space
-    for bone in dest_arma.data.edit_bones:  # Must be done in edit mode
+    for bone in target_armature.data.edit_bones:  # Must be done in edit mode
         local_mat = (
             (bone.parent.matrix.inverted() @ bone.matrix)
             if bone.parent
@@ -302,7 +238,7 @@ def load_armature_animation(
         # Quaternion rotations
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
-            bone = dest_arma.pose.bones.get(bone_name, None)
+            bone = target_armature.pose.bones.get(bone_name, None)
             if not bone:
                 logger.warning("[Rotation] Bone %s not found in pose bones" % bone_name)
                 continue
@@ -328,7 +264,7 @@ def load_armature_animation(
         # Euler rotations
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
-            bone = dest_arma.pose.bones.get(bone_name, None)
+            bone = target_armature.pose.bones.get(bone_name, None)
             if not bone:
                 logger.warning(
                     "[Rotation Euler] Bone %s not found in pose bones" % bone_name
@@ -353,7 +289,7 @@ def load_armature_animation(
         # Translations
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
-            bone = dest_arma.pose.bones.get(bone_name, None)
+            bone = target_armature.pose.bones.get(bone_name, None)
             if not bone:
                 logger.warning(
                     "[Translation] Bone %s not found in pose bones" % bone_name
@@ -377,7 +313,7 @@ def load_armature_animation(
         # Scale
         if str(bone_hash) in bone_table:
             bone_name = bone_table[str(bone_hash)]
-            bone = dest_arma.pose.bones.get(bone_name, None)
+            bone = target_armature.pose.bones.get(bone_name, None)
             if not bone:
                 logger.warning("[Scale] Bone %s not found in pose bones" % bone_name)
                 continue
@@ -400,7 +336,9 @@ def load_keyshape_animation(
     frame_offset: int,
     action: bpy.types.Action = None,
 ):
-    """Converts an Animation object into Blender Action **without** applying it to the mesh
+    """Converts an Animation object into Blender Action WITHOUT applying it to the mesh
+
+    To apply the animation, you must call `apply_action` with the returned action.
 
     Args:
         name (str): name of the action
@@ -473,7 +411,9 @@ def load_camera_animation(
     fov_offset: float,
     action: bpy.types.Action = None,
 ):
-    """Converts an Animation object into Blender Action **without** applying it to the camera
+    """Converts an Animation object into Blender Action WITHOUT applying it to the camera
+
+    To apply the animation, you must call `apply_action` with the returned action.
 
     Args:
         name (str): name of the action
@@ -565,15 +505,15 @@ def load_camera_animation(
 def import_articulation_animation(
     name: str,
     data: Animation,
-    dest_arma: bpy.types.Object,
+    dest_articulation: bpy.types.Object,
     frame_offset: int,
     always_create_new: bool,
 ):
-    """Converts an Animation object into Blender Action(s), **whilst applying it to the articulation hierarchy**
+    """Converts an Animation object into Blender Action(s), and APPLIES it to the target joint hierarchy
 
-    In this case there would be seperate actions for **each** joint in the hierarchy.
+    In this case there would be seperate actions for EACH node in the hierarchy.
 
-    Support for exportable Actions (for usage with NLA Clips, for example) is not planned due to this approach.
+    Therefore it's recommended to use this function only when you're sure that the animation is meant to be applied
 
     Args:
         name (str): name of the action
@@ -582,10 +522,10 @@ def import_articulation_animation(
         frame_offset (int): frame offset
         always_create_new (bool): whether to always create a new action
     """
-    joint_table = json.loads(dest_arma[KEY_ARTICULATION_NAME_HASH_TBL])
+    joint_table = json.loads(dest_articulation[KEY_ARTICULATION_NAME_HASH_TBL])
     joint_obj = {
         obj[KEY_JOINT_BONE_NAME]: obj
-        for obj in dest_arma.children_recursive
+        for obj in dest_articulation.children_recursive
         if obj.type == "EMPTY" and KEY_JOINT_BONE_NAME in obj
     }
     for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():

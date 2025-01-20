@@ -41,9 +41,9 @@ def build_scene_hierarchy(env: Environment) -> Tuple[List[Hierarchy], List[Hiera
     articulations = []
     armatures = []
     for root in transform_roots:
-        armature = Hierarchy(root.m_GameObject.read().m_Name)
-        armature.global_path_hash_table = dict()
-        armature.nodes = dict()
+        hierarchy = Hierarchy(root.m_GameObject.read().m_Name)
+        hierarchy.global_path_hash_table = dict()
+        hierarchy.nodes = dict()
         path_id_tbl = dict()  # Only used locally
         is_skinned = False
 
@@ -102,14 +102,14 @@ def build_scene_hierarchy(env: Environment) -> Tuple[List[Hierarchy], List[Hiera
                 sekai_physics=sekai_physics,
             )
             path_id_tbl[root.m_GameObject.m_PathID] = node
-            armature.nodes[name] = node
+            hierarchy.nodes[name] = node
             if not parent:
-                armature.root = node
+                hierarchy.root = node
             else:
                 name_hash = get_name_hash(
                     "/".join(global_path[1:])
                 )  # Root would be the armature itself, so skip
-                armature.global_path_hash_table[name_hash] = node
+                hierarchy.global_path_hash_table[name_hash] = node
                 parent.children.append(node)
             # Skinned Mesh Renderer
             if getattr(game_object, "m_SkinnedMeshRenderer", None):
@@ -119,11 +119,11 @@ def build_scene_hierarchy(env: Environment) -> Tuple[List[Hierarchy], List[Hiera
 
         dfs(root)
         if is_skinned:
-            armature.is_articulation = False
-            armatures.append(armature)
+            hierarchy.is_articulation = False
+            armatures.append(hierarchy)
         else:
-            armature.is_articulation = True
-            articulations.append(armature)
+            hierarchy.is_articulation = True
+            articulations.append(hierarchy)
     articulations = sorted(articulations, key=lambda x: x.name)
     armatures = sorted(armatures, key=lambda x: x.name)
     return articulations, armatures

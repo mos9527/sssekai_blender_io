@@ -107,3 +107,70 @@ def auto_setup_shader_node_driver(node_group, target_obj, target_bone=None):
                 fcurves = fcurves_for_output(node, 0)
                 drivers_setup([fcurves], [f'["{node.name}"]'])
     pass
+
+
+def time_to_frame(time: float, frame_offset: int):
+    return int(time * bpy.context.scene.render.fps) + 1 + frame_offset
+
+
+def retrive_action(object: bpy.types.Object):
+    """Retrieves the action bound to an object, if any"""
+    return object.animation_data.action if object.animation_data else None
+
+
+def ensure_action(object: bpy.types.Object, name: str, always_create_new: bool):
+    """Creates (or retrieves) an action for an object, whilst ensuring that the action is bound to animation_data"""
+    existing_action = retrive_action(object)
+    if always_create_new or not existing_action:
+        object.animation_data_clear()
+        object.animation_data_create()
+        action = bpy.data.actions.new(name)
+        object.animation_data.action = action
+        return action
+    else:
+        return object.animation_data.action
+
+
+def create_action(name: str):
+    """Creates a new action"""
+    action = bpy.data.actions.new(name)
+    return action
+
+
+def apply_action(
+    object: bpy.types.Object,
+    action: bpy.types.Action,
+    use_nla: bool = False,
+    nla_always_new_track: bool = False,
+):
+    """Applies an action to an object
+
+    Args:
+
+        object (bpy.types.Object): target object
+        action (bpy.types.Action): action to apply
+        use_nla (bool): whether to use NLA tracks
+        nla_always_new_track (bool): whether to always create a new track. otherwise, the NLA clip (is use_nla) will be appended to the last track
+    """
+    if not object.animation_data:
+        object.animation_data_create()
+    if not use_nla:
+        object.animation_data_clear()
+        object.animation_data_create()
+        object.animation_data.action = action
+    else:
+        nla_tracks = object.animation_data.nla_tracks
+        if not len(nla_tracks):
+            object.animation_data_clear()
+            object.animation_data_create()
+            nla_tracks = object.animation_data.nla_tracks
+            nla_tracks.new()
+            nla_always_new_track = False
+        if nla_always_new_track:
+            nla_track = nla_tracks.new()
+        else:
+            nla_track = nla_tracks[-1]  # Use the last track if available
+        nla_track.name = action.name
+        frame_begin = max(0, action.frame_range[0])
+        strip = nla_track.strips.new(action.name, int(frame_begin), action)
+        strip.action_frame_start = max(0, frame_begin)
