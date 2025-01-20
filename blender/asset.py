@@ -56,7 +56,7 @@ def build_scene_hierarchy(env: Environment) -> Tuple[List[Hierarchy], List[Hiera
             if parent and parent.global_path:
                 # Copies implicitly
                 global_path = parent.global_path + [name]
-            print(name, global_path)
+
             # --- FIRE HAZARD AHEAD
             # Reads:
             # - Physics Rb + Collider

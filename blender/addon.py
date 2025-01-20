@@ -34,7 +34,12 @@ from UnityPy.classes import (
 
 from .consts import *
 from .utils import get_name_hash, encode_asset_id
-from .helpers import create_empty, ensure_sssekai_shader_blend
+from .helpers import (
+    create_empty,
+    ensure_sssekai_shader_blend,
+    retrive_action,
+    apply_action,
+)
 from .math import uVector3, uQuaternion, blVector
 from .math import euler3_to_quat_swizzled
 from . import register_class, register_wm_props, logger
@@ -55,8 +60,6 @@ from .animation import (
     load_armature_animation,
     load_camera_animation,
     load_keyshape_animation,
-    retrive_action,
-    apply_action,
     import_articulation_animation,
 )
 from .types import Hierarchy
