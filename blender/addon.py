@@ -790,11 +790,6 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
     def execute(self, context):
         global sssekai_global
         wm = context.window_manager
-        articulations, armatures, animations = (
-            sssekai_global.articulations,
-            sssekai_global.armatures,
-            sssekai_global.animations,
-        )
         ensure_sssekai_shader_blend()
         logger.debug("Loading selected asset: %s" % wm.sssekai_assetbundle_selected)
         texture_cache = dict()
@@ -898,7 +893,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
         def add_articulation(articulation: Hierarchy):
             joint_map, parent_object = import_articulation(articulation)
             for bone_name, joint in joint_map.items():
-                bone = articulation.get_bone_by_name(bone_name)
+                bone = articulation.nodes[bone_name]
                 try:
                     mesh = add_mesh(bone.game_object, bone_name, joint)
                 except Exception as e:
@@ -933,7 +928,7 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                 logger.debug(
                     "Creating new Rim Light controller %s" % rim_controller.name
                 )
-            for parent, bone, depth in armature.root.dfs_generator():
+            for parent, bone, depth in armature.root.children_recursive():
                 try:
                     mesh = add_mesh(
                         bone.game_object,
@@ -956,27 +951,17 @@ class SSSekaiBlenderImportOperator(bpy.types.Operator):
                     raise e
             logger.debug("Imported Armature %s" % armature.name)
 
-        for articulation in articulations:
+        for hierarchy in sssekai_global.hierarchies:
             if (
-                encode_asset_id(articulation.root.game_object)
-                == wm.sssekai_assetbundle_selected
-            ):
-                add_articulation(articulation)
-                return {"FINISHED"}
-
-        for armature in armatures:
-            if (
-                encode_asset_id(armature.root.game_object)
+                encode_asset_id(hierarchy.root.game_object)
                 == wm.sssekai_assetbundle_selected
             ):
                 if wm.sssekai_armatures_as_articulations:
-                    add_articulation(armature)
-                    return {"FINISHED"}
+                    add_articulation(hierarchy)
                 else:
-                    add_armature(armature)
-                    return {"FINISHED"}
+                    add_armature(hierarchy)
 
-        for animation in animations:
+        for animation in sssekai_global.animations:
             if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
                 logger.debug("Reading AnimationClip: %s" % animation.m_Name)
                 logger.debug("Loading...")
@@ -1136,17 +1121,15 @@ class SSSekaiBlenderImportPhysicsOperator(bpy.types.Operator):
             bpy.context.active_object and bpy.context.active_object.type == "ARMATURE"
         ), "Please select an armature to import physics data to!"
         wm = context.window_manager
-        articulations, armatures = (
-            sssekai_global.articulations,
-            sssekai_global.armatures,
-        )
-        for armature in armatures:
+        for hierarchy in sssekai_global.hierarchies:
             if (
-                encode_asset_id(armature.root.game_object)
+                encode_asset_id(hierarchy.root.game_object)
                 == wm.sssekai_assetbundle_selected
             ):
                 bpy.context.scene.frame_current = 0
-                import_armature_physics_constraints(bpy.context.active_object, armature)
+                import_armature_physics_constraints(
+                    bpy.context.active_object, hierarchy
+                )
                 return {"FINISHED"}
         return {"CANCELLED"}
 
@@ -1213,56 +1196,7 @@ class SSSekaiBlenderExportAnimationTypeTree(
 
     def execute(self, context):
         global sssekai_global
-        wm = context.window_manager
-        articulations, armatures, animations = (
-            sssekai_global.articulations,
-            sssekai_global.armatures,
-            sssekai_global.animations,
-        )
-        from UnityPy.classes import GameObject
-
-        def export_typetree(gameObject: GameObject):
-            assert (
-                gameObject.type == ClassIDType.AnimationClip
-            ), "Only AnimationClip is supported for exporting TypeTree"
-            filename = self.filepath
-            import yaml
-
-            with open(filename, "w", encoding="utf-8") as f:
-                logger.debug("Exporting TypeTree to %s" % filename)
-                f.write(
-                    """%YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
---- !u!74 &7400000
-"""
-                )
-                yaml.dump(
-                    {"AnimationClip": gameObject.read_typetree()},
-                    f,
-                    indent=4,
-                    ensure_ascii=False,
-                )
-                logger.debug("Exported TypeTree to %s" % filename)
-
-        for articulation in articulations:
-            if (
-                encode_asset_id(articulation.root.game_object)
-                == wm.sssekai_assetbundle_selected
-            ):
-                export_typetree(articulation.root.game_object)
-                return {"FINISHED"}
-        for armature in armatures:
-            if (
-                encode_asset_id(armature.root.game_object)
-                == wm.sssekai_assetbundle_selected
-            ):
-                export_typetree(armature.root.game_object)
-                return {"FINISHED"}
-        for animation in animations:
-            if encode_asset_id(animation) == wm.sssekai_assetbundle_selected:
-                export_typetree(animation)
-                return {"FINISHED"}
-        return {"CANCELLED"}
+        raise Exception("Not implemented")
 
 
 @register_class
@@ -1792,24 +1726,14 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
             UnityPy.config.FALLBACK_VERSION_WARNED = True
             UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()
             sssekai_global.env = UnityPy.load(dirname)
-            sssekai_global.articulations, sssekai_global.armatures = (
-                build_scene_hierarchy(sssekai_global.env)
-            )
+            sssekai_global.hierarchies = build_scene_hierarchy(sssekai_global.env)
             logger.debug(
-                "Found %d articulations and %d armatures"
-                % (len(sssekai_global.articulations), len(sssekai_global.armatures))
+                "Found %d Scene-level objects" % len(sssekai_global.hierarchies)
             )
             # See https://docs.blender.org/api/current/bpy.props.html#bpy.props.EnumProperty
             # enum_items = [(identifier, name, description, icon, number),...]
             # Note that `identifier` is the value that will be stored (and read) in the property
-            for articulation in sssekai_global.articulations:
-                encoded = encode_asset_id(articulation.root.game_object)
-                enum_items.append(
-                    (encoded, articulation.name, encoded, "MESH_DATA", index)
-                )
-                index += 1
-
-            for armature in sssekai_global.armatures:
+            for armature in sssekai_global.hierarchies:
                 encoded = encode_asset_id(armature.root.game_object)
                 enum_items.append(
                     (encoded, armature.name, encoded, "ARMATURE_DATA", index)

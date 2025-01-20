@@ -26,30 +26,26 @@ from .consts import *
 from . import logger
 
 
-def build_scene_hierarchy(env: Environment) -> Tuple[List[Hierarchy], List[Hierarchy]]:
-    """Builds the scene hierarchy from the Unity Environment"""
-    # Collect all static meshes and skinned meshes's *root transform* object
-    # UnityPy does not construct the Bone Hierarchy so we have to do it ourselves
+def build_scene_hierarchy(env: Environment) -> List[Hierarchy]:
+    """Build the scene hierarchy from the UnityPy Environment
+
+    Formally, this function locates all the root Transform objects
+    in the scene and builds the hierarchy from there.
+
+    Since with Unity's Scene Graph, the root of the hierarchy belongs to the scene itself.
+    This in effect eliminates the distinction between scene(s) and would allow a one-to-one
+    representation of the scene in Blender's View Layer.
+    """
     transform_roots = []
-    for obj in env.objects:
-        if obj.type == ClassIDType.Transform:
-            data = obj.read()
-            if hasattr(data, "m_Children") and not data.m_Father.path_id:
-                transform_roots.append(data)
-    # Collect all skinned meshes as Armature[s], otherwise build articulations for
-    # Note that Mesh maybe reused across Armatures, but we don't care...for now
-    articulations = []
-    armatures = []
-    for root in transform_roots:
-        hierarchy = Hierarchy(root.m_GameObject.read().m_Name)
-        hierarchy.global_path_hash_table = dict()
-        hierarchy.nodes = dict()
-        path_id_tbl = dict()  # Only used locally
-        is_skinned = False
+    for obj in filter(lambda obj: obj.type == ClassIDType.Transform, env.objects):
+        data = obj.read()
+        if hasattr(data, "m_Children") and not data.m_Father.path_id:
+            transform_roots.append(data)
+    hierarchies = []
+    for transform in transform_roots:
+        hierarchy = Hierarchy(transform.m_GameObject.read().m_Name)
 
         def dfs(root: Transform, parent: HierarchyNode = None):
-            nonlocal is_skinned
-
             game_object = root.m_GameObject.read()
             name = game_object.m_Name
             global_path = [name]
@@ -57,53 +53,19 @@ def build_scene_hierarchy(env: Environment) -> Tuple[List[Hierarchy], List[Hiera
                 # Copies implicitly
                 global_path = parent.global_path + [name]
 
-            # --- FIRE HAZARD AHEAD
-            # Reads:
-            # - Physics Rb + Collider
-            # XXX: Some properties are not implemented yet
-            # TODO: This...is so ugly
-            sekai_physics = None
-            for component in game_object.m_Components:
-                if component.type == ClassIDType.MonoBehaviour:
-                    component = component.deref().read(check_read=False)
-                    if component.m_Script:
-                        physicsScript = component.m_Script.read()
-                        physics = component.__dict__  # .read_typetree()
-                        phy_type = None
-                        if physicsScript.m_Name == "SpringSphereCollider":
-                            phy_type = SekaiBonePhysicsType.SphereCollider
-                        if physicsScript.m_Name == "SpringCapsuleCollider":
-                            phy_type = SekaiBonePhysicsType.CapsuleCollider
-                        if physicsScript.m_Name == "SekaiSpringBone":
-                            phy_type = SekaiBonePhysicsType.SpringBone
-                        if physicsScript.m_Name == "SpringManager":
-                            phy_type = SekaiBonePhysicsType.SpringManager
-                        if phy_type != None:
-                            sekai_physics = SekaiBonePhysics.from_dict(physics)
-                            sekai_physics.type = phy_type
-                            if "pivotNode" in physics:
-                                sekai_physics.pivot = path_id_tbl.get(
-                                    physics["pivotNode"].m_PathID, None
-                                )
-                                sekai_physics.pivot = getattr(
-                                    sekai_physics.pivot, "name", None
-                                )
-            # ---
-
             node = HierarchyNode(
                 name,
                 root.m_LocalPosition,
                 root.m_LocalRotation,
                 root.m_LocalScale,
-                # Keywords
+                # ---
                 parent=parent,
                 global_path=global_path,
                 game_object=game_object,
-                sekai_physics=sekai_physics,
             )
-            path_id_tbl[root.m_GameObject.m_PathID] = node
             hierarchy.nodes[name] = node
             if not parent:
+                # Effectively the bone for `transform`
                 hierarchy.root = node
             else:
                 name_hash = get_name_hash(
@@ -111,22 +73,16 @@ def build_scene_hierarchy(env: Environment) -> Tuple[List[Hierarchy], List[Hiera
                 )  # Root would be the armature itself, so skip
                 hierarchy.global_path_hash_table[name_hash] = node
                 parent.children.append(node)
-            # Skinned Mesh Renderer
-            if getattr(game_object, "m_SkinnedMeshRenderer", None):
-                is_skinned = True
             for child in root.m_Children:
                 dfs(child.read(), node)
 
-        dfs(root)
-        if is_skinned:
-            hierarchy.is_articulation = False
-            armatures.append(hierarchy)
-        else:
-            hierarchy.is_articulation = True
-            articulations.append(hierarchy)
-    articulations = sorted(articulations, key=lambda x: x.name)
-    armatures = sorted(armatures, key=lambda x: x.name)
-    return articulations, armatures
+        dfs(transform)
+        if hierarchy.root:
+            hierarchy.root.update_global_transforms()
+        hierarchies.append(hierarchy)
+
+    hierarchies = sorted(hierarchies, key=lambda x: x.name)
+    return hierarchies
 
 
 def import_mesh(
@@ -287,7 +243,7 @@ def import_articulation(arma: Hierarchy, name: str = None):
     name = name or arma.name
     joint_map = dict()
     parent_joint = None
-    for parent, bone, depth in arma.root.dfs_generator():
+    for parent, bone, depth in arma.root.children_recursive():
         joint = create_empty(
             bone.name, joint_map[parent.name] if parent else parent_joint
         )
@@ -332,9 +288,9 @@ def import_armature(arma: Hierarchy, name: str = None):
     bpy.ops.object.mode_set(mode="EDIT")
     root = arma.root
     # Build global transforms
-    root.calculate_global_transforms()
+    root.update_global_transforms()
     # Build bone hierarchy in blender
-    for parent, child, _ in root.dfs_generator():
+    for parent, child, _ in root.children_recursive():
         if child.name != root.name:
             ebone = armature.edit_bones.new(child.name)
             ebone.use_local_location = True
@@ -376,7 +332,7 @@ def import_armature_physics_constraints(armature, data: Hierarchy):
     SPRINGBONE_RADIUS_FACTOR = 0.15
     # These are totally empirical
     bpy.context.view_layer.objects.active = armature
-    root_bone = data.root.recursive_locate_by_name("Position")
+    root_bone = data.nodes["Position"]
 
     if root_bone:
         # Connect all spring bones
@@ -620,7 +576,7 @@ def import_armature_physics_constraints(armature, data: Hierarchy):
         for i in range(len(rbs)):
             for j in range(i + 1, len(rbs)):
                 set_no_collision(rbs[i], rbs[j])
-        for parent, child, _ in root_bone.dfs_generator():
+        for parent, child, _ in root_bone.children_recursive():
             if child.sekai_physics:
                 if child.sekai_physics.type & SekaiBonePhysicsType.Collider:
                     # Add colliders

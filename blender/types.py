@@ -1,7 +1,7 @@
 from enum import IntEnum
 from dataclasses import dataclass, field
-from typing import Dict, List
-from .utils import dataclass_from_dict, get_name_hash
+from typing import Dict, List, Tuple, Generator
+from .utils import dataclass_from_dict
 from .math import (
     swizzle_vector,
     swizzle_quaternion,
@@ -60,20 +60,23 @@ class SekaiBonePhysics:
 class HierarchyNode:
     name: str
 
-    # Transform (in Local Space)
+    # Transform (in Local Space, Unity coordinates)
     position: uVector3
     rotation: uQuaternion
     scale: uVector3
+
     # Graph relations
     parent: object = None  # HierarchyNode
     children: List[object] = field(default_factory=list)  # HierarchyNode
+
     # Cached global attributes
+    """Path from the root to this bone (inclusive)"""
     global_path: List[str] = field(default_factory=list)
+    """Global transform in Blender coordinates. NOTE: You will need to update this manually with `update_global_transforms`"""
     global_transform: blMatrix = blMatrix.Identity(4)
-    # Attributes
+
+    # Unity-specific
     game_object: GameObject = None
-    # Sekai Specific
-    sekai_physics: SekaiBonePhysics = None
 
     # Helpers
     def get_blender_local_position(self):
@@ -92,7 +95,14 @@ class HierarchyNode:
             swizzle_vector_scale(self.scale),
         )
 
-    def dfs_generator(self, root=None):
+    def children_recursive(
+        self, root=None
+    ) -> Generator[Tuple[object, object, int], None, None]:
+        """Yields a tuple of (parent, child, depth) for each bone in the hierarchy.
+
+        The tree is traversed in depth-first order and from top to bottom.
+        """
+
         def dfs(bone: HierarchyNode, parent: HierarchyNode = None, depth=0):
             yield parent, bone, depth
             for child in bone.children:
@@ -100,27 +110,13 @@ class HierarchyNode:
 
         yield from dfs(root or self)
 
-    def calculate_global_transforms(self):
+    def update_global_transforms(self):
         """Calculates global transforms for this bone and all its children recursively."""
-        if not self.global_transform:
-            self.global_transform = blMatrix.Identity(4)
-        for parent, child, _ in self.dfs_generator():
+        for parent, child, _ in self.children_recursive():
             if parent:
                 child.global_transform = parent.global_transform @ child.to_trs_matrix()
             else:
                 child.global_transform = child.to_trs_matrix()
-
-    def recursive_search(self, predicate=lambda x: True):
-        """Searches for a bone that matches the predicate, recursively."""
-        for parent, child, _ in self.dfs_generator():
-            if predicate(child):
-                yield child
-
-    def recursive_locate_by_name(self, name):
-        try:
-            return next(self.recursive_search(lambda x: x.name == name))
-        except StopIteration:
-            return None
 
     # Extra
     edit_bone: object = None  # Blender EditBone
@@ -130,16 +126,10 @@ class HierarchyNode:
 class Hierarchy:
     name: str
 
+    # Graph relations
     root: HierarchyNode = None
-    nodes: Dict[str, HierarchyNode] = None
+    nodes: Dict[str, HierarchyNode] = field(default_factory=dict)
 
     # Tables
-    # CRC32 hash table of global path concatenated with / (e.g. Position/Body/Neck/Head)
-    global_path_hash_table: Dict[int, HierarchyNode] = None
-
-    # Helpers
-    def get_bone_by_path(self, path: str):
-        return self.global_path_hash_table[get_name_hash(path)]
-
-    def get_bone_by_name(self, name: str):
-        return self.nodes[name]
+    """CRC32 hash table of global path concatenated with / (e.g. Position/Body/Neck/Head)"""
+    global_path_hash_table: Dict[int, HierarchyNode] = field(default_factory=dict)

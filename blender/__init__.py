@@ -72,8 +72,7 @@ class SSSekaiGlobalEnvironment:
     current_enum_entries: list = None
     # --- SSSekai exclusive
     env: Environment
-    articulations: List[Hierarchy]
-    armatures: List[Hierarchy]
+    hierarchies: List[Hierarchy]
     animations: List[AnimationClip]
     # --- RLA exclusive
     rla_sekai_streaming_live_bundle_path: str = None
