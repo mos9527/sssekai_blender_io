@@ -1,5 +1,5 @@
 import os, zlib
-from . import SCRIPT_DIR
+from .. import SCRIPT_DIR
 from sssekai.abcache import fromdict as dataclass_from_dict
 
 

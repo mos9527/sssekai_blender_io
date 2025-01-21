@@ -14,8 +14,7 @@ from .math import (
 )
 from .helpers import create_empty, time_to_frame, ensure_action, create_action
 from .consts import *
-
-logger = logging.getLogger(__name__)
+from .. import logger
 
 
 # TODO: Handle Bezier control points

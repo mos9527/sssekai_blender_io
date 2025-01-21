@@ -2,12 +2,14 @@
 
 import bpy, os
 from logging import getLogger
-from typing import List
+from typing import List, Dict
+from dataclasses import dataclass, field
 
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger = getLogger("sssekai")
 
 
+@dataclass
 class SSSekaiClassRegistry:
     """Registers classes and WindowManager properties for the addon.
 
@@ -15,14 +17,14 @@ class SSSekaiClassRegistry:
     XXX: Broken in a lot of cases.
     """
 
-    classes = list()
-    wm_props = dict()
+    classes: List[object] = field(default_factory=list)
+    wm_props: Dict[str, object] = field(default_factory=dict)
 
     def add_register_class(self, clazz):
         self.classes.append(clazz)
 
     def register_all(self):
-        for clazz in self.classes[::-1]:
+        for clazz in self.classes:
             bpy.utils.register_class(clazz)
 
     def unregister_all(self):
@@ -64,7 +66,7 @@ def register_wm_props(**kw):
 from typing import Set
 from UnityPy import Environment
 from UnityPy.classes import AnimationClip
-from .types import Hierarchy
+from .core.types import Hierarchy
 
 
 class SSSekaiGlobalEnvironment:

@@ -23,16 +23,16 @@ from .math import (
     blMatrix,
 )
 from .consts import *
-from . import logger
+from .. import logger
 
 
 def build_scene_hierarchy(env: Environment) -> List[Hierarchy]:
     """Build the scene hierarchy from the UnityPy Environment
 
     Formally, this function locates all the root Transform objects
-    in the scene and builds the hierarchy from there.
+    in the Environment (all scenes would then be included) and builds the hierarchy from there.
 
-    Since with Unity's Scene Graph, the root of the hierarchy belongs to the scene itself.
+    With Unity's Scene Graph, the root of the hierarchy belongs to the scene itself.
     This in effect eliminates the distinction between scene(s) and would allow a one-to-one
     representation of the scene in Blender's View Layer.
     """
@@ -180,11 +180,10 @@ def import_mesh(
                     uv_layer.data[loop].uv = src_layer[vtx]
 
     try_add_uv_map("UV0", set_active=True)
-    # TODO: Figure out all uses cases for UV1 maps
-    # Discoveries so far:
-    # - Lightmaps for stage pre-baked lighting
-    # - Facial SDF shadows. See Reference section in the README
-    try_add_uv_map("UV1")
+    for i in range(1, 8):
+        # Unity supports up to 8 UV maps
+        try_add_uv_map("UV" + str(i))
+
     # Vertex Color
     if handler.m_Colors:
         vertex_color = mesh.color_attributes.new(
@@ -287,8 +286,6 @@ def import_armature(arma: Hierarchy, name: str = None):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode="EDIT")
     root = arma.root
-    # Build global transforms
-    root.update_global_transforms()
     # Build bone hierarchy in blender
     for parent, child, _ in root.children_recursive():
         if child.name != root.name:

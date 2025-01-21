@@ -111,4 +111,4 @@ CAMERA_TRANS_ROT_CRC_MAIN = 3326594866  # Euler, Position in transform tracks
 CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA = (
     3283970054  # Position, Scale(??) in transform tracks, FOV in the last float track
 )
-# region Sekai specific values
+# endregion

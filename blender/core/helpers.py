@@ -1,6 +1,6 @@
 import bpy
 from .utils import get_addon_relative_path
-from . import logger
+from .. import logger
 
 
 def ensure_sssekai_shader_blend():

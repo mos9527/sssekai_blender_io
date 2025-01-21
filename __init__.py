@@ -50,8 +50,12 @@ logger = getLogger(__name__)
 
 
 def register():
-    from .blender import registry, SCRIPT_DIR
+    from . import blender
     from coloredlogs import install
+
+    from .translations import translations_dict
+
+    bpy.app.translations.register(__package__, translations_dict)
 
     install(level="DEBUG", fmt="sssekai | %(levelname)s | %(module)s | %(message)s")
 
@@ -60,18 +64,15 @@ def register():
     logger.debug("SSSekai version: %s", sssekai.__version__)
     logger.debug("UnityPy version: %s", UnityPy.__version__)
     logger.info("Registering addon.")
+
+    blender.registry.reset()
     modules = []
     for addon in ADDONS:
         modules.append(importlib.import_module(".blender." + addon, __name__))
-    registry.reset()
     for module in modules:
         importlib.reload(module)  # Ensure that the latest code is loaded everytime
-    registry.register_all()
-    registry.register_all_wm()
-
-    from .translations import translations_dict
-
-    bpy.app.translations.register(__package__, translations_dict)
+    blender.registry.register_all()
+    blender.registry.register_all_wm()
 
 
 def unregister():
