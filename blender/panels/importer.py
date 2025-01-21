@@ -239,6 +239,26 @@ register_wm_props(
         description=T("Height of the character in meters"),
         default=1.00,
     ),
+    sssekai_character_type=EnumProperty(
+        name=T("Character Type"),
+        description=T("Type of character mesh to import."),
+        items=[
+            (
+                "HEAD",
+                T("Face"),
+                T("Hierachy is a Face object"),
+                "SHAPEKEY_DATA",
+                1,
+            ),
+            (
+                "BODY",
+                T("Body"),
+                T("Hierachy is a Body object"),
+                "CON_ARMATURE",
+                2,
+            ),
+        ],
+    ),
 )
 
 
@@ -327,16 +347,33 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     text=T("Project SEKAI Character Options"),
                     icon="OUTLINER_OB_ARMATURE",
                 )
-                row = layout.row()
-                row.label(
-                    text=T(
-                        "NOTE: To import a Project SEKAI Armature, you'll have to create a Character Controller first. Click the operator below to make one."
+                obj = context.active_object
+                if not KEY_SEKAI_CHARACTER_ROOT_STUB in obj:
+                    row = layout.row()
+                    row.label(text=T("NOTE: To import a Project SEKAI Armature"))
+                    row.label(
+                        text=T(
+                            "You'll need to create an instance of SekaiCharacterRoot, or have one selected"
+                        )
                     )
-                )
-                row = layout.row()
-                row.operator(
-                    "sssekai.create_character_controller_op",
-                    icon="OUTLINER_OB_ARMATURE",
-                )
+                    row.label(text=T("Click the button below to create one"))
+                    row = layout.row()
+                    row.operator(
+                        "sssekai.create_character_controller_op",
+                        icon="OUTLINER_OB_ARMATURE",
+                    )
+                else:
+                    row = layout.row()
+                    row.label(text=T("Character Height"))
+                    row = layout.row()
+                    row.prop(
+                        obj,
+                        '["%s"]' % KEY_SEKAI_CHARACTER_HEIGHT,
+                        text=T("Character Height (in meters)"),
+                    )
+                    row = layout.row()
+                    row.label(text=T("Mesh Type"))
+                    row = layout.row()
+                    row.prop(wm, "sssekai_character_type", expand=True)
         row = layout.row()
         row.operator(SSSekaiBlenderImportOperator.bl_idname, icon="APPEND_BLEND")

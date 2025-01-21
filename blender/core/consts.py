@@ -11,6 +11,8 @@ KEY_CAMERA_RIG = "sssekai_camera_rig"  # Camera rig data
 # Plugin table names
 KEY_SEKAI_CHARACTER_ROOT_STUB = "sssekai_sekai_character_root_stub"
 KEY_SEKAI_CHARACTER_HEIGHT = "sssekai_sekai_character_height"
+KEY_SEKAI_CHARACTER_BODY_OBJ = "sssekai_sekai_character_body_obj"
+KEY_SEKAI_CHARACTER_FACE_OBJ = "sssekai_sekai_character_face_obj"
 # Hardcoded orders for RLA import
 RLA_VALID_BONES = [
     "Hip",
