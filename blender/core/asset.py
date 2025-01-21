@@ -145,7 +145,7 @@ def import_mesh(
             else:
                 # Default to 1 otherwise the bone would not make any effect
                 # XXX: This is purly emprical to handle some edge cases.
-                boneWeight = [1.0] * len(boneIndex)
+                boneWeight = [1.0 / len(boneIndex)] * len(boneIndex)
             for i in range(len(boneIndex)):
                 vertex_group_index = boneIndex[i]
                 if not vertex_group_index in vert[deform_layer]:

@@ -2,8 +2,9 @@
 
 import bpy, os
 from logging import getLogger
-from typing import List, Dict
+from typing import List, Dict, DefaultDict
 from dataclasses import dataclass, field
+from collections import defaultdict
 
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger = getLogger("sssekai")
@@ -63,30 +64,72 @@ def register_wm_props(**kw):
 
 # Evil(!!) global variables
 # Copilot autocompleted this after 'evil' lmao
-from typing import Set
 from UnityPy import Environment
-from UnityPy.classes import AnimationClip
+from UnityPy.classes import AnimationClip, Animator
 from .core.types import Hierarchy
 
+from typing import Dict, List, Tuple
+from dataclasses import dataclass, field
 
+
+@dataclass
+class SSSekaiEnvironmentContainerCachedEnums:
+    hierarchies: List[Tuple[str, str, str, str, int]] = field(default_factory=list)
+    animators: List[Tuple[str, str, str, str, int]] = field(default_factory=list)
+    animations: List[Tuple[str, str, str, str, int]] = field(default_factory=list)
+
+
+@dataclass
+class SSSekaiEnvironmentContainer:
+    # PathID to types
+    hierarchies: Dict[int, Hierarchy] = field(default_factory=dict)
+    animators: Dict[int, Animator] = field(default_factory=dict)
+    animations: Dict[int, AnimationClip] = field(default_factory=dict)
+    enums: SSSekaiEnvironmentContainerCachedEnums = field(
+        default_factory=SSSekaiEnvironmentContainerCachedEnums
+    )
+
+    def update_enums(self):
+        # [(identifier, name, description, icon, number), ...]
+        self.enums.hierarchies = [
+            (str(path_id), hierarchy.name, "", "ARMATURE_DATA", index)
+            for index, (path_id, hierarchy) in enumerate(self.hierarchies.items())
+        ]
+        self.enums.animators = [
+            (
+                str(path_id),
+                animator.m_GameObject.read().m_Name,
+                "",
+                "DECORATE_ANIMATE",
+                index,
+            )
+            for index, (path_id, animator) in enumerate(self.animators.items())
+        ]
+        self.enums.animations = [
+            (str(path_id), animation.m_Name, "", "ANIM_DATA", index)
+            for index, (path_id, animation) in enumerate(self.animations.items())
+        ]
+
+
+@dataclass
 class SSSekaiGlobalEnvironment:
-    current_dir: str = None
-    current_enum_entries: list = None
-    # --- SSSekai exclusive
-    env: Environment
-    hierarchies: List[Hierarchy]
-    animations: List[AnimationClip]
-    # --- RLA exclusive
+    # --- UnityPy
+    env: Environment = None
+    cotainers: DefaultDict[str, SSSekaiEnvironmentContainer] = field(
+        default_factory=lambda: defaultdict(SSSekaiEnvironmentContainer)
+    )
+    container_enum: List[Tuple[str, str, str, str, int]] = field(default_factory=list)
+    # --- RLA
     rla_sekai_streaming_live_bundle_path: str = None
-    rla_header: dict = dict()
-    rla_clip_data: dict = dict()
-    rla_selected_raw_clip: str = 0
-    rla_raw_clips: dict = dict()
-    rla_animations: dict = dict()  # character ID -> Animation
+    rla_header: dict = field(default_factory=dict)
+    rla_clip_data: dict = field(default_factory=dict)
+    rla_selected_raw_clip: str = None
+    rla_raw_clips: dict = field(default_factory=dict)
+    rla_animations: dict = field(default_factory=dict)  # character ID -> Animation
     rla_clip_tick_range: tuple = (0, 0)
-    rla_clip_charas: set = set()
+    rla_clip_charas: set = field(default_factory=set)
     rla_enum_entries: list = None
-    rla_enum_bookmarks: list = []
+    rla_enum_bookmarks: list = field(default_factory=list)
 
     def rla_get_version(self):
         return (

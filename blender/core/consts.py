@@ -9,6 +9,7 @@ KEY_CAMERA_RIG = "sssekai_camera_rig"  # Camera rig data
 
 # region Sekai specific values
 # Plugin table names
+KEY_SEKAI_CHARACTER_ROOT_STUB = "sssekai_sekai_character_root_stub"
 KEY_SEKAI_CHARACTER_HEIGHT = "sssekai_sekai_character_height"
 # Hardcoded orders for RLA import
 RLA_VALID_BONES = [

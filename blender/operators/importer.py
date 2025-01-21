@@ -15,7 +15,7 @@ from UnityPy.classes import (
 )
 
 from ..core.consts import *
-from ..core.utils import encode_asset_id
+from ..core.helpers import create_empty
 from ..core.helpers import (
     ensure_sssekai_shader_blend,
     retrive_action,
@@ -40,8 +40,32 @@ from ..core.animation import (
     import_articulation_animation,
 )
 from ..core.types import Hierarchy
-from .. import register_class, logger
+from .. import register_class, register_wm_props, logger
 from .. import sssekai_global
+
+
+@register_class
+class SSSekaiBlenderCreateCharacterControllerOperator(bpy.types.Operator):
+    bl_idname = "sssekai.create_character_controller_op"
+    bl_label = T("Create Character Controller")
+    bl_description = T(
+        "Create an Empty object with a Rim Light Controller that one can import Sekai Character armatures to"
+    )
+
+    def execute(self, context):
+        wm = context.window_manager
+        ensure_sssekai_shader_blend()
+
+        root = create_empty("SekaiCharacterRoot")
+        root[KEY_SEKAI_CHARACTER_ROOT_STUB] = True
+        root[KEY_SEKAI_CHARACTER_HEIGHT] = wm.sssekai_character_height
+
+        rim_controller = bpy.data.objects["SekaiCharaRimLight"].copy()
+        rim_controller.parent = root
+        bpy.context.collection.objects.link(rim_controller)
+
+        bpy.context.view_layer.objects.active = root
+        return {"FINISHED"}
 
 
 @register_class
