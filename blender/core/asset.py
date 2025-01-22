@@ -97,6 +97,8 @@ def import_mesh(
     Takes care of the following:
     - Vertices (Position + Normal) and indices (Trig Faces)
     - UV Map
+    - Submeshes (Material indices)
+
     Additonally, for Skinned meshes:
     - Bone Indices + Bone Weights
     - Blend Shape / Shape Keys
@@ -226,6 +228,19 @@ def import_mesh(
             keyshape_hash_tbl, ensure_ascii=False
         )
     bm.free()
+    # Set material indices
+    # Materials don't have to be present beforehand
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for index, sub in enumerate(data.m_SubMeshes):
+        start, count = sub.firstVertex, sub.vertexCount
+        for i in range(start, start + count):
+            mesh.vertices[i].select = True
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.context.object.active_material_index = index
+        bpy.ops.object.material_slot_assign()
+        bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.object.mode_set(mode="OBJECT")  # Deselects
     return mesh, obj
 
 

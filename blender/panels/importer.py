@@ -351,11 +351,13 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 if not KEY_SEKAI_CHARACTER_ROOT_STUB in obj:
                     row = layout.row()
                     row.label(text=T("NOTE: To import a Project SEKAI Armature"))
+                    row = layout.row()
                     row.label(
                         text=T(
                             "You'll need to create an instance of SekaiCharacterRoot, or have one selected"
                         )
                     )
+                    row = layout.row()
                     row.label(text=T("Click the button below to create one"))
                     row = layout.row()
                     row.operator(
