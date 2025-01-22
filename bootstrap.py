@@ -165,6 +165,8 @@ class SSSekaiUpdateAddonOperator(bpy.types.Operator):
                     cwd=install_path,
                     check=True,
                 )
+                self.report({"INFO"}, "Addon has been updated!")
+                return {"FINISHED"}
             else:
                 # Invalid git repository.
                 if env.is_current_installation_symlinked:
