@@ -28,7 +28,7 @@ Currently supported languages and maintainers:
 - 简体中文 (zh_HANS, mos9527)
 
 # Installing & Updating
-- Make sure you have Git installed on your system.
+- Make sure you have [Git](https://git-scm.com/) installed on your system.
 - Download the addon [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py)
 - Install the Bootstrapper in Blender by going to `Edit > Preferences > Add-ons > Install...` and selecting the Bootstrapper, which is a `.py` file.
 - Enable the Bootstrapper in Blender by checking the box next to it.
