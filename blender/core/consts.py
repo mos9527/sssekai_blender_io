@@ -1,14 +1,7 @@
-# The tables stored in the mesh's Custom Properties. Used by the animation importer.
-KEY_BONE_NAME_HASH_TBL = "sssekai_bone_name_hash_tbl"  # Bone *full path hash* to bone name (Vertex Group name in blender lingo)
-KEY_ARTICULATION_NAME_HASH_TBL = "sssekai_articulation_name_hash_tbl"  # GameObject hierarchy path hash to parent GameObject name
-KEY_SHAPEKEY_NAME_HASH_TBL = (
-    "sssekai_shapekey_name_hash_tbl"  # ShapeKey name hash to ShapeKey names
-)
-KEY_JOINT_BONE_NAME = "sssekai_joint_bone_name"  # Bone name of the joint
-KEY_CAMERA_RIG = "sssekai_camera_rig"  # Camera rig data
+# Plugin custom attribute keys
+KEY_SHAPEKEY_HASH_TABEL = "sssekai_shapekey_name_hash_tbl"
 
-# region Sekai specific values
-# Plugin table names
+KEY_SEKAI_CAMERA_RIG = "sssekai_camera_rig"
 KEY_SEKAI_CHARACTER_ROOT_STUB = "sssekai_sekai_character_root_stub"
 KEY_SEKAI_CHARACTER_HEIGHT = "sssekai_sekai_character_height"
 KEY_SEKAI_CHARACTER_BODY_OBJ = "sssekai_sekai_character_body_obj"
@@ -114,4 +107,3 @@ CAMERA_TRANS_ROT_CRC_MAIN = 3326594866  # Euler, Position in transform tracks
 CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA = (
     3283970054  # Position, Scale(??) in transform tracks, FOV in the last float track
 )
-# endregion

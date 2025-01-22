@@ -59,6 +59,7 @@ class SekaiBonePhysics:
 @dataclass
 class HierarchyNode:
     name: str
+    path_id: int
 
     # Transform (in Local Space, Unity coordinates)
     position: uVector3
@@ -70,15 +71,15 @@ class HierarchyNode:
     children: List[object] = field(default_factory=list)  # HierarchyNode
 
     # Cached global attributes
-    """Path from the root to this bone (inclusive)"""
-    global_path: List[str] = field(default_factory=list)
     """Global transform in Blender coordinates. NOTE: You will need to update this manually with `update_global_transforms`"""
     global_transform: blMatrix = blMatrix.Identity(4)
 
     # Unity-specific
     game_object: GameObject = None
 
-    # Helpers
+    def __hash__(self):
+        return self.path_id
+
     def get_blender_local_position(self):
         return swizzle_vector(self.position)
 
@@ -118,9 +119,6 @@ class HierarchyNode:
             else:
                 child.global_transform = child.to_trs_matrix()
 
-    # Extra
-    edit_bone: object = None  # Blender EditBone
-
 
 @dataclass
 class Hierarchy:
@@ -128,8 +126,9 @@ class Hierarchy:
 
     # Graph relations
     root: HierarchyNode = None
-    nodes: Dict[str, HierarchyNode] = field(default_factory=dict)
+    nodes: Dict[int, HierarchyNode] = field(default_factory=dict)
+    named_nodes: Dict[str, HierarchyNode] = field(default_factory=dict)
 
-    # Tables
-    """CRC32 hash table of global path concatenated with / (e.g. Position/Body/Neck/Head)"""
-    global_path_hash_table: Dict[int, HierarchyNode] = field(default_factory=dict)
+    @property
+    def path_id(self):
+        return self.root.path_id

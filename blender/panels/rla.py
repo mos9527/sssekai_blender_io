@@ -19,7 +19,7 @@ from ..operators.rla import (
 )
 
 
-@register_class
+# @register_class
 class SSSekaiRLAImportPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_rla_import"
     bl_label = T("RLA Import")

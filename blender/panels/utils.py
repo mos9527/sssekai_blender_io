@@ -3,22 +3,14 @@ from bpy.app.translations import pgettext as T
 
 from ..core.consts import *
 from ..operators.utils import (
-    SSSekaiBlenderUtilMiscRenameRemoveNumericSuffixOperator,
-    SSSekaiBlenderUtilMiscRemoveBoneHierarchyOperator,
     SSSekaiBlenderUtilApplyModifersOperator,
     SSSekaiBlenderUtilArmatureMergeOperator,
-    SSSekaiBlenderUtilCharacterArmatureSimplifyOperator,
-    SSSekaiBlenderUtilCharacterHeelOffsetOperator,
-    SSSekaiBlenderUtilCharacterNeckMergeOperator,
-    SSSekaiBlenderUtilCharacterScalingMakeRootOperator,
-    SSSekaiBlenderUtilMiscBatchAddArmatureModifier,
-    SSSekaiBlenderUtilMiscRecalculateBoneHashTableOperator,
     SSSekaiBlenderUtilNeckAttachOperator,
 )
 from .. import register_class
 
 
-@register_class
+# @register_class
 class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_misc"
     bl_label = T("Misc")
@@ -73,7 +65,7 @@ class SSSekaiBlenderUtilMiscPanel(bpy.types.Panel):
         row.operator(bpy.ops.script.reload.idname(), icon="FILE_SCRIPT")
 
 
-@register_class
+# @register_class
 class SSSekaiBlenderUtilCharacterPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_util_character"
     bl_label = T("Sekai Character")

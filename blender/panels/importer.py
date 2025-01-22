@@ -24,11 +24,7 @@ from .. import register_class, register_wm_props, logger
 from ..core.asset import build_scene_hierarchy
 from .. import sssekai_global, SSSekaiEnvironmentContainer
 
-from ..operators.importer import (
-    SSSekaiBlenderImportOperator,
-    SSSekaiBlenderImportPhysicsOperator,
-    SSSekaiBlenderExportAnimationTypeTree,
-)
+from ..operators.importer import SSSekaiBlenderImportHierarchyOperator
 
 EMPTY_OPT = ("--", "Not Available", "", "ERROR", 0)
 EMPTY_CONTAINER = "<default>"
@@ -52,7 +48,7 @@ def update_environment(path: str):
             root = hierarchy.root.game_object
             container = root.object_reader.container or EMPTY_CONTAINER
             sssekai_global.cotainers[container].hierarchies[
-                root.object_reader.path_id
+                hierarchy.path_id
             ] = hierarchy
 
         predicate = lambda obj: obj.type == ClassIDType.AnimationClip
@@ -84,6 +80,9 @@ def update_environment(path: str):
             (container, container, "", "FILE_FOLDER", index)
             for index, container in enumerate(sssekai_global.cotainers)
         ]
+        sssekai_global.container_enum = sorted(
+            sssekai_global.container_enum, key=lambda x: x[1]
+        )
     else:
         sssekai_global.container_enum.clear()
 
@@ -215,22 +214,13 @@ register_wm_props(
                 2,
             ),
             (
-                "GENERIC_ARMATURE",
-                T("Generic Armature"),
+                "GENERIC",
+                T("Generic"),
                 T(
                     "Import the selected hierarchy as a generic armature, with no additional setup"
                 ),
                 "ARMATURE_DATA",
                 3,
-            ),
-            (
-                "GENERIC_ARTICULATION",
-                T("Generic Articulation"),
-                T(
-                    "Import the selected hierarchy as a generic articulation (built with joint hierarchy), with no additional setup"
-                ),
-                "OUTLINER_DATA_EMPTY",
-                4,
             ),
         ],
     ),
@@ -321,61 +311,89 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
 
         row.label(text=T("Import Options"), icon="OPTIONS")
         row = layout.row()
-        if import_type == "IMPORT_ANIMATION":
-            row.label(text=T("Animation Options"), icon="ANIM_DATA")
-            row = layout.row()
-            row.prop(wm, "sssekai_animation_import_offset", icon="TIME")
-            row = layout.row()
-            row.prop(wm, "sssekai_animation_import_use_nla", icon="NLA")
-            row.prop(
-                wm,
-                "sssekai_animation_import_nla_always_new_tracks",
-                icon="NLA_PUSHDOWN",
-            )
-            row = layout.row()
-            row.prop(wm, "sssekai_animation_use_animator", icon="DECORATE_ANIMATE")
-            row.prop(wm, "sssekai_animation_append_exisiting", icon="OVERLAY")
-            row = layout.row()
-        elif import_type == "IMPORT_HIERARCHY":
-            row.label(text=T("Hierarchy Options"), icon="OUTLINER_OB_ARMATURE")
-            row = layout.row()
-            row.prop(wm, "sssekai_hierarchy_import_mode", expand=True)
-            row = layout.row()
-            import_mode = wm.sssekai_hierarchy_import_mode
-            if import_mode == "SEKAI_CHARACTER":
-                row.label(
-                    text=T("Project SEKAI Character Options"),
-                    icon="OUTLINER_OB_ARMATURE",
+        match import_type:
+            case "IMPORT_ANIMATION":
+                row.label(text=T("Animation Options"), icon="ANIM_DATA")
+                row = layout.row()
+                row.prop(wm, "sssekai_animation_import_offset", icon="TIME")
+                row = layout.row()
+                row.prop(wm, "sssekai_animation_import_use_nla", icon="NLA")
+                row.prop(
+                    wm,
+                    "sssekai_animation_import_nla_always_new_tracks",
+                    icon="NLA_PUSHDOWN",
                 )
-                obj = context.active_object
-                if not KEY_SEKAI_CHARACTER_ROOT_STUB in obj:
-                    row = layout.row()
-                    row.label(text=T("NOTE: To import a Project SEKAI Armature"))
-                    row = layout.row()
-                    row.label(
-                        text=T(
-                            "You'll need to create an instance of SekaiCharacterRoot, or have one selected"
+                row = layout.row()
+                row.prop(wm, "sssekai_animation_use_animator", icon="DECORATE_ANIMATE")
+                row.prop(wm, "sssekai_animation_append_exisiting", icon="OVERLAY")
+                row = layout.row()
+            case "IMPORT_HIERARCHY":
+                row.label(text=T("Hierarchy Options"), icon="OUTLINER_OB_ARMATURE")
+                row = layout.row()
+                row.prop(wm, "sssekai_hierarchy_import_mode", expand=True)
+                row = layout.row()
+                import_mode = wm.sssekai_hierarchy_import_mode
+                match import_mode:
+                    case "SEKAI_CHARACTER":
+                        row.label(
+                            text=T("Project SEKAI Character Options"),
+                            icon="OUTLINER_OB_ARMATURE",
                         )
-                    )
-                    row = layout.row()
-                    row.label(text=T("Click the button below to create one"))
-                    row = layout.row()
-                    row.operator(
-                        "sssekai.create_character_controller_op",
-                        icon="OUTLINER_OB_ARMATURE",
-                    )
-                else:
-                    row = layout.row()
-                    row.label(text=T("Character Height"))
-                    row = layout.row()
-                    row.prop(
-                        obj,
-                        '["%s"]' % KEY_SEKAI_CHARACTER_HEIGHT,
-                        text=T("Character Height (in meters)"),
-                    )
-                    row = layout.row()
-                    row.label(text=T("Mesh Type"))
-                    row = layout.row()
-                    row.prop(wm, "sssekai_character_type", expand=True)
-        row = layout.row()
-        row.operator(SSSekaiBlenderImportOperator.bl_idname, icon="APPEND_BLEND")
+                        obj = context.active_object
+                        if not (obj and KEY_SEKAI_CHARACTER_ROOT_STUB in obj):
+                            row = layout.row()
+                            row.label(
+                                text=T("NOTE: To import a Project SEKAI Armature")
+                            )
+                            row = layout.row()
+                            row.label(
+                                text=T(
+                                    "You'll need to create an instance of SekaiCharacterRoot, or have one selected"
+                                )
+                            )
+                            row = layout.row()
+                            row.label(text=T("Click the button below to create one"))
+                            row = layout.row()
+                            row.operator(
+                                "sssekai.create_character_controller_op",
+                                icon="OUTLINER_OB_ARMATURE",
+                            )
+                        else:
+                            row = layout.row()
+                            row.label(text=T("Character Height"))
+                            row = layout.row()
+                            row.prop(
+                                obj,
+                                '["%s"]' % KEY_SEKAI_CHARACTER_HEIGHT,
+                                text=T("Character Height (in meters)"),
+                            )
+                            row = layout.row()
+                            row.label(text=T("Mesh Type"))
+                            row = layout.row()
+                            row.prop(wm, "sssekai_character_type", expand=True)
+                            row = layout.row()
+                            row.operator(
+                                SSSekaiBlenderImportHierarchyOperator.bl_idname,
+                                icon="APPEND_BLEND",
+                            )
+                    case "SEKAI_STAGE":
+                        row.label(
+                            text=T("Project SEKAI Stage Options"),
+                            icon="OUTLINER_OB_EMPTY",
+                        )
+                        row = layout.row()
+                        row.label(text=T("Not implemented yet"))
+                        row = layout.row()
+                        row.operator(
+                            SSSekaiBlenderImportHierarchyOperator.bl_idname,
+                            icon="APPEND_BLEND",
+                        )
+                    case "GENERIC":
+                        row.label(text=T("Generic Options"), icon="ARMATURE_DATA")
+                        row = layout.row()
+                        row.label(text=T("Not implemented yet"))
+                        row = layout.row()
+                        row.operator(
+                            SSSekaiBlenderImportHierarchyOperator.bl_idname,
+                            icon="APPEND_BLEND",
+                        )

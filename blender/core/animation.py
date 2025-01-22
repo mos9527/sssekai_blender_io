@@ -354,10 +354,10 @@ def load_keyshape_animation(
     """
     mesh = dest_mesh.data
     assert (
-        KEY_SHAPEKEY_NAME_HASH_TBL in mesh
+        KEY_SHAPEKEY_HASH_TABEL in mesh
     ), "Shape Key table not found. You can only import blend shape animations on meshes with blend shapes!"
     assert BLENDSHAPES_CRC in data.FloatTracks, "No blend shape animation found!"
-    keyshape_table = json.loads(mesh[KEY_SHAPEKEY_NAME_HASH_TBL])
+    keyshape_table = json.loads(mesh[KEY_SHAPEKEY_HASH_TABEL])
     action = create_action(name)
     for attrCRC, track in data.FloatTracks[BLENDSHAPES_CRC].items():
         bsName = keyshape_table[str(attrCRC)]
@@ -371,7 +371,7 @@ def load_keyshape_animation(
 
 
 def prepare_camera_rig(camera: bpy.types.Object):
-    if not camera.parent or not KEY_CAMERA_RIG in camera.parent:
+    if not camera.parent or not KEY_SEKAI_CAMERA_RIG in camera.parent:
         # The 'rig' Offsets the camera's look-at direction w/o modifying the Euler angles themselves, which
         # would otherwise cause interpolation issues.
         # This is simliar to how mmd_tools handles camera animations.
@@ -379,7 +379,7 @@ def prepare_camera_rig(camera: bpy.types.Object):
         # We also store the FOV in the X scale of the parent object so that it's easy to interpolate
         # and we'd only need one action for the entire animation.
         rig = create_empty("Camera Rig", camera.parent)
-        rig[KEY_CAMERA_RIG] = "<marker>"
+        rig[KEY_SEKAI_CAMERA_RIG] = "<marker>"
         camera.parent = rig
         camera.location = blVector((0, 0, 0))
         camera.rotation_euler = blEuler((math.radians(90), 0, math.radians(180)))

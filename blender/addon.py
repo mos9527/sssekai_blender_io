@@ -45,32 +45,6 @@ register_wm_props(
         ),
         default="",
     ),
-    sssekai_rla_import_range=IntVectorProperty(
-        name=T("Import Range"),
-        description=T("Import clips from this range, order is as shown in the list"),
-        size=2,
-        default=[0, 0],
-    ),
-    sssekai_armatures_as_articulations=BoolProperty(
-        name=T("Armatures as Articulations"),
-        description=T(
-            "Treating armatures as articulations instead of skinned meshes. Useful for importing stages, etc"
-        ),
-        default=False,
-    ),
-    sssekai_materials_use_principled_bsdf=BoolProperty(
-        name=T("Use Principled BSDF"),
-        description=T(
-            "Use Principled BSDF instead of SekaiShader for imported materials"
-        ),
-        default=False,
-    ),
-    sssekai_armature_display_physics=BoolProperty(
-        name=T("Display Physics"),
-        description=T("Display Physics Objects"),
-        default=True,
-        update=operators.importer.SSSekaiBlenderPhysicsDisplayOperator.execute,
-    ),
     sssekai_util_neck_attach_obj_face=bpy.props.PointerProperty(
         name=T("Face"), type=bpy.types.Armature
     ),
@@ -84,9 +58,6 @@ register_wm_props(
         update=lambda self, context: sssekai_set_unity_version(
             context.window_manager.sssekai_unity_version_override
         ),
-    ),
-    sssekai_util_batch_armature_mod_parent=bpy.props.PointerProperty(
-        name=T("Parent"), type=bpy.types.Armature
     ),
 )
 

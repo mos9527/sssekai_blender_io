@@ -45,6 +45,10 @@ class SSSekaiClassRegistry:
             setattr(bpy.types.WindowManager, k, None)
         self.wm_props.clear()
 
+    def lookup_wm(self, key: str, default=None):
+        props = bpy.types.WindowManager.bl_rna.properties
+        return props.get(key, None)
+
     def reset(self):
         self.classes.clear()
         self.wm_props.clear()
@@ -60,6 +64,10 @@ def register_class(clazz):
 
 def register_wm_props(**kw):
     registry.add_register_wm(**kw)
+
+
+def lookup_wm_prop(key: str, default=None):
+    return registry.lookup_wm(key, default)
 
 
 # Evil(!!) global variables
@@ -95,6 +103,7 @@ class SSSekaiEnvironmentContainer:
             (str(path_id), hierarchy.name, "", "ARMATURE_DATA", index)
             for index, (path_id, hierarchy) in enumerate(self.hierarchies.items())
         ]
+        self.enums.hierarchies = sorted(self.enums.hierarchies, key=lambda x: x[1])
         self.enums.animators = [
             (
                 str(path_id),
@@ -105,10 +114,12 @@ class SSSekaiEnvironmentContainer:
             )
             for index, (path_id, animator) in enumerate(self.animators.items())
         ]
+        self.enums.animators = sorted(self.enums.animators, key=lambda x: x[1])
         self.enums.animations = [
             (str(path_id), animation.m_Name, "", "ANIM_DATA", index)
             for index, (path_id, animation) in enumerate(self.animations.items())
         ]
+        self.enums.animations = sorted(self.enums.animations, key=lambda x: x[1])
 
 
 @dataclass

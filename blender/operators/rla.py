@@ -37,12 +37,10 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
         ), "Please select an armature to import the animation to!"
         mesh_obj = None
         for child in bpy.context.active_object.children:
-            if KEY_SHAPEKEY_NAME_HASH_TBL in child.data:
+            if KEY_SHAPEKEY_HASH_TABEL in child.data:
                 mesh_obj = child
                 break
-        assert (
-            mesh_obj
-        ), "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes!"
+        assert mesh_obj, "KEY_SHAPEKEY_HASH_TABEL not found in any of the sub meshes!"
 
         wm = context.window_manager
         pose = json.loads(wm.sssekai_rla_single_pose_json)
@@ -51,7 +49,7 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
         inv_bone_hash_table = json.loads(inv_bone_hash_table)
         inv_bone_hash_table = {v: k for k, v in inv_bone_hash_table.items()}
 
-        inv_shape_table = mesh_obj.data[KEY_SHAPEKEY_NAME_HASH_TBL]
+        inv_shape_table = mesh_obj.data[KEY_SHAPEKEY_HASH_TABEL]
         inv_shape_table = json.loads(inv_shape_table)
         inv_shape_table = {v: k for k, v in inv_shape_table.items()}
 
@@ -257,12 +255,10 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
         ), "Please select an armature to import the animation to!"
         mesh_obj = None
         for child in bpy.context.active_object.children:
-            if KEY_SHAPEKEY_NAME_HASH_TBL in child.data:
+            if KEY_SHAPEKEY_HASH_TABEL in child.data:
                 mesh_obj = child
                 break
-        assert (
-            mesh_obj
-        ), "KEY_SHAPEKEY_NAME_HASH_TBL not found in any of the sub meshes!"
+        assert mesh_obj, "KEY_SHAPEKEY_HASH_TABEL not found in any of the sub meshes!"
 
         shapekey_segments = list()
         for tick, data in sssekai_global.rla_clip_data.items():
@@ -275,7 +271,7 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
                             if shapeData:
                                 shapekey_segments.append((pose["timestamp"], shapeData))
 
-        inv_hash_table = mesh_obj.data[KEY_SHAPEKEY_NAME_HASH_TBL]
+        inv_hash_table = mesh_obj.data[KEY_SHAPEKEY_HASH_TABEL]
         inv_hash_table = json.loads(inv_hash_table)
         inv_hash_table = {v: k for k, v in inv_hash_table.items()}
         anim = Animation()
