@@ -24,10 +24,11 @@ PRs are welcome for additions.
 You can find your language code by entering `bpy.app.translations.locale` in the Blender Python console.
 
 Currently supported languages and maintainers:
-- English (en_US, mos9527)
+- English (en_US, mos9527, @Rypie109)
 - 简体中文 (zh_HANS, mos9527)
 
 # Installing & Updating
+## As A User
 ### 1. Dependencies
 `sssekai_blender_io` requires `sssekai` to function. Ensure `sssekai` is installed **correctly** before attempting to install the addon itself.
 #### Method A. Package the dependencies into the addon ZIP
