@@ -122,7 +122,15 @@ class SSSekaiUpdateSSSekaiOperator(bpy.types.Operator):
 
         try:
             subprocess.run(
-                [sys.executable, "-m", "pip", "install", "--upgrade", "sssekai"],
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-user",
+                    "--upgrade",
+                    "sssekai",
+                ],
                 capture_output=False,
                 text=False,
                 check=True,
