@@ -242,7 +242,7 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
         if env.sssekai_installed:
             row.label(text=env.sssekai_installed, icon="CHECKMARK")
         else:
-            row.label("SSSekai is NOT available.", icon="ERROR")
+            row.label(text="SSSekai is NOT available.", icon="ERROR")
         row = layout.row()
 
         row.label(text="Addon Path")
