@@ -28,48 +28,19 @@ Currently supported languages and maintainers:
 - 简体中文 (zh_HANS, mos9527)
 
 # Installing & Updating
-## As A User
-### 1. Dependencies
-`sssekai_blender_io` requires `sssekai` to function. Ensure `sssekai` is installed **correctly** before attempting to install the addon itself.
-#### Method A. Package the dependencies into the addon ZIP
-This is the **recommended** method for most users as it is the least intrusive or error-prone.
-- Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master), and unzip it.
-  - Or preferably, clone this repo.
-- Locate your Blender's Python interpreter (as stated in [Method B](#method-b-manage-dependencies-with-blender-pythons-pip))
-- Run `<path_to_blender_python> make_addon_zip.py <output_zip_name WITHOUT the zip extension>`
-  - e.g. `/Applications/Blender.app/Contents/Resources/4.3/python/bin/python3.11 make_addon_zip.py sssekai_blender_io-master`
-- Install the *packaged* addon zip like any other Blender addon. (e.g. `sssekai_blender_io-master.zip` in the example).
-- You can now skip the rest and jump to the [Install The Addon](#2-install-the-addon) section for help.
+- Make sure you have Git installed on your system.
+- Download the addon [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py)
+- Install the Bootstrapper in Blender by going to `Edit > Preferences > Add-ons > Install...` and selecting the Bootstrapper, which is a `.py` file.
+- Enable the Bootstrapper in Blender by checking the box next to it.
+- Follow the instructions in the Bootstrapper to install or update the addon.
+- Once done, search for `SSSekai` and enable `SSSekai Blender IO` - which is the main addon.
+- You can come back to the Bootstrapper to update the addon at any time.
 
-#### Method B. Manage dependencies with Blender Python's `pip`
-It's only recommended if you're interested in debugging/developing the addon yourself. This method is platform-dependent.
-
-**ATTENTION**: This method **only** works when you can freely write to the Blender installation directory on your system.
-  - Navigate to your Blender installation path, and find the Python interpreter of your version. 
-    - e.g. `C:\Program Files (x86)\Steam\steamapps\common\Blender\4.0\python\bin\python.exe`
-      - ...and no, managing your Blender installation with Steam isn't recommended.
-    - (For Windows, Linux) It is recommended to use the portable ZIP package instead of other versions to avoid permission issues
-      - i.e. MSI installer for Windows, Snap Store for some Linux distros
-    - (For macOS) Make sure that you can write to Blender's application path (e.g. `/Applications/Blender.app/`). The details shall be omitted here for the sake of sanity. <sigh>
-      - Giving whichever terminal app you're using Full Disk Access in System Preferences > Security & Privacy > Privacy > Full Disk Access* worked for me
-  - Install the dependencies with `pip` in-built with Blender's Python.
-  ```bash
-  <blender_python_path> -m ensurepip
-  <blender_python_path> -m pip install --no-user -U sssekai 
-  ```
-  - **Make sure** the scripts are deployed to your **Blender** instance.
-    - `--no-user` is an undocumented flag introduced in https://github.com/pypa/pip/commit/17e0d115e82fd195513b3a41736a13d122a5730b
-      - This is **strictly** required as it prevents the dependencies from installing into the User directory - Blender **cannot** read those. 
-      - If this happens, check if you can write to Blender's directory and start over.
-  - Download [this repo as zip](https://codeload.github.com/mos9527/sssekai_blender_io/zip/refs/heads/master) and jump to the [next section](#2-install-the-addon)
-
-### 2. Install the addon
-- In Blender, go to `Edit > Preferences > Add-ons > Install...` and select the zip file you just prepared/downloaded.
-- The addon should appear in the 3D Viewport sidebar (N key) under the tab `SSSekai`
+The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
 
 ## TODO
 ### QoL
-- An actual updater
+- ~~An actual updater~~
 - **Cleanup** temp files after importing.
 ### Lighting
 - 1-to-1 approximation of the game's lighting system
