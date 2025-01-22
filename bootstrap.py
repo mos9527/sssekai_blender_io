@@ -11,7 +11,7 @@ bl_info = {
 }
 
 
-import bpy, os, subprocess, sys
+import bpy, os, subprocess, sys, shutil
 import addon_utils
 from dataclasses import dataclass
 
@@ -31,6 +31,8 @@ class SSSekaiAddonEnviornmentStatus:
     lib_writable: bool = False
 
     install_path: str = None
+
+    path_relinked: bool = False
 
     @property
     def addon_link_path(self):
@@ -82,6 +84,18 @@ class SSSekaiAddonEnviornmentStatus:
             and self.sssekai_installed
         )
 
+    @property
+    def is_currently_installed(self):
+        return self.addon_installed is not None
+
+    @property
+    def is_current_installation_symlinked(self):
+        return os.path.islink(self.addon_link_path)
+
+    @property
+    def current_installation_link_target(self):
+        return os.readlink(self.addon_link_path)
+
 
 env = SSSekaiAddonEnviornmentStatus()
 env.refresh()
@@ -130,47 +144,61 @@ class SSSekaiUpdateAddonOperator(bpy.types.Operator):
         install_path = env.install_path
         link_path = env.addon_link_path
         if install_path != link_path:
+            # Relink the source path
             try:
-                os.symlink(install_path, link_path)
-            except FileExistsError:
-                pass
+                if env.is_currently_installed:
+                    if env.is_current_installation_symlinked:
+                        os.unlink(link_path)
+                    else:
+                        shutil.rmtree(link_path)
+                os.symlink(install_path, link_path, True)
+                self.report({"INFO"}, "Source path has been relinked.")
+                env.path_relinked = True
             except Exception as e:
                 self.report({"ERROR"}, str(e))
             env.refresh()
             return {"FINISHED"}
         else:
-            if env.addon_installed:
+            if env.is_currently_installed:
                 subprocess.run(
                     ["git", "pull"],
                     cwd=install_path,
                     check=True,
                 )
             else:
-                # Invalid git repository. Delete it and clone again.
-                assert not os.path.islink(
-                    install_path
-                ), "Invalid source directory. Target is not a Git repository"
-                os.rmdir(install_path)
-            try:
-                subprocess.run(
-                    [
-                        "git",
-                        "clone",
-                        "https://github.com/mos9527/sssekai_blender_io",
-                        ADDON_INSTALLATION_LINK_FOLDER,
-                    ],
-                    cwd=os.path.dirname(install_path),
-                    check=True,
-                )
-            except Exception:
-                self.report(
-                    {"ERROR"},
-                    "Failed to clone the repository. See System Console for more info.",
-                )
+                # Invalid git repository.
+                if env.is_current_installation_symlinked:
+                    self.report(
+                        {"ERROR"},
+                        "Invalid linked source directory. Target is not a Git repository",
+                    )
+                    env.refresh()
+                    return {"CANCELLED"}
+                # Otherwise - first time or broken git repository.
+                # Delete the old folder and clone the repository.
+                try:
+                    if os.path.exists(install_path):
+                        os.rmdir(install_path)
+                    subprocess.run(
+                        [
+                            "git",
+                            "clone",
+                            "https://github.com/mos9527/sssekai_blender_io",
+                            ADDON_INSTALLATION_LINK_FOLDER,
+                        ],
+                        cwd=os.path.dirname(install_path),
+                        check=True,
+                    )
+                    self.report({"INFO"}, "Repository has been cloned!")
+                except Exception:
+                    self.report(
+                        {"ERROR"},
+                        "Failed to clone the repository. See System Console for more info.",
+                    )
+                    env.refresh()
+                    return {"CANCELLED"}
                 env.refresh()
-                return {"CANCELLED"}
-            env.refresh()
-            return {"FINISHED"}
+                return {"FINISHED"}
 
 
 class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
@@ -186,7 +214,11 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
         layout = self.layout
         layout.label(text="SSSekai Blender IO Addon Bootstrapper")
         row = layout.row()
-
+        row.label(
+            text="NOTE: It's recommended to bring up the System Console for easy diagnostics.",
+            icon="INFO",
+        )
+        row = layout.row()
         row.label(text="Git Version")
         row = layout.row()
         if env.git_installed:
@@ -221,12 +253,14 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
         layout.separator()
         row = layout.row()
         if env.is_ok:
-            if not self.source_path:
+            if not self.source_path or env.path_relinked:
                 self.source_path = env.addon_link_path
+                env.path_relinked = False
             env.install_path = self.source_path
 
             row.label(
-                text="Your Blender environment is ready for the addon installation!"
+                text="Your Blender environment is ready for the addon installation!",
+                icon="INFO_LARGE",
             )
             row = layout.row()
             row.prop(self, "source_path")
@@ -245,16 +279,67 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
                 text="Otherwise, the source will be installed directly into the addons folder."
             )
             row = layout.row()
-            row.label(text="Current installed version:")
+            row.label(text="Current installed version:", icon="INFO_LARGE")
             row = layout.row()
             row.label(
                 text=env.addon_installed or "(not installed or invalid source path)"
             )
             row = layout.row()
+            row.separator()
+            row = layout.row()
+            if env.is_currently_installed:
+                row.label(
+                    text="You can UPDATE the addon by clicking the button below.",
+                    icon="INFO_LARGE",
+                )
+                row = layout.row()
+                if env.is_current_installation_symlinked:
+                    row.label(
+                        text=f"Current source path is symlinked to: {env.current_installation_link_target}",
+                        icon="CHECKMARK",
+                    )
+                else:
+                    row.label(
+                        text="Current source path is installed directly into the addons folder.",
+                        icon="CHECKMARK",
+                    )
+                if env.addon_link_path != env.install_path:
+                    row = layout.row()
+                    row.label(
+                        text="Installation will be relinked", icon="WARNING_LARGE"
+                    )
+                    if not env.is_current_installation_symlinked:
+                        row = layout.row()
+                        row.label(
+                            text="WARNING: This will destory the current installation!",
+                            icon="WARNING_LARGE",
+                        )
+            else:
+                row.label(
+                    text="You can INSTALL the addon by clicking the button below.",
+                    icon="INFO_LARGE",
+                )
+                row = layout.row()
+                if env.addon_link_path == env.install_path:
+                    row.label(
+                        text="Direct installation is enabled.",
+                        icon="WARNING_LARGE",
+                    )
+                else:
+                    row.label(
+                        text="Link installation is enabled. (source path will be symlinked)",
+                        icon="WARNING_LARGE",
+                    )
+                    row = layout.row()
+                    row.label(
+                        text="After this operation, the source path will be symlinked to the addons folder."
+                    )
+            row = layout.row()
             row.operator(SSSekaiUpdateAddonOperator.bl_idname)
         else:
             row.label(
-                text="You CANNOT install the addon at the moment since there still are issues."
+                text="You CANNOT install the addon at the moment since there still are issues.",
+                icon="ERROR",
             )
             row = layout.row()
             row.label(
