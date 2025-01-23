@@ -325,7 +325,7 @@ def make_material_texture_node(
 def import_fallback_material(name: str, data: Material, texture_cache=None, **kwargs):
     """Imports Material assets into blender.
     This is a generic material importer that only imports the main texture,
-    as the input to a Principled BSDF shader's Base Color (Diffuse) input.
+    as the input to a Principled BSDF shader's Base Color (Diffuse) and an Alpha input
 
     Args:
         name (str): material name
@@ -335,9 +335,9 @@ def import_fallback_material(name: str, data: Material, texture_cache=None, **kw
         bpy.types.Material: Created material
     """
     textures = dict(data.m_SavedProperties.m_TexEnvs)
-    material = bpy.data.materials.new(name)
-    material.use_nodes = True
-    material.use_backface_culling = True
+    material = bpy.data.materials["SekaiDefaultFallbackMaterial"].copy()
+    material.name = name
+    sekaiShader = material.node_tree.nodes["SekaiDefaultFallbackShader"]
     if "_MainTex" in textures:
         mainTex = make_material_texture_node(
             material, textures["_MainTex"], texture_cache
@@ -345,7 +345,10 @@ def import_fallback_material(name: str, data: Material, texture_cache=None, **kw
         if mainTex:
             material.node_tree.links.new(
                 mainTex.outputs["Color"],
-                material.node_tree.nodes[0].inputs["Base Color"],
+                sekaiShader.inputs["Color"],
+            )
+            material.node_tree.links.new(
+                mainTex.outputs["Alpha"], sekaiShader.inputs["Alpha"]
             )
     return material
 
@@ -552,7 +555,7 @@ def import_sekai_character_face_sdf_material(
 
 
 def import_sekai_stage_lightmap_material(
-    name: str, data: Material, texture_cache=None, **kwargs
+    name: str, data: Material, texture_cache=None, has_reflection=False, **kwargs
 ):
     """Imports Material assets for stage (w/ baked lightmap) into blender.
 
@@ -564,9 +567,17 @@ def import_sekai_stage_lightmap_material(
         bpy.types.Material: Created material
     """
     textures = dict(data.m_SavedProperties.m_TexEnvs)
-    material = bpy.data.materials["SekaiShaderStageLightmapMaterial"].copy()
+    if not has_reflection:
+        material = bpy.data.materials["SekaiShaderStageLightmapMaterial"].copy()
+        sekaiShader = material.node_tree.nodes["SekaiStageLightmapShader"]
+    else:
+        material = bpy.data.materials[
+            "SekaiShaderStageLightmapReflectionMaterial"
+        ].copy()
+        sekaiShader = material.node_tree.nodes[
+            "SekaiShaderStageLightmapReflectionShader"
+        ]
     material.name = name
-    sekaiShader = material.node_tree.nodes["SekaiStageLightmapShader"]
     if "_MainTex" in textures:
         mainTex = make_material_texture_node(
             material, textures["_MainTex"], texture_cache
@@ -585,5 +596,32 @@ def import_sekai_stage_lightmap_material(
         if lightMapTex:
             material.node_tree.links.new(
                 lightMapTex.outputs["Color"], sekaiShader.inputs["Sekai Lightmap"]
+            )
+    return material
+
+
+def import_sekai_stage_color_add_material(
+    name: str, data: Material, texture_cache=None, **kwargs
+):
+    """Imports Material assets for stage Color Add type (e.g. flares) into Blender
+
+    Args:
+        name (str): material name
+        data (Material): UnityPy Material
+
+    Returns:
+        bpy.types.Material: Created material
+    """
+    textures = dict(data.m_SavedProperties.m_TexEnvs)
+    material = bpy.data.materials["SekaiShaderStageColorAddMaterial"].copy()
+    material.name = name
+    sekaiShader = material.node_tree.nodes["SekaiShaderStageColorAddShader"]
+    if "_MainTex" in textures:
+        mainTex = make_material_texture_node(
+            material, textures["_MainTex"], texture_cache
+        )
+        if mainTex:
+            material.node_tree.links.new(
+                mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
             )
     return material

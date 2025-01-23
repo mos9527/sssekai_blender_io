@@ -31,6 +31,7 @@ from ..core.asset import (
     import_sekai_character_material,
     import_sekai_character_face_sdf_material,
     import_sekai_stage_lightmap_material,
+    import_sekai_stage_color_add_material,
     import_hierarchy_as_armature,
     import_mesh_data,
 )
@@ -133,15 +134,20 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         texture_cache = dict()
         material_cache = dict()
 
+        # By principle this should be matched by their respective Shaders
+        # But since there's no guarantee that the PathID would always match therefore we'd pattern-match
+        # the name and the properties to determine the correct importer
         def import_material_sekai_character(material: Material):
             envs = dict(material.m_SavedProperties.m_TexEnvs)
             floats = dict(material.m_SavedProperties.m_Floats)
             name = material.m_Name
-            if "_eye" in name:
+            if "_eye" in name:  # CharacterEyeBase
                 return import_sekai_eye_material(name, material, texture_cache)
-            if "_ehl_" in name:
+            if "_ehl_" in name:  # CharacterEyeLight
                 return import_sekai_eyelight_material(name, material, texture_cache)
-            if "_FaceShadowTex" in envs and floats.get("_UseFaceSDF", 0):
+            if "_FaceShadowTex" in envs and floats.get(
+                "_UseFaceSDF", 0
+            ):  # CharacterToonV3
                 return import_sekai_character_face_sdf_material(
                     name,
                     material,
@@ -164,7 +170,24 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
             )
 
         def import_material_sekai_stage(material: Material):
+            envs = dict(material.m_SavedProperties.m_TexEnvs)
+            floats = dict(material.m_SavedProperties.m_Floats)
             name = material.m_Name
+            if "_LightMapTex" in envs:
+                if floats.get("_DstBlend", 0) == 10:  # StageLightMapReflection
+                    return import_sekai_stage_lightmap_material(
+                        name, material, texture_cache, has_reflection=True
+                    )
+                else:  # StageLightMap
+                    return import_sekai_stage_lightmap_material(
+                        name, material, texture_cache, has_reflection=False
+                    )
+            else:
+                if floats.get("_DstBlend", 0) == 10:  # ColorMapAdd
+                    return import_sekai_stage_color_add_material(
+                        name, material, texture_cache
+                    )
+            # XXX: Some other permutations still exist
             return import_sekai_stage_lightmap_material(name, material, texture_cache)
 
         def import_material_fallback(material: Material):
