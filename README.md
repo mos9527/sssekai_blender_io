@@ -29,7 +29,7 @@ Currently supported languages and maintainers:
 
 # Installing & Updating
   **PLEASE NOTE:**
-  The updater is still a W.I.P and has bugs! Report them in the [issues](https://github.com/mos9527/sssekai_blender_io/issues) tab.
+  The updater is still a W.I.P and has bugs! Please report them in the [issues](https://github.com/mos9527/sssekai_blender_io/issues) tab if you encounter one.
   
 - Make sure you have [Git](https://git-scm.com/downloads) installed on your system.
 - Download the addon [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py)
