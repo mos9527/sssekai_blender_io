@@ -3,6 +3,9 @@
 
 Blender asset importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク) asset bundles.
 
+# Attention
+The addon is being heavily revised in the [master branch](https://github.com/mos9527/sssekai_blender_io/tree/master). The addon represented here is the legacy version, which is no longer maintained.
+
 # Features
 ## Asset Types
 - Character (legacy and 'v2') armatures and stage objects (with hierarchy) from asset bundles are generally supported.
