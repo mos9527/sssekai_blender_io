@@ -135,7 +135,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         material_cache = dict()
 
         # By principle this should be matched by their respective Shaders
-        # But since there's no guarantee that the PathID would always match therefore we'd pattern-match
+        # But since there's no guarantee that the PathID would always match across versions therefore we'd pattern-match
         # the name and the properties to determine the correct importer
         def import_material_sekai_character(material: Material):
             envs = dict(material.m_SavedProperties.m_TexEnvs)
@@ -226,3 +226,14 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
 
         armature_obj.parent = active_object
         return {"FINISHED"}
+
+
+class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
+    bl_idname = "sssekai.import_hierarchy_animation_op"
+    bl_label = T("Import Hierarchy Animation")
+    bl_description = T(
+        "Import the selected Animation into the selected Armature (Hierarchy)"
+    )
+
+    def execute(self, context):
+        pass

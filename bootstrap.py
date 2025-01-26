@@ -315,14 +315,12 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
                     )
                 if env.addon_link_path != env.install_path:
                     row = layout.row()
-                    row.label(
-                        text="Installation will be relinked", icon="WARNING_LARGE"
-                    )
+                    row.label(text="Installation will be relinked", icon="WARNING")
                     if not env.is_current_installation_symlinked:
                         row = layout.row()
                         row.label(
                             text="WARNING: This will destory the current installation!",
-                            icon="WARNING_LARGE",
+                            icon="WARNING",
                         )
             else:
                 row.label(
@@ -333,12 +331,12 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
                 if env.addon_link_path == env.install_path:
                     row.label(
                         text="Direct installation is enabled.",
-                        icon="WARNING_LARGE",
+                        icon="WARNING",
                     )
                 else:
                     row.label(
                         text="Link installation is enabled. (source path will be symlinked)",
-                        icon="WARNING_LARGE",
+                        icon="WARNING",
                     )
                     row = layout.row()
                     row.label(

@@ -21,7 +21,7 @@ class SSSekaiRendererPanel(bpy.types.Panel):
         if context.scene.render.engine != "BLENDER_EEVEE_NEXT":
             row.label(
                 text="Eevee Next (available since 4.2+) is the recommended renderer for PJSK assets.",
-                icon="WARNING_LARGE",
+                icon="WARNING",
             )
             row = layout.row()
         else:
@@ -43,7 +43,7 @@ class SSSekaiRendererPanel(bpy.types.Panel):
         if not context.scene.view_settings.view_transform == "Standard":
             row.label(
                 text="View Transform should be set to Standard since the assets are authored in SRGB space.",
-                icon="WARNING_LARGE",
+                icon="WARNING",
             )
         row = layout.row()
         row.operator(SSSekaiBlenderRendererApplyRecommendedSettingsOperator.bl_idname)
