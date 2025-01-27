@@ -1,7 +1,15 @@
 import bpy
 import logging, json, math
 from typing import List
-from sssekai.unity.AnimationClip import Animation, AnimationClip, TransformType
+from sssekai.unity.AnimationClip import (
+    Animation,
+    Interpolation,
+    Curve,
+    kBindTransformEuler,
+    kBindTransformPosition,
+    kBindTransformRotation,
+    kBindTransformScale,
+)
 from .math import (
     blEuler,
     blQuaternion,
@@ -16,97 +24,140 @@ from .helpers import create_empty, time_to_frame, ensure_action, create_action
 from .consts import *
 from .. import logger
 
+BEZIER_FREE = (
+    bpy.types.Keyframe.bl_rna.properties["handle_left_type"].enum_items["FREE"].value
+)
 
-# TODO: Handle Bezier control points
-def import_fcurve(
+
+def interpolation_to_blender(ipo: Interpolation):
+    return (
+        bpy.types.Keyframe.bl_rna.properties["interpolation"]
+        .enum_items[
+            {
+                Interpolation.Constant: "CONSTANT",
+                Interpolation.Hermite: "LINEAR",
+                Interpolation.HermiteOrLinear: "BEZIER",
+                # Blender seem to use the left key value for the interpolation too
+                Interpolation.Stepped: "CONSTANT",
+            }[ipo]
+        ]
+        .value
+    )
+
+
+def import_curve(
     action: bpy.types.Action,
     data_path: str,
-    values: list,
-    frames: list,
-    num_curves: int = 1,
-    interpolation: str = "BEZIER",
-    tangents_in: list = [],
-    tangents_out: list = [],
+    curve: Curve,
+    bl_values: List[float | blEuler | blVector],
+    is_scale: bool = False,
 ):
-    """Imports an Fcurve into an action
+    """Creates an arbitrary amount of FCurves for a sssekai Curve
 
     Args:
-        action (bpy.types.Action): target action. keyframes will be merged into this action.
+        action (bpy.types.Action): target action.
         data_path (str): data path
-        values (list): values. size must be that of frames
-        frames (list): frame indices. size must be that of values
-        num_curves (int, optional): number of curves. e.g. with translation (X,Y,Z) you'd want 3. Defaults to 1.
-        interpolation (str, optional): interpolation type. Defaults to 'BEZIER'.
-        tagents_in (list, optional): in tangents (i.e. inSlope). Defaults to [].
-        tagents_out (list, optional): out tangents (i.e. outSlope). Defaults to [].
+        curve (Curve): curve data
+        bl_values (List[float | blEuler | blVector | blQuaternion]): values in Blender types
     """
-    valueIterable = type(values[0])
-    valueIterable = valueIterable != float and valueIterable != int
-    assert valueIterable or (
-        not valueIterable and num_curves == 1
-    ), "Cannot import multiple curves for non-iterable values"
+    num_curves = 1
+    bl_inSlopes = []
+    bl_outSlopes = []
+    # Slope values are in Blender's local space though should be unaffected
+    # by the pose space transform since it's affine.
+    # Only swizzling is needed since it's elementary matrix math which is not affine.
+    # The same applies to translation and scale
+    if type(bl_values[0]) == blEuler:
+        num_curves = 3
+        bl_inSlopes = [swizzle_euler(k.inSlope) for k in curve.Data]
+        bl_outSlopes = [swizzle_euler(k.outSlope) for k in curve.Data]
+    elif type(bl_values[0]) == blVector:
+        num_curves = 3
+        if not is_scale:
+            bl_inSlopes = [swizzle_vector(k.inSlope) for k in curve.Data]
+            bl_outSlopes = [swizzle_vector(k.outSlope) for k in curve.Data]
+        else:
+            bl_inSlopes = [swizzle_vector_scale(k.inSlope) for k in curve.Data]
+            bl_outSlopes = [swizzle_vector_scale(k.outSlope) for k in curve.Data]
+    elif type(bl_values[0]) == blQuaternion:
+        num_curves = 4
+        bl_inSlopes = [swizzle_quaternion(k.inSlope) for k in curve.Data]
+        bl_outSlopes = [swizzle_quaternion(k.outSlope) for k in curve.Data]
+    elif type(bl_values[0]) == float:
+        num_curves = 1
+        bl_inSlopes = [keyframe.inSlope for keyframe in curve.Data]
+        bl_outSlopes = [keyframe.outSlope for keyframe in curve.Data]
+    else:
+        raise NotImplementedError("Unsupported value type")
+    frames = [time_to_frame(keyframe.time) for keyframe in curve.Data]
     fcurve = [
-        action.fcurves.find(data_path=data_path, index=i)
-        or action.fcurves.new(data_path=data_path, index=i)
-        for i in range(num_curves)
+        action.fcurves.new(data_path=data_path, index=i) for i in range(num_curves)
     ]
+
     for i in range(num_curves):
         curve_data = [0] * (len(frames) * 2)
         curve_data[::2] = frames
-        curve_data[1::2] = [v[i] if valueIterable else v for v in values]
-        if len(fcurve[i].keyframe_points) > 0:
-            # Has existing data. Always append them
-            existing_data = [0] * (len(fcurve[i].keyframe_points) * 2)
-            fcurve[i].keyframe_points.foreach_get("co", existing_data)
-            curve_data = existing_data + curve_data
+        curve_data[1::2] = [v[i] if num_curves > 1 else v for v in bl_values]
+
         fcurve[i].keyframe_points.clear()
-        fcurve[i].keyframe_points.add(len(curve_data) // 2)
+        fcurve[i].keyframe_points.add(len(frames))
         fcurve[i].keyframe_points.foreach_set("co", curve_data)
-        ipo = (
-            bpy.types.Keyframe.bl_rna.properties["interpolation"]
-            .enum_items[interpolation]
-            .value
-        )
+        # Setup interpolation
         fcurve[i].keyframe_points.foreach_set(
-            "interpolation", [ipo] * len(fcurve[i].keyframe_points)
+            "interpolation",
+            [
+                interpolation_to_blender(
+                    keyframe.interpolation_segment(keyframe, keyframe.next)[i]
+                )
+                for keyframe in curve.Data
+            ],
         )
-        if tangents_in or tangents_out:
-            free_handle = (
-                bpy.types.Keyframe.bl_rna.properties["handle_left_type"]
-                .enum_items["FREE"]
-                .value
-            )
-            free_handles = [free_handle] * len(fcurve[i].keyframe_points)
-            handle_data = [0] * (len(frames) * 2)
-            if tangents_in:
-                fcurve[i].keyframe_points.foreach_set("handle_left_type", free_handles)
-                handle_data[::2] = [f - 1 for f in frames]
-                # Fixed 1 unit on the curve for now since that's what Unity does
-                handle_data[1::2] = [v[i] if valueIterable else v for v in tangents_in]
-                fcurve[i].keyframe_points.foreach_set("handle_left", handle_data)
-            if tangents_out:
-                fcurve[i].keyframe_points.foreach_set("handle_right_type", free_handles)
-                handle_data[::2] = [f + 1 for f in frames]
-                handle_data[1::2] = [v[i] if valueIterable else v for v in tangents_out]
-                fcurve[i].keyframe_points.foreach_set("handle_right", handle_data)
+        # Setup Hermite to cubic Bezier CPs
+        free_handles = [BEZIER_FREE] * len(frames)
+        fcurve[i].keyframe_points.foreach_set("handle_left_type", free_handles)
+        fcurve[i].keyframe_points.foreach_set("handle_right_type", free_handles)
+        p1 = [0] * (len(frames) * 2)
+        p2 = [0] * (len(frames) * 2)
+        # Cubic Bezier H(t) = (1-t)^3 * P0 + 3(1-t)^2 * t * P1 + 3(1-t) * t^2 * P2 + t^3 * P3
+        # H'(t) = 3(1-t)^2 * (P1 - P0) + 6(1-t) * t * (P2 - P1) + 3t^2 * (P3 - P2)
+        # H'(0) = 3(P1 - P0) = m0 \therefore P1 = P0 + m0/3
+        # H'(1) = 3(P3 - P2) = m1 \therefore P2 = P3 - m1/3
+        # This is also where the rule of 1/3rd comes from
+        delta_t_3 = lambda keyframe: (
+            ((keyframe.next.time - keyframe.time) if keyframe.next else 0) / 3
+        )
+        p1[::2] = [time_to_frame(k.time + delta_t_3(k)) for k in curve.Data]
+        p1[1::2] = [bl_values[i] + k * delta_t_3(k) for i, k in enumerate(bl_outSlopes)]
+        p2[::2] = [time_to_frame(k.time - delta_t_3(k)) for k in curve.Data]
+        p2[1::2] = [bl_values[i] - k * delta_t_3(k) for i, k in enumerate(bl_inSlopes)]
+        fcurve[i].keyframe_points.foreach_set("handle_left", p2)
+        fcurve[i].keyframe_points.foreach_set("handle_right", p1)
         fcurve[i].update()
 
 
-def import_fcurve_quatnerion(
+def import_float_curve(
     action: bpy.types.Action,
     data_path: str,
-    values: List[blQuaternion],
-    frames: list,
+    curve: Curve,
+):
+    bl_values = [k.value for k in curve.Data]
+    return import_curve(action, data_path, curve, bl_values)
+
+
+def import_curve_quatnerion(
+    action: bpy.types.Action,
+    data_path: str,
+    curve: Curve,
+    bl_values: List[blQuaternion],
     interpolation: str = "LINEAR",
 ):
-    """Imports an Fcurve into an action, specialized for quaternions
+    """Creates 4 FCurves (x,y,z,w) for a sssekai Quaternion Curve
 
     Args:
-        action (bpy.types.Action): target action. keyframes will be merged into this action.
+        action (bpy.types.Action): target action.
         data_path (str): data path
-        values (List[blQuaternion]): values. size must be that of frames
-        frames (list): frame indices. size must be that of values
-        interpolation (str, optional): interpolation type. Defaults to 'LINEAR'.
+        curve (Curve): curve data
+        bl_values (List[blQuaternion]): blQuaternion values in pose space
 
     Note:
         * The import function ensures that the quaternions in the curve are compatible with each other
@@ -114,21 +165,16 @@ def import_fcurve_quatnerion(
         * Note it's *LERP* not *SLERP*. Blender fcurves does not specialize in quaternion interpolation.
         * Hence, with `interpolation`, you should always use `LINEAR` for the most accurate results.
     """
-    fcurve = [
-        action.fcurves.find(data_path=data_path, index=i)
-        or action.fcurves.new(data_path=data_path, index=i)
-        for i in range(4)
-    ]
+    assert (
+        type(bl_values[0]) == blQuaternion
+    ), "Values must be in Blender Quaternion type"
+    frames = [time_to_frame(keyframe.time) for keyframe in curve.Data]
+    fcurve = [action.fcurves.new(data_path=data_path, index=i) for i in range(4)]
     curve_datas = list()
     for i in range(4):
         curve_data = [0] * (len(frames) * 2)
         curve_data[::2] = frames
-        curve_data[1::2] = [v[i] for v in values]
-        if len(fcurve[i].keyframe_points) > 0:
-            # Has existing data. Always append them
-            existing_data = [0] * (len(fcurve[i].keyframe_points) * 2)
-            fcurve[i].keyframe_points.foreach_get("co", existing_data)
-            curve_data = existing_data + curve_data
+        curve_data[1::2] = [v[i] for v in bl_values]
         curve_datas.append(curve_data)
     curve_quats = [
         blQuaternion(
@@ -153,14 +199,11 @@ def import_fcurve_quatnerion(
             "interpolation", [ipo] * len(fcurve[i].keyframe_points)
         )
         fcurve[i].update()
+    return fcurve
 
 
 def load_armature_animation(
-    name: str,
-    data: Animation,
-    target_armature: bpy.types.Object,
-    frame_offset: int,
-    action: bpy.types.Action = None,
+    name: str, anim: Animation, target: bpy.types.Object, crc_bone_table: dict
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to the armature
 
@@ -168,25 +211,26 @@ def load_armature_animation(
 
     Args:
         name (str): name of the action
-        data (Animation): animation data
-        target_armature (bpy.types.Object): target armature object
-        frame_offset (int): frame offset
-        action (bpy.types.Action, optional): existing action to append to. Defaults
+        anim (Animation): animation data
+        target (bpy.types.Object): target armature object
+        crc_bone_table (dict): Animation path CRC32 value to Bone name table
 
     Returns:
         bpy.types.Action: the created action
     """
-    bone_table = json.loads(target_armature.data[KEY_BONE_NAME_HASH_TBL])
     bpy.ops.object.mode_set(mode="EDIT")
-    # Collect bone space <-> local space transforms
-    local_space_trans_rot = dict()  # i.e. parent space
-    for bone in target_armature.data.edit_bones:  # Must be done in edit mode
+    # Collect Local Space matrices
+    # In Blender we animate bones in Pose Space (explained below)
+    local_space_TR = dict()
+    for bone in target.data.edit_bones:  # Must be accessed in edit mode
         local_mat = (
-            (bone.parent.matrix.inverted() @ bone.matrix)
+            (
+                bone.parent.matrix.inverted() @ bone.matrix
+            )  # In armature space / world space
             if bone.parent
             else blMatrix.Identity(4)
         )
-        local_space_trans_rot[bone.name] = (
+        local_space_TR[bone.name] = (
             local_mat.to_translation(),
             local_mat.to_quaternion(),
         )
@@ -209,18 +253,18 @@ def load_armature_animation(
     #     pr = er^{-1} fr
     #     ps = fs
     # ---
-    def to_pose_quaternion(name, quat: blQuaternion):
-        etrans, erot = local_space_trans_rot[name]
+    def to_pose_quaternion(name: str, quat: blQuaternion):
+        etrans, erot = local_space_TR[name]
         erot_inv = erot.conjugated()
         return erot_inv @ quat
 
-    def to_pose_translation(name: bpy.types.PoseBone, vec: blVector):
-        etrans, erot = local_space_trans_rot[name]
+    def to_pose_translation(name: str, vec: blVector):
+        etrans, erot = local_space_TR[name]
         erot_inv = erot.conjugated()
         return erot_inv @ (vec - etrans)
 
-    def to_pose_euler(name: bpy.types.PoseBone, euler: blEuler):
-        etrans, erot = local_space_trans_rot[name]
+    def to_pose_euler(name: str, euler: blEuler):
+        etrans, erot = local_space_TR[name]
         erot_inv = erot.conjugated()
         result = erot_inv @ euler.to_quaternion()
         result = result.to_euler("XYZ")
@@ -232,117 +276,83 @@ def load_armature_animation(
     bpy.ops.pose.transforms_clear()
     bpy.ops.pose.select_all(action="DESELECT")
     # Setup actions
-    action = action or create_action(name)
-    for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
-        # Quaternion rotations
-        if str(bone_hash) in bone_table:
-            bone_name = bone_table[str(bone_hash)]
-            bone = target_armature.pose.bones.get(bone_name, None)
-            if not bone:
-                logger.warning("[Rotation] Bone %s not found in pose bones" % bone_name)
-                continue
-            bone.rotation_mode = "QUATERNION"
-            values = [
-                to_pose_quaternion(bone_name, swizzle_quaternion(keyframe.value))
-                for keyframe in track.Curve
-            ]
-            frames = [
-                time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve
-            ]
-            import_fcurve_quatnerion(
-                action,
-                'pose.bones["%s"].rotation_quaternion' % bone_name,
-                values,
-                frames,
-            )
-        else:
-            logger.warning(
-                "[Rotation] Bone hash %s not found in bone table" % bone_hash
-            )
-    for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
-        # Euler rotations
-        if str(bone_hash) in bone_table:
-            bone_name = bone_table[str(bone_hash)]
-            bone = target_armature.pose.bones.get(bone_name, None)
-            if not bone:
-                logger.warning(
-                    "[Rotation Euler] Bone %s not found in pose bones" % bone_name
-                )
-                continue
-            bone.rotation_mode = "YXZ"
-            values = [
-                to_pose_euler(bone_name, swizzle_euler(keyframe.value))
-                for keyframe in track.Curve
-            ]
-            frames = [
-                time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve
-            ]
-            import_fcurve(
-                action, 'pose.bones["%s"].rotation_euler' % bone_name, values, frames, 3
-            )
-        else:
-            logger.warning(
-                "[Rotation Euler] Bone hash %s not found in bone table" % bone_hash
-            )
-    for bone_hash, track in data.TransformTracks[TransformType.Translation].items():
-        # Translations
-        if str(bone_hash) in bone_table:
-            bone_name = bone_table[str(bone_hash)]
-            bone = target_armature.pose.bones.get(bone_name, None)
-            if not bone:
-                logger.warning(
-                    "[Translation] Bone %s not found in pose bones" % bone_name
-                )
-                continue
-            values = [
-                to_pose_translation(bone_name, swizzle_vector(keyframe.value))
-                for keyframe in track.Curve
-            ]
-            frames = [
-                time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve
-            ]
-            import_fcurve(
-                action, 'pose.bones["%s"].location' % bone_name, values, frames, 3
-            )
-        else:
-            logger.warning(
-                "[Translation] Bone hash %s not found in bone table" % bone_hash
-            )
-    for bone_hash, track in data.TransformTracks[TransformType.Scaling].items():
-        # Scale
-        if str(bone_hash) in bone_table:
-            bone_name = bone_table[str(bone_hash)]
-            bone = target_armature.pose.bones.get(bone_name, None)
-            if not bone:
-                logger.warning("[Scale] Bone %s not found in pose bones" % bone_name)
-                continue
-            values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
-            frames = [
-                time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve
-            ]
-            import_fcurve(
-                action, 'pose.bones["%s"].scale' % bone_name, values, frames, 3
-            )
-        else:
-            logger.warning("[Scale] Bone hash %s not found in bone table" % bone_hash)
+    action = create_action(name)
+    # Quaternions
+    for path, curve in anim.Curves[kBindTransformRotation].items():
+        bone = crc_bone_table.get(path, None)
+        if not bone:
+            logger.warning("Quaternion: Failed to bind CRC32 %s to bone" % path)
+            continue
+        frames = [time_to_frame(keyframe.time, 0) for keyframe in curve.Data]
+        values = [
+            to_pose_quaternion(bone, swizzle_quaternion(keyframe.value))
+            for keyframe in curve.Data
+        ]
+        import_curve_quatnerion(
+            action, 'pose.bones["%s"].rotation_quaternion' % bone, frames, values
+        )
+    # Euler Rotations
+    for path, curve in anim.Curves[kBindTransformEuler].items():
+        bone = crc_bone_table.get(path, None)
+        if not bone:
+            logger.warning("Euler: Failed to bind CRC32 %s to bone" % path)
+            continue
+        pose_bone = target.pose.bones.get(bone)
+        pose_bone.rotation_mode = "YXZ"  # see swizzle_euler
+        frames = [time_to_frame(keyframe.time, 0) for keyframe in curve.Data]
+        values = [
+            to_pose_euler(bone, swizzle_euler(keyframe.value))
+            for keyframe in curve.Data
+        ]
+        import_curve(
+            action, 'pose.bones["%s"].rotation_euler' % bone, curve, frames, values
+        )
+    # Translations
+    for path, curve in anim.Curves[kBindTransformPosition].items():
+        bone = crc_bone_table.get(path, None)
+        if not bone:
+            logger.warning("Translation: Failed to bind CRC32 %s to bone" % path)
+            continue
+        frames = [time_to_frame(keyframe.time, 0) for keyframe in curve.Data]
+        values = [
+            to_pose_translation(bone, swizzle_vector(keyframe.value))
+            for keyframe in curve.Data
+        ]
+        import_curve(action, 'pose.bones["%s"].location' % bone, curve, frames, values)
+    # Scale
+    for path, curve in anim.Curves[kBindTransformScale].items():
+        bone = crc_bone_table.get(path, None)
+        if not bone:
+            logger.warning("Scale: Failed to bind CRC32 %s to bone" % path)
+            continue
+        frames = [time_to_frame(keyframe.time, 0) for keyframe in curve.Data]
+        values = [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data]
+        import_curve(
+            action,
+            'pose.bones["%s"].scale' % bone,
+            curve,
+            frames,
+            values,
+            is_scale=True,
+        )
     return action
 
 
 def load_keyshape_animation(
     name: str,
     data: Animation,
-    dest_mesh: bpy.types.Object,
-    frame_offset: int,
+    crc_keyshape_table: dict,
+    frame_offset: int = 0,
     action: bpy.types.Action = None,
 ):
-    """Converts an Animation object into Blender Action WITHOUT applying it to the mesh
+    """Converts an Animation object into Blender Action WITHOUT applying it to any mesh
 
     To apply the animation, you must call `apply_action` with the returned action.
 
     Args:
         name (str): name of the action
         data (Animation): animation data
-        dest_mesh (bpy.types.Object): target mesh object
+        crc_keyshape_table (dict): Animation path CRC32 value to Blend Shape name table
         frame_offset (int): frame offset
         action (bpy.types.Action, optional): existing action to append to. Defaults to None
 
@@ -352,16 +362,10 @@ def load_keyshape_animation(
     Note:
         KeyShape value range [0,100]
     """
-    mesh = dest_mesh.data
-    assert (
-        KEY_SHAPEKEY_HASH_TABEL in mesh
-    ), "Shape Key table not found. You can only import blend shape animations on meshes with blend shapes!"
-    assert BLENDSHAPES_CRC in data.FloatTracks, "No blend shape animation found!"
-    keyshape_table = json.loads(mesh[KEY_SHAPEKEY_HASH_TABEL])
     action = create_action(name)
     for attrCRC, track in data.FloatTracks[BLENDSHAPES_CRC].items():
-        bsName = keyshape_table[str(attrCRC)]
-        import_fcurve(
+        bsName = crc_keyshape_table[str(attrCRC)]
+        import_curve(
             action,
             'key_blocks["%s"].value' % bsName,
             [keyframe.value / 100.0 for keyframe in track.Curve],
@@ -454,7 +458,7 @@ def load_camera_animation(
         curve = data.TransformTracks[TransformType.EulerRotation][
             CAMERA_TRANS_ROT_CRC_MAIN
         ].Curve
-        import_fcurve(
+        import_curve(
             action,
             "rotation_euler",
             [swizzle_euler_camera(keyframe.value) for keyframe in curve],
@@ -469,7 +473,7 @@ def load_camera_animation(
         curve = data.TransformTracks[TransformType.Translation][
             CAMERA_TRANS_ROT_CRC_MAIN
         ].Curve
-        import_fcurve(
+        import_curve(
             action,
             "location",
             [swizzle_translation_camera(keyframe.value) for keyframe in curve],
@@ -488,7 +492,7 @@ def load_camera_animation(
         curve = data.TransformTracks[TransformType.Translation][
             CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA
         ].Curve
-        import_fcurve(
+        import_curve(
             action,
             "scale",  # FOV on the X scale
             [(fov_to_focal_length(keyframe.value.z * 100), 1, 1) for keyframe in curve],
@@ -499,87 +503,3 @@ def load_camera_animation(
             # [fov_to_focal_length(keyframe.outSlope.Z * 100) for keyframe in curve]
         )
     return action
-
-
-def import_articulation_animation(
-    name: str,
-    data: Animation,
-    dest_articulation: bpy.types.Object,
-    frame_offset: int,
-    always_create_new: bool,
-):
-    """Converts an Animation object into Blender Action(s), and APPLIES it to the target joint hierarchy
-
-    In this case there would be seperate actions for EACH node in the hierarchy.
-
-    Therefore it's recommended to use this function only when you're sure that the animation is meant to be applied
-
-    Args:
-        name (str): name of the action
-        data (Animation): animation data
-        dest_arma (bpy.types.Object): target joint (Empty) hierarchy's top-most parent object
-        frame_offset (int): frame offset
-        always_create_new (bool): whether to always create a new action
-    """
-    joint_table = json.loads(dest_articulation[KEY_ARTICULATION_NAME_HASH_TBL])
-    joint_obj = {
-        obj[KEY_JOINT_BONE_NAME]: obj
-        for obj in dest_articulation.children_recursive
-        if obj.type == "EMPTY" and KEY_JOINT_BONE_NAME in obj
-    }
-    for bone_hash, track in data.TransformTracks[TransformType.Rotation].items():
-        bone_name = joint_table.get(str(bone_hash), None)
-        obj = joint_obj.get(bone_name, None)
-        if obj:
-            action = ensure_action(obj, name, always_create_new)
-            obj.rotation_mode = "QUATERNION"
-            values = [swizzle_quaternion(keyframe.value) for keyframe in track.Curve]
-            frames = [
-                time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve
-            ]
-            import_fcurve_quatnerion(action, "rotation_quaternion", values, frames)
-        else:
-            logger.warning(
-                "[Rotation] Bone hash %s not found in joint table" % bone_hash
-            )
-    for bone_hash, track in data.TransformTracks[TransformType.EulerRotation].items():
-        bone_name = joint_table.get(str(bone_hash), None)
-        obj = joint_obj.get(bone_name, None)
-        if obj:
-            action = ensure_action(obj, name, always_create_new)
-            obj.rotation_mode = "YXZ"
-            values = [swizzle_euler(keyframe.value) for keyframe in track.Curve]
-            frames = [
-                time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve
-            ]
-            import_fcurve(action, "rotation_euler", values, frames, 3)
-        else:
-            logger.warning(
-                "[Rotation Euler] Bone hash %s not found in joint table" % bone_hash
-            )
-    for bone_hash, track in data.TransformTracks[TransformType.Translation].items():
-        bone_name = joint_table.get(str(bone_hash), None)
-        obj = joint_obj.get(bone_name, None)
-        if obj:
-            action = ensure_action(obj, name, always_create_new)
-            values = [swizzle_vector(keyframe.value) for keyframe in track.Curve]
-            frames = [
-                time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve
-            ]
-            import_fcurve(action, "location", values, frames, 3)
-        else:
-            logger.warning(
-                "[Translation] Bone hash %s not found in joint table" % bone_hash
-            )
-    for bone_hash, track in data.TransformTracks[TransformType.Scaling].items():
-        bone_name = joint_table.get(str(bone_hash), None)
-        obj = joint_obj.get(bone_name, None)
-        if obj:
-            action = ensure_action(obj, name, always_create_new)
-            values = [swizzle_vector_scale(keyframe.value) for keyframe in track.Curve]
-            frames = [
-                time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve
-            ]
-            import_fcurve(action, "scale", values, frames, 3)
-        else:
-            logger.warning("[Scale] Bone hash %s not found in joint table" % bone_hash)

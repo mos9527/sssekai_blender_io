@@ -76,3 +76,5 @@ MIT
 - https://zhuanlan.zhihu.com/p/337944099
 - https://zhuanlan.zhihu.com/p/670837192
 - https://github.com/przemir/ApplyModifierForObjectWithShapeKeys
+- https://www.academia.edu/9781223/Matrix_Form_for_Cubic_B%C3%A9zier_Curves_Converting_Between_Cubic_Spline_Types
+- https://pomax.github.io/bezierinfo/#catmullconv
