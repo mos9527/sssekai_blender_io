@@ -351,6 +351,9 @@ def load_armature_animation(
             logger.warning("Scale: Failed to bind CRC32 %s to bone" % path)
             continue
         values = [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data]
+        # In a bit of a pickle here. The way Blender scales bones changes the bone's length
+        # which would in turn affect translation/rotation.
+        # XXX: Handle this properly
         load_curve(
             action,
             'pose.bones["%s"].scale' % bone,
@@ -397,67 +400,21 @@ def load_sekai_keyshape_animation(
     return action
 
 
-def ensure_sekai_camera_rig(camera: bpy.types.Object):
-    """
-    The 'rig' Offsets the camera's look-at direction w/o modifying the Euler angles themselves, which
-    would otherwise cause interpolation issues.
-    This is simliar to how mmd_tools handles camera animations.
-
-    We store the FOV in degrees in the X scale of the parent object so that it's easy to interpolate
-    and we'd only need one action for the entire FOV animation.
-
-    FOV = 2 arctan [sensor_height / (2*focalLength)]
-    focalLength = sensor_height / (2 * tan(FOV/2))
-    -> sensor_height / (2 * tan(radians(fov) / 2))
-    """
-    if not camera.parent or not KEY_SEKAI_CAMERA_RIG in camera.parent:
-        rig = create_empty("SekaiCameraRig", camera.parent)
-        rig[KEY_SEKAI_CAMERA_RIG] = "<marker>"
-        camera.parent = rig
-        camera.location = blVector((0, 0, 0))
-        camera.rotation_euler = blEuler((math.radians(90), 0, math.radians(180)))
-        camera.rotation_mode = "XYZ"
-        camera.scale = blVector((1, 1, 1))
-        # Driver for FOV
-        driver = camera.data.driver_add("lens")
-        driver.driver.type = "SCRIPTED"
-        var_scale = driver.driver.variables.new()
-        var_scale.name = "fov"
-        var_scale.type = "TRANSFORMS"
-        var_scale.targets[0].id = rig
-        var_scale.targets[0].transform_space = "WORLD_SPACE"
-        var_scale.targets[0].transform_type = "SCALE_X"
-        driver.driver.expression = "sensor_height / (2 * tan(radians(fov) / 2))"
-        logger.debug("Created Camera Rig for camera %s" % camera.name)
-        return rig
-    return camera.parent
-
-
 def load_sekai_camera_animation(
     name: str,
     data: Animation,
-    camera: bpy.types.Object,
 ):
-    """Converts an Animation object into Blender Action WITHOUT applying it to the camera
+    """Converts an Animation object into Blender Action WITHOUT applying it to the camera rig
 
-    To apply the animation, you must call `apply_action` with the returned action.
+    The Action MUST be applied to a SekaiCameraRig object.
 
     Args:
         name (str): name of the action
         data (Animation): animation data
-        camera (bpy.types.Object): target camera object
-        frame_offset (int): frame offset
-        scaling_factor (Vector): scale factor
-        scaling_offset (Vector): scale offset
-        fov_offset (float): offset to the FOV
-        action (bpy.types.Action, optional): existing action to append to. Defaults to None
-
     Returns:
         bpy.types.Action: the created action
     """
-    rig = ensure_sekai_camera_rig(camera)
-    rig.rotation_mode = "YXZ"
-    action = action or create_action(name)
+    action = create_action(name)
 
     def swizzle_translation_camera(vector: blVector):
         result = swizzle_vector(vector)
@@ -471,7 +428,7 @@ def load_sekai_camera_animation(
     mainCam = data.CurvesT.get(
         crc32(SEKAI_CAMERA_MAIN_NAME), None
     )  # Euler, Position in transform tracks
-    camParam = data.Curves.get(
+    camParam = data.CurvesT.get(
         crc32(SEKAI_CAMERA_PARAM_NAME), None
     )  # Position, Scale(??) in transform tracks, FOV in the last float track
     if mainCam:
@@ -493,9 +450,12 @@ def load_sekai_camera_animation(
                 [swizzle_translation_camera(keyframe.value) for keyframe in curve.Data],
                 swizzle_func=swizzle_translation_camera,
             )
+    else:
+        logger.warning(
+            "Main Camera Transform not found. Camera Motion will be unavailable"
+        )
     if camParam:
         if kBindTransformPosition in camParam:
-            camera.data.lens_unit = "MILLIMETERS"
             curve = camParam[kBindTransformPosition]
             load_curve(
                 action,
@@ -504,6 +464,10 @@ def load_sekai_camera_animation(
                 [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data],
                 swizzle_func=swizzle_vector_scale,
             )
+    else:
+        logger.warning(
+            "Camera Param Transform not found. Camera FOV curve will be unavailable"
+        )
     return action
 
 

@@ -24,8 +24,10 @@ from ..core.asset import build_scene_hierarchy
 from .. import sssekai_global, SSSekaiEnvironmentContainer
 
 from ..operators.importer import (
+    SSSekaiBlenderCreateCameraRigControllerOperator,
     SSSekaiBlenderImportHierarchyOperator,
     SSSekaiBlenderImportHierarchyAnimationOperaotr,
+    SSSekaiBlenderImportSekaiCameraAnimationOperator,
 )
 
 EMPTY_OPT = ("--", "Not Available", "", "ERROR", 0)
@@ -258,6 +260,42 @@ register_wm_props(
             ),
         ],
     ),
+    sssekai_animation_import_mode=EnumProperty(
+        name=T("Animation Import Mode"),
+        description=T("Method to import the selected animation"),
+        items=[
+            (
+                "SEKAI_MOTION",
+                T("Sekai Motion"),
+                T("Import the selected animation as a Project SEKAI Motion"),
+                "ARMATURE_DATA",
+                1,
+            ),
+            (
+                "SEKAI_FACE",
+                T("Sekai Face"),
+                T("Import the selected animation as a Project SEKAI Face Animation"),
+                "SHAPEKEY_DATA",
+                2,
+            ),
+            (
+                "SEKAI_CAMERA",
+                T("Sekai Camera"),
+                T("Import the selected animation as a Project SEKAI Camera Animation"),
+                "CAMERA_DATA",
+                3,
+            ),
+            (
+                "GENERIC",
+                T("Generic Transform"),
+                T(
+                    "Import the selected animation as generic animation data applied on Transforms"
+                ),
+                "ANIM_DATA",
+                4,
+            ),
+        ],
+    ),
 )
 
 
@@ -272,6 +310,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         wm = context.window_manager
+        active_obj = context.active_object
+
         row = layout.row()
         row.prop(wm, "sssekai_unity_version_override", icon="SETTINGS")
         row = layout.row()
@@ -288,36 +328,36 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         layout.label(text=T("Select Asset"), icon="SCENE_DATA")
         row = layout.row()
         import_type = wm.sssekai_import_type
-        if import_type == "IMPORT_ANIMATION":
-            row.prop(
-                wm,
-                "sssekai_selected_animation_container",
-                text=T("Container"),
-                icon="ANIM_DATA",
-            )
-            row = layout.row()
-            row.prop(wm, "sssekai_selected_animation")
-            row = layout.row()
-            row.prop(
-                wm,
-                "sssekai_selected_animator_container",
-                text=T("Container"),
-                icon="DECORATE_ANIMATE",
-            )
-            row = layout.row()
-            row.prop(wm, "sssekai_selected_animator")
-            row = layout.row()
-        elif import_type == "IMPORT_HIERARCHY":
-            row.prop(
-                wm,
-                "sssekai_selected_hierarchy_container",
-                text=T("Container"),
-                icon="OUTLINER_OB_ARMATURE",
-            )
-            row = layout.row()
-            row.prop(wm, "sssekai_selected_hierarchy")
-            row = layout.row()
-
+        match import_type:
+            case "IMPORT_ANIMATION":
+                row.prop(
+                    wm,
+                    "sssekai_selected_animation_container",
+                    text=T("Container"),
+                    icon="ANIM_DATA",
+                )
+                row = layout.row()
+                row.prop(wm, "sssekai_selected_animation")
+                row = layout.row()
+                row.prop(
+                    wm,
+                    "sssekai_selected_animator_container",
+                    text=T("Container"),
+                    icon="DECORATE_ANIMATE",
+                )
+                row = layout.row()
+                row.prop(wm, "sssekai_selected_animator")
+                row = layout.row()
+            case "IMPORT_HIERARCHY":
+                row.prop(
+                    wm,
+                    "sssekai_selected_hierarchy_container",
+                    text=T("Container"),
+                    icon="OUTLINER_OB_ARMATURE",
+                )
+                row = layout.row()
+                row.prop(wm, "sssekai_selected_hierarchy")
+                row = layout.row()
         row.label(text=T("Import Options"), icon="OPTIONS")
         row = layout.row()
         match import_type:
@@ -333,13 +373,70 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     icon="NLA_PUSHDOWN",
                 )
                 row = layout.row()
-                row.prop(wm, "sssekai_animation_use_animator", icon="DECORATE_ANIMATE")
-                row.prop(wm, "sssekai_animation_append_exisiting", icon="OVERLAY")
+                row.prop(wm, "sssekai_animation_import_mode", expand=True)
                 row = layout.row()
-                if not wm.sssekai_animation_use_animator:
-                    row.prop(wm, "sssekai_animation_root_bone", icon="BONE_DATA")
-                    row = layout.row()
-                row.operator(SSSekaiBlenderImportHierarchyAnimationOperaotr.bl_idname)
+                import_mode = wm.sssekai_animation_import_mode
+                match import_mode:
+                    case "SEKAI_MOTION":
+                        if active_obj and KEY_SEKAI_CHARACTER_BODY_OBJ in active_obj:
+                            row.operator(
+                                SSSekaiBlenderImportHierarchyAnimationOperaotr.bl_idname
+                            )
+                            row = layout.row()
+                        else:
+                            row.label(
+                                text=T(
+                                    "Please select a SekaiCharacterRoot with a Body armature first"
+                                )
+                            )
+                            row = layout.row()
+                    case "SEKAI_FACE":
+                        raise NotImplementedError
+                    case "SEKAI_CAMERA":
+                        if active_obj and KEY_SEKAI_CAMERA_RIG in active_obj:
+                            row.operator(
+                                SSSekaiBlenderImportSekaiCameraAnimationOperator.bl_idname
+                            )
+                            row = layout.row()
+                        else:
+                            row.label(
+                                text=T(
+                                    "Please select a SekaiCameraRig with a Camera armature first"
+                                )
+                            )
+                            row = layout.row()
+                            row.label(
+                                text=T(
+                                    "You can create one by selecting a Camera first."
+                                )
+                            )
+                            row = layout.row()
+                            if active_obj and active_obj.type == "CAMERA":
+                                row.operator(
+                                    SSSekaiBlenderCreateCameraRigControllerOperator.bl_idname,
+                                    icon="OUTLINER_OB_ARMATURE",
+                                )
+                    case "GENERIC":
+                        if active_obj and KEY_HIERARCHY_PATHID in active_obj:
+                            row.prop(
+                                wm,
+                                "sssekai_animation_use_animator",
+                                icon="DECORATE_ANIMATE",
+                            )
+                            row = layout.row()
+                            if not wm.sssekai_animation_use_animator:
+                                row.prop(
+                                    wm, "sssekai_animation_root_bone", icon="BONE_DATA"
+                                )
+                                row = layout.row()
+                            row.operator(
+                                SSSekaiBlenderImportHierarchyAnimationOperaotr.bl_idname
+                            )
+                        else:
+                            row.label(
+                                text=T("Please select an armature created by the addon")
+                            )
+                row = layout.row()
             case "IMPORT_HIERARCHY":
                 row.label(text=T("Hierarchy Options"), icon="OUTLINER_OB_ARMATURE")
                 row = layout.row()
@@ -352,8 +449,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             text=T("Project SEKAI Character Options"),
                             icon="OUTLINER_OB_ARMATURE",
                         )
-                        obj = context.active_object
-                        if not (obj and KEY_SEKAI_CHARACTER_ROOT_STUB in obj):
+                        if not (active_obj and KEY_SEKAI_CHARACTER_ROOT in active_obj):
                             row = layout.row()
                             row.label(
                                 text=T("NOTE: To import a Project SEKAI Armature")
@@ -376,9 +472,21 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             row.label(text=T("Character Height"))
                             row = layout.row()
                             row.prop(
-                                obj,
+                                active_obj,
                                 '["%s"]' % KEY_SEKAI_CHARACTER_HEIGHT,
                                 text=T("Character Height (in meters)"),
+                            )
+                            row = layout.row()
+                            row.prop(
+                                active_obj,
+                                '["%s"]' % KEY_SEKAI_CHARACTER_FACE_OBJ,
+                                text=T("Face"),
+                            )
+                            row = layout.row()
+                            row.prop(
+                                active_obj,
+                                '["%s"]' % KEY_SEKAI_CHARACTER_BODY_OBJ,
+                                text=T("Body"),
                             )
                             row = layout.row()
                             row.label(text=T("Mesh Type"))

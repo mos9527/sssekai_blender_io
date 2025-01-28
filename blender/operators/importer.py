@@ -1,5 +1,6 @@
 from bpy.app.translations import pgettext as T
 import bpy, bpy.utils.previews, bpy_extras
+import math
 
 from typing import List, Tuple
 from UnityPy.classes import PPtr
@@ -40,6 +41,7 @@ from ..core.animation import (
     load_sekai_keyshape_animation,
 )
 from ..core.types import Hierarchy
+from ..core.math import blVector, blEuler
 from .. import register_class, register_wm_props, logger
 from .. import sssekai_global
 from .utils import crc32
@@ -58,14 +60,59 @@ class SSSekaiBlenderCreateCharacterControllerOperator(bpy.types.Operator):
         ensure_sssekai_shader_blend()
 
         root = create_empty("SekaiCharacterRoot")
-        root[KEY_SEKAI_CHARACTER_ROOT_STUB] = True
+        root[KEY_SEKAI_CHARACTER_ROOT] = True
         root[KEY_SEKAI_CHARACTER_HEIGHT] = wm.sssekai_character_height
+        root[KEY_SEKAI_CHARACTER_BODY_OBJ] = None
+        root[KEY_SEKAI_CHARACTER_FACE_OBJ] = None
 
         rim_controller = bpy.data.objects["SekaiCharaRimLight"].copy()
         rim_controller.parent = root
         bpy.context.collection.objects.link(rim_controller)
 
         bpy.context.view_layer.objects.active = root
+        return {"FINISHED"}
+
+
+@register_class
+class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
+    bl_idname = "sssekai.create_camera_rig_controller_op"
+    bl_label = T("Create Camera Rig Controller")
+    bl_description = T(
+        "Create an Empty object with a Camera Rig Controller that one can import Sekai Camera animations to"
+    )
+
+    def execute(self, context):
+        wm = context.window_manager
+        ensure_sssekai_shader_blend()
+        camera = context.active_object
+        assert camera.type == "CAMERA", "Active object must be a Camera"
+
+        rig = create_empty("SekaiCameraRig", camera.parent)
+        rig[KEY_SEKAI_CAMERA_RIG] = "<marker>"
+        rig.rotation_mode = "YXZ"
+        rig.scale.x = 60  # Arbitrary default
+        camera.parent = rig
+        camera.data.lens_unit = "MILLIMETERS"
+        camera.location = blVector((0, 0, 0))
+        camera.rotation_euler = blEuler((math.radians(90), 0, math.radians(180)))
+        camera.rotation_mode = "XYZ"
+        camera.scale = blVector((1, 1, 1))
+        # Driver for FOV
+        driver = camera.data.driver_add("lens")
+        driver.driver.type = "SCRIPTED"
+        var_scale = driver.driver.variables.new()
+        var_scale.name = "fov"
+        var_scale.type = "TRANSFORMS"
+        var_scale.targets[0].id = rig
+        var_scale.targets[0].transform_space = "WORLD_SPACE"
+        var_scale.targets[0].transform_type = "SCALE_Z"
+        var_sensor = driver.driver.variables.new()
+        var_sensor.name = "sensor_height"
+        var_sensor.type = "SINGLE_PROP"
+        var_sensor.targets[0].id = camera
+        var_sensor.targets[0].data_path = "data.sensor_height"
+        driver.driver.expression = "sensor_height / (2 * tan(radians(fov) / 2))"
+        bpy.context.view_layer.objects.active = rig
         return {"FINISHED"}
 
 
@@ -89,6 +136,21 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         logger.debug("Loading selected hierarchy: %s" % hierarchy.name)
         # Import the scene as an Armature
         armature, armature_obj = import_hierarchy_as_armature(hierarchy)
+        if wm.sssekai_hierarchy_import_mode == "SEKAI_CHARACTER":
+            assert (
+                KEY_SEKAI_CHARACTER_ROOT in active_object
+            ), "Active object is not a Character Controller"
+            match wm.sssekai_character_type:
+                case "HEAD":
+                    assert not active_object[
+                        KEY_SEKAI_CHARACTER_FACE_OBJ
+                    ], "Face already imported"
+                    active_object[KEY_SEKAI_CHARACTER_FACE_OBJ] = armature_obj
+                case "BODY":
+                    assert not active_object[
+                        KEY_SEKAI_CHARACTER_BODY_OBJ
+                    ], "Body already imported"
+                    active_object[KEY_SEKAI_CHARACTER_BODY_OBJ] = armature_obj
         # Import Skinned Meshes and Static Meshes
         # - Just like with Unity scene graph, everything is going to have a parent
         # - Once expressed as a Blender Armature, the direct translation of that is a Bone Parent
@@ -113,7 +175,6 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 mesh_obj.parent_bone = node.name
                 # Add an armature modifier
                 mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
-                logger.debug("Imported Mesh (skinned) %s" % game_object.m_Name)
                 imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
 
             if game_object.m_MeshFilter:
@@ -126,7 +187,6 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 mesh_obj.parent = armature_obj
                 mesh_obj.parent_type = "BONE"
                 mesh_obj.parent_bone = node.name
-                logger.debug("Imported Mesh (static) %s" % game_object.m_Name)
                 imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
 
         # Import Materials
@@ -289,6 +349,36 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         bpy.context.scene.render.fps = int(anim.SampleRate)
         self.report({"INFO"}, T("Sample Rate: %d FPS") % anim.SampleRate)
         action = load_armature_animation(anim.Name, anim, obj, tos_leaf)
+        # Set frame range
+        bpy.context.scene.frame_end = max(
+            bpy.context.scene.frame_end, int(action.curve_frame_range[1])
+        )
+        apply_action(obj, action, wm.sssekai_animation_import_use_nla)
+        self.report({"INFO"}, T("Imported Animation %s") % anim.Name)
+        return {"FINISHED"}
+
+
+@register_class
+class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
+    bl_idname = "sssekai.import_sekai_camera_animation_op"
+    bl_label = T("Import Sekai Camera Animation")
+    bl_description = T("Import the selected Sekai Camera Animation")
+
+    def execute(self, context):
+        global sssekai_global
+        wm = context.window_manager
+        ensure_sssekai_shader_blend()
+        obj = context.active_object
+        assert KEY_SEKAI_CAMERA_RIG in obj, "Active object must be a Camera Rig"
+        # Load Animation
+        anim = sssekai_global.cotainers[
+            wm.sssekai_selected_animation_container
+        ].animations[int(wm.sssekai_selected_animation)]
+        self.report({"INFO"}, T("Loading Animation %s") % anim.m_Name)
+        anim = read_animation(anim)
+        bpy.context.scene.render.fps = int(anim.SampleRate)
+        self.report({"INFO"}, T("Sample Rate: %d FPS") % anim.SampleRate)
+        action = load_sekai_camera_animation(anim.Name, anim)
         # Set frame range
         bpy.context.scene.frame_end = max(
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])
