@@ -7,7 +7,7 @@ KEY_SEKAI_CHARACTER_HEIGHT = "sssekai_sekai_character_height"
 KEY_SEKAI_CHARACTER_BODY_OBJ = "sssekai_sekai_character_body_obj"
 KEY_SEKAI_CHARACTER_FACE_OBJ = "sssekai_sekai_character_face_obj"
 # Hardcoded orders for RLA import
-RLA_VALID_BONES = [
+SEKAI_RLA_VALID_BONES = [
     "Hip",
     "Waist",
     "Spine",
@@ -69,7 +69,7 @@ RLA_VALID_BONES = [
     "Right_Toe",
     "Right_AssistHip",
 ]
-RLA_VALID_BLENDSHAPES = [
+SEKAI_RLA_VALID_BLENDSHAPES = [
     "BS_look.look_up",
     "BS_look.look_down",
     "BS_look.look_left",
@@ -97,13 +97,9 @@ RLA_VALID_BLENDSHAPES = [
     "BS_eyeblow.eyeblow_kime",
     "BS_eyeblow.eyeblow_smile",
 ]
-RLA_ROOT_BONE = "Hip"
-RLA_TIME_MAGNITUDE = 1e7  # 1e7 = 1 second
-# CRC Constants
-# XXX: Find the corresponding source strings for these!
-BLENDSHAPES_CRC = 2770785369
-# Camera rigs
-CAMERA_TRANS_ROT_CRC_MAIN = 3326594866  # Euler, Position in transform tracks
-CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA = (
-    3283970054  # Position, Scale(??) in transform tracks, FOV in the last float track
-)
+SEKAI_RLA_ROOT_BONE = "Hip"
+SEKAI_RLA_TIME_MAGNITUDE = 1e7  # 1e7 = 1 second
+
+SEKAI_BLENDSHAPE_NAME = "BS_"  # XXX: Incorrect!!
+SEKAI_CAMERA_MAIN_NAME = "mainCam"
+SEKAI_CAMERA_PARAM_NAME = "mainCam/CamParam"

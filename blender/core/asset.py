@@ -7,7 +7,7 @@ from UnityPy.helpers.MeshHelper import MeshHandler
 from UnityPy.classes import ColorRGBA, Texture2D, Material, Mesh, Transform, UnityTexEnv
 from UnityPy import Environment
 from .types import Hierarchy, HierarchyNode, SekaiBonePhysics, SekaiBonePhysicsType
-from .utils import get_name_hash
+from .utils import crc32
 from .helpers import (
     create_empty,
     rgba_to_rgb_tuple,

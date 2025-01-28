@@ -55,27 +55,27 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
 
         anim = Animation()
         if pose["boneDatas"]:
-            for bone in RLA_VALID_BONES:
+            for bone in SEKAI_RLA_VALID_BONES:
                 anim.TransformTracks[TransformType.Rotation][
                     inv_bone_hash_table[bone]
                 ] = Track()
         else:
             anim.TransformTracks[TransformType.Rotation][
-                inv_bone_hash_table[RLA_ROOT_BONE]
+                inv_bone_hash_table[SEKAI_RLA_ROOT_BONE]
             ] = Track()
         anim.TransformTracks[TransformType.Translation][
-            inv_bone_hash_table[RLA_ROOT_BONE]
+            inv_bone_hash_table[SEKAI_RLA_ROOT_BONE]
         ] = Track()
 
         if pose["shapeDatas"]:
             anim.FloatTracks[BLENDSHAPES_CRC] = dict()
-            for shape in RLA_VALID_BLENDSHAPES:
+            for shape in SEKAI_RLA_VALID_BLENDSHAPES:
                 anim.FloatTracks[BLENDSHAPES_CRC][inv_shape_table[shape]] = Track()
 
         for idx, boneEuler in enumerate(pose["boneDatas"]):
-            if RLA_VALID_BONES[idx] != RLA_ROOT_BONE:
+            if SEKAI_RLA_VALID_BONES[idx] != SEKAI_RLA_ROOT_BONE:
                 anim.TransformTracks[TransformType.Rotation][
-                    inv_bone_hash_table[RLA_VALID_BONES[idx]]
+                    inv_bone_hash_table[SEKAI_RLA_VALID_BONES[idx]]
                 ].add_keyframe(
                     KeyFrame(
                         0,
@@ -86,12 +86,12 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
                     )
                 )
         anim.TransformTracks[TransformType.Translation][
-            inv_bone_hash_table[RLA_ROOT_BONE]
+            inv_bone_hash_table[SEKAI_RLA_ROOT_BONE]
         ].add_keyframe(
             KeyFrame(0, uVector3(*pose["bodyPosition"]), uVector3(), uVector3(), 0)
         )
         anim.TransformTracks[TransformType.Rotation][
-            inv_bone_hash_table[RLA_ROOT_BONE]
+            inv_bone_hash_table[SEKAI_RLA_ROOT_BONE]
         ].add_keyframe(
             KeyFrame(
                 0,
@@ -104,7 +104,7 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
 
         for idx, value in enumerate(pose["shapeDatas"]):
             anim.FloatTracks[BLENDSHAPES_CRC][
-                inv_shape_table[RLA_VALID_BLENDSHAPES[idx]]
+                inv_shape_table[SEKAI_RLA_VALID_BLENDSHAPES[idx]]
             ].add_keyframe(KeyFrame(0, value, 0, 0, 0))
 
         action = load_armature_animation(
@@ -158,27 +158,27 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
 
         anim = Animation()
         if has_boneData:
-            for bone in RLA_VALID_BONES:
+            for bone in SEKAI_RLA_VALID_BONES:
                 anim.TransformTracks[TransformType.Rotation][
                     inv_hash_table[bone]
                 ] = Track()
         else:
             anim.TransformTracks[TransformType.Rotation][
-                inv_hash_table[RLA_ROOT_BONE]
+                inv_hash_table[SEKAI_RLA_ROOT_BONE]
             ] = Track()
         anim.TransformTracks[TransformType.Translation][
-            inv_hash_table[RLA_ROOT_BONE]
+            inv_hash_table[SEKAI_RLA_ROOT_BONE]
         ] = Track()
         base_tick = sssekai_global.rla_header["baseTicks"]
         tick_min, tick_max = 1e18, 0
         for segment in chara_segments:
-            timestamp = (segment["timestamp"] - base_tick) / RLA_TIME_MAGNITUDE
+            timestamp = (segment["timestamp"] - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
             tick_min = min(tick_min, timestamp)
             tick_max = max(tick_max, timestamp)
             for idx, boneEuler in enumerate(segment["pose"]["boneDatas"]):
-                if RLA_VALID_BONES[idx] != RLA_ROOT_BONE:
+                if SEKAI_RLA_VALID_BONES[idx] != SEKAI_RLA_ROOT_BONE:
                     anim.TransformTracks[TransformType.Rotation][
-                        inv_hash_table[RLA_VALID_BONES[idx]]
+                        inv_hash_table[SEKAI_RLA_VALID_BONES[idx]]
                     ].add_keyframe(
                         KeyFrame(
                             timestamp,
@@ -189,7 +189,7 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
                         )
                     )
             anim.TransformTracks[TransformType.Translation][
-                inv_hash_table[RLA_ROOT_BONE]
+                inv_hash_table[SEKAI_RLA_ROOT_BONE]
             ].add_keyframe(
                 KeyFrame(
                     timestamp,
@@ -205,7 +205,7 @@ class SSSekaiBlenderImportRLAArmatureAnimationOperator(bpy.types.Operator):
                 )
             )
             anim.TransformTracks[TransformType.Rotation][
-                inv_hash_table[RLA_ROOT_BONE]
+                inv_hash_table[SEKAI_RLA_ROOT_BONE]
             ].add_keyframe(
                 KeyFrame(
                     timestamp,
@@ -278,16 +278,16 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
         base_tick = sssekai_global.rla_header["baseTicks"]
         anim.FloatTracks[BLENDSHAPES_CRC] = dict()
         if shapekey_segments:
-            for shape in RLA_VALID_BLENDSHAPES:
+            for shape in SEKAI_RLA_VALID_BLENDSHAPES:
                 anim.FloatTracks[BLENDSHAPES_CRC][inv_hash_table[shape]] = Track()
         tick_min, tick_max = 1e18, 0
         for timestamp, segment in shapekey_segments:
-            timestamp = (timestamp - base_tick) / RLA_TIME_MAGNITUDE
+            timestamp = (timestamp - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
             tick_min = min(tick_min, timestamp)
             tick_max = max(tick_max, timestamp)
             for idx, value in enumerate(segment):
                 anim.FloatTracks[BLENDSHAPES_CRC][
-                    inv_hash_table[RLA_VALID_BLENDSHAPES[idx]]
+                    inv_hash_table[SEKAI_RLA_VALID_BLENDSHAPES[idx]]
                 ].add_keyframe(KeyFrame(timestamp, value, 0, 0, 0))
         action = load_keyshape_animation(
             "RLA",
@@ -351,8 +351,8 @@ NOTE: NLA tracks will be used regardless of the option specified!"""
                         sssekai_global.rla_clip_charas.add(pose["id"])
         base_tick = sssekai_global.rla_header["baseTicks"]
         sssekai_global.rla_clip_tick_range = (
-            (min_tick - base_tick) / RLA_TIME_MAGNITUDE,
-            (max_tick - base_tick) / RLA_TIME_MAGNITUDE,
+            (min_tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE,
+            (max_tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE,
         )
 
     def execute(self, context):

@@ -3,7 +3,7 @@ import bpy, bpy.utils.previews
 import json
 
 from ..core.consts import *
-from ..core.utils import get_name_hash
+from ..core.utils import crc32
 from ..core.helpers import create_empty
 from .. import register_class, logger
 

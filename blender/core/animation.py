@@ -21,6 +21,7 @@ from .math import (
     swizzle_vector_scale,
 )
 from .helpers import create_empty, time_to_frame, ensure_action, create_action
+from utils import crc32
 from .consts import *
 from .. import logger
 
@@ -35,8 +36,8 @@ def interpolation_to_blender(ipo: Interpolation):
         .enum_items[
             {
                 Interpolation.Constant: "CONSTANT",
-                Interpolation.Hermite: "LINEAR",
-                Interpolation.HermiteOrLinear: "BEZIER",
+                Interpolation.Hermite: "BEZIER",
+                Interpolation.Linear: "LINEAR",
                 # Blender seem to use the left key value for the interpolation too
                 Interpolation.Stepped: "CONSTANT",
             }[ipo]
@@ -45,12 +46,12 @@ def interpolation_to_blender(ipo: Interpolation):
     )
 
 
-def import_curve(
+def load_curve(
     action: bpy.types.Action,
     data_path: str,
     curve: Curve,
-    bl_values: List[float | blEuler | blVector],
-    is_scale: bool = False,
+    bl_values: List[float | blEuler | blVector | blQuaternion],
+    swizzle_func: callable = None,
 ):
     """Creates an arbitrary amount of FCurves for a sssekai Curve
 
@@ -59,36 +60,37 @@ def import_curve(
         data_path (str): data path
         curve (Curve): curve data
         bl_values (List[float | blEuler | blVector | blQuaternion]): values in Blender types
+        slope_transform (callable, optional): swizzle function applied on the slope values. Read the note below
+
+    Notes on slope_transform:
+        Swizzling `g(x) = kx` would be STRICTLY linear and `f(x), f'(x)` are known, this implies that:
+        `F(x) = g(f(x))`->`F'(x) = g'(f(x)) * f'(x) = k * f'(x) = g(f'(x))`
+
+        Meaning swizzling the slope values would make them correct.
+
+        Affine transform (non-Scale, Shear) in 3D space only needs the swizzling on the slope values since
+        affine transforms don't affect slopes.
     """
     num_curves = 1
     bl_inSlopes = []
     bl_outSlopes = []
-    # Slope values are in Blender's local space though should be unaffected
-    # by the pose space transform since it's affine.
-    # Only swizzling is needed since it's elementary matrix math which is not affine.
-    # The same applies to translation and scale
+
     if type(bl_values[0]) == blEuler:
         num_curves = 3
-        bl_inSlopes = [swizzle_euler(k.inSlope) for k in curve.Data]
-        bl_outSlopes = [swizzle_euler(k.outSlope) for k in curve.Data]
+        swizzle_func = swizzle_func or swizzle_euler
     elif type(bl_values[0]) == blVector:
         num_curves = 3
-        if not is_scale:
-            bl_inSlopes = [swizzle_vector(k.inSlope) for k in curve.Data]
-            bl_outSlopes = [swizzle_vector(k.outSlope) for k in curve.Data]
-        else:
-            bl_inSlopes = [swizzle_vector_scale(k.inSlope) for k in curve.Data]
-            bl_outSlopes = [swizzle_vector_scale(k.outSlope) for k in curve.Data]
+        swizzle_func = swizzle_func or swizzle_vector
     elif type(bl_values[0]) == blQuaternion:
         num_curves = 4
-        bl_inSlopes = [swizzle_quaternion(k.inSlope) for k in curve.Data]
-        bl_outSlopes = [swizzle_quaternion(k.outSlope) for k in curve.Data]
+        swizzle_func = swizzle_func or swizzle_quaternion
     elif type(bl_values[0]) == float:
         num_curves = 1
-        bl_inSlopes = [keyframe.inSlope for keyframe in curve.Data]
-        bl_outSlopes = [keyframe.outSlope for keyframe in curve.Data]
+        swizzle_func = swizzle_func or (lambda x: x)
     else:
         raise NotImplementedError("Unsupported value type")
+    bl_inSlopes = [swizzle_func(k.inSlope) for k in curve.Data]
+    bl_outSlopes = [swizzle_func(k.outSlope) for k in curve.Data]
     frames = [time_to_frame(keyframe.time) for keyframe in curve.Data]
     fcurve = [
         action.fcurves.new(data_path=data_path, index=i) for i in range(num_curves)
@@ -113,6 +115,7 @@ def import_curve(
             ],
         )
         # Setup Hermite to cubic Bezier CPs
+        # For non-Bezier segments the would not have any effect
         free_handles = [BEZIER_FREE] * len(frames)
         fcurve[i].keyframe_points.foreach_set("handle_left_type", free_handles)
         fcurve[i].keyframe_points.foreach_set("handle_right_type", free_handles)
@@ -135,16 +138,25 @@ def import_curve(
         fcurve[i].update()
 
 
-def import_float_curve(
+def load_float_curve(
     action: bpy.types.Action,
     data_path: str,
     curve: Curve,
+    bl_values: List[float] = None,
 ):
-    bl_values = [k.value for k in curve.Data]
-    return import_curve(action, data_path, curve, bl_values)
+    """Helper fuction that creates an FCurve for a sssekai Float Curve
+
+    Args:
+        action (bpy.types.Action): target action.
+        data_path (str): data path
+        curve (Curve): curve data
+        bl_values (List[float], optional): values in Blender types. will be extracted from curve if not provided. Defaults to None.
+    """
+    bl_values = bl_values or [k.value for k in curve.Data]
+    return load_curve(action, data_path, curve, bl_values)
 
 
-def import_curve_quatnerion(
+def load_curve_quatnerion(
     action: bpy.types.Action,
     data_path: str,
     curve: Curve,
@@ -158,12 +170,14 @@ def import_curve_quatnerion(
         data_path (str): data path
         curve (Curve): curve data
         bl_values (List[blQuaternion]): blQuaternion values in pose space
+        interpolation (str, optional): interpolation type. Defaults to "LINEAR".
 
     Note:
         * The import function ensures that the quaternions in the curve are compatible with each other
             (i.e. lerping between them will not cause flips and the shortest path will always be taken).
         * Note it's *LERP* not *SLERP*. Blender fcurves does not specialize in quaternion interpolation.
         * Hence, with `interpolation`, you should always use `LINEAR` for the most accurate results.
+        * The curve's tangents are NOT used for this reason.
     """
     assert (
         type(bl_values[0]) == blQuaternion
@@ -288,7 +302,7 @@ def load_armature_animation(
             to_pose_quaternion(bone, swizzle_quaternion(keyframe.value))
             for keyframe in curve.Data
         ]
-        import_curve_quatnerion(
+        load_curve_quatnerion(
             action, 'pose.bones["%s"].rotation_quaternion' % bone, frames, values
         )
     # Euler Rotations
@@ -304,7 +318,7 @@ def load_armature_animation(
             to_pose_euler(bone, swizzle_euler(keyframe.value))
             for keyframe in curve.Data
         ]
-        import_curve(
+        load_curve(
             action, 'pose.bones["%s"].rotation_euler' % bone, curve, frames, values
         )
     # Translations
@@ -318,7 +332,7 @@ def load_armature_animation(
             to_pose_translation(bone, swizzle_vector(keyframe.value))
             for keyframe in curve.Data
         ]
-        import_curve(action, 'pose.bones["%s"].location' % bone, curve, frames, values)
+        load_curve(action, 'pose.bones["%s"].location' % bone, curve, frames, values)
     # Scale
     for path, curve in anim.Curves[kBindTransformScale].items():
         bone = crc_bone_table.get(path, None)
@@ -327,13 +341,13 @@ def load_armature_animation(
             continue
         frames = [time_to_frame(keyframe.time, 0) for keyframe in curve.Data]
         values = [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data]
-        import_curve(
+        load_curve(
             action,
             'pose.bones["%s"].scale' % bone,
             curve,
             frames,
             values,
-            is_scale=True,
+            swizzle_func=swizzle_vector_scale,
         )
     return action
 
@@ -342,8 +356,6 @@ def load_keyshape_animation(
     name: str,
     data: Animation,
     crc_keyshape_table: dict,
-    frame_offset: int = 0,
-    action: bpy.types.Action = None,
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to any mesh
 
@@ -363,26 +375,29 @@ def load_keyshape_animation(
         KeyShape value range [0,100]
     """
     action = create_action(name)
-    for attrCRC, track in data.FloatTracks[BLENDSHAPES_CRC].items():
-        bsName = crc_keyshape_table[str(attrCRC)]
-        import_curve(
+    for attr, curve in data.CurvesT[crc32(SEKAI_BLENDSHAPE_NAME)].items():
+        bsName = crc_keyshape_table[str(attr)]
+        load_curve(
             action,
             'key_blocks["%s"].value' % bsName,
-            [keyframe.value / 100.0 for keyframe in track.Curve],
-            [time_to_frame(keyframe.time, frame_offset) for keyframe in track.Curve],
+            [keyframe.value / 100.0 for keyframe in curve.Data],
         )
     return action
 
 
-def prepare_camera_rig(camera: bpy.types.Object):
+def ensure_sekai_camera_rig(camera: bpy.types.Object):
     if not camera.parent or not KEY_SEKAI_CAMERA_RIG in camera.parent:
         # The 'rig' Offsets the camera's look-at direction w/o modifying the Euler angles themselves, which
         # would otherwise cause interpolation issues.
         # This is simliar to how mmd_tools handles camera animations.
         #
-        # We also store the FOV in the X scale of the parent object so that it's easy to interpolate
-        # and we'd only need one action for the entire animation.
-        rig = create_empty("Camera Rig", camera.parent)
+        # We store the FOV in degrees in the X scale of the parent object so that it's easy to interpolate
+        # and we'd only need one action for the entire FOV animation.
+        #
+        # FOV = 2 arctan [sensor_height / (2*focalLength)]
+        # focalLength = sensor_height / (2 * tan(FOV/2))
+        # -> sensor_height / (2 * tan(radians(fov) / 2))
+        rig = create_empty("SekaiCameraRig", camera.parent)
         rig[KEY_SEKAI_CAMERA_RIG] = "<marker>"
         camera.parent = rig
         camera.location = blVector((0, 0, 0))
@@ -398,7 +413,7 @@ def prepare_camera_rig(camera: bpy.types.Object):
         var_scale.targets[0].id = rig
         var_scale.targets[0].transform_space = "WORLD_SPACE"
         var_scale.targets[0].transform_type = "SCALE_X"
-        driver.driver.expression = "fov"
+        driver.driver.expression = "sensor_height / (2 * tan(radians(fov) / 2))"
         logger.debug("Created Camera Rig for camera %s" % camera.name)
         return rig
     return camera.parent
@@ -408,11 +423,6 @@ def load_camera_animation(
     name: str,
     data: Animation,
     camera: bpy.types.Object,
-    frame_offset: int,
-    scaling_factor: blVector,
-    scaling_offset: blVector,
-    fov_offset: float,
-    action: bpy.types.Action = None,
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to the camera
 
@@ -431,14 +441,12 @@ def load_camera_animation(
     Returns:
         bpy.types.Action: the created action
     """
-    rig = prepare_camera_rig(camera)
+    rig = ensure_sekai_camera_rig(camera)
     rig.rotation_mode = "YXZ"
     action = action or create_action(name)
 
     def swizzle_translation_camera(vector: blVector):
         result = swizzle_vector(vector)
-        result *= blVector(scaling_factor)
-        result += blVector(scaling_offset)
         return result
 
     def swizzle_euler_camera(euler: blEuler):
@@ -446,60 +454,39 @@ def load_camera_animation(
         result.y *= -1  # Invert Y (Unity's Roll)
         return result
 
-    def fov_to_focal_length(fov: float):
-        # FOV = 2 arctan [sensorSize/(2*focalLength)]
-        # focalLength = sensorSize / (2 * tan(FOV/2))
-        # fov -> Vertical FOV, which is the default in Unity
-        fov += fov_offset
-        return camera.data.sensor_height / (2 * math.tan(math.radians(fov) / 2))
-
-    if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.EulerRotation]:
-        logger.debug("Found Camera Rotation track")
-        curve = data.TransformTracks[TransformType.EulerRotation][
-            CAMERA_TRANS_ROT_CRC_MAIN
-        ].Curve
-        import_curve(
-            action,
-            "rotation_euler",
-            [swizzle_euler_camera(keyframe.value) for keyframe in curve],
-            [time_to_frame(keyframe.time, frame_offset) for keyframe in curve],
-            3,
-            "BEZIER",
-            # [swizzle_euler(keyframe.inSlope) for keyframe in curve],
-            # [swizzle_euler(keyframe.outSlope) for keyframe in curve]
-        )
-    if CAMERA_TRANS_ROT_CRC_MAIN in data.TransformTracks[TransformType.Translation]:
-        logger.debug("Found Camera Translation track, scaling=%s" % scaling_factor)
-        curve = data.TransformTracks[TransformType.Translation][
-            CAMERA_TRANS_ROT_CRC_MAIN
-        ].Curve
-        import_curve(
-            action,
-            "location",
-            [swizzle_translation_camera(keyframe.value) for keyframe in curve],
-            [time_to_frame(keyframe.time, frame_offset) for keyframe in curve],
-            3,
-            "BEZIER",
-            # [swizzle_translation_camera(keyframe.inSlope) for keyframe in curve],
-            # [swizzle_translation_camera(keyframe.outSlope) for keyframe in curve]
-        )
-    if (
-        CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA
-        in data.TransformTracks[TransformType.Translation]
-    ):
-        logger.debug("Found Camera FOV track")
-        camera.data.lens_unit = "MILLIMETERS"
-        curve = data.TransformTracks[TransformType.Translation][
-            CAMERA_TRANS_SCALE_EXTRA_CRC_EXTRA
-        ].Curve
-        import_curve(
-            action,
-            "scale",  # FOV on the X scale
-            [(fov_to_focal_length(keyframe.value.z * 100), 1, 1) for keyframe in curve],
-            [time_to_frame(keyframe.time, frame_offset) for keyframe in curve],
-            3,
-            "BEZIER",
-            # [fov_to_focal_length(keyframe.inSlope.Z * 100) for keyframe in curve],
-            # [fov_to_focal_length(keyframe.outSlope.Z * 100) for keyframe in curve]
-        )
+    mainCam = data.CurvesT.get(
+        crc32(SEKAI_CAMERA_MAIN_NAME), None
+    )  # Euler, Position in transform tracks
+    camParam = data.Curves.get(
+        crc32(SEKAI_CAMERA_PARAM_NAME), None
+    )  # Position, Scale(??) in transform tracks, FOV in the last float track
+    if mainCam:
+        if kBindTransformEuler in mainCam:
+            curve = mainCam[kBindTransformEuler]
+            load_curve(
+                action,
+                "rotation_euler",
+                curve,
+                [swizzle_euler_camera(keyframe.value) for keyframe in curve.Data],
+                swizzle_func=swizzle_euler_camera,
+            )
+        if kBindTransformPosition in mainCam:
+            curve = mainCam[kBindTransformPosition]
+            load_curve(
+                action,
+                "location",
+                curve,
+                [swizzle_translation_camera(keyframe.value) for keyframe in curve.Data],
+                swizzle_func=swizzle_translation_camera,
+            )
+    if camParam:
+        if kBindTransformPosition in camParam:
+            camera.data.lens_unit = "MILLIMETERS"
+            curve = camParam[kBindTransformPosition]
+            load_curve(
+                action,
+                "scale",
+                curve,
+                [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data],
+            )
     return action
