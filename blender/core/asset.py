@@ -6,7 +6,7 @@ from UnityPy.enums import ClassIDType
 from UnityPy.helpers.MeshHelper import MeshHandler
 from UnityPy.classes import ColorRGBA, Texture2D, Material, Mesh, Transform, UnityTexEnv
 from UnityPy import Environment
-from .types import Hierarchy, HierarchyNode, SekaiBonePhysics, SekaiBonePhysicsType
+from .types import Hierarchy, HierarchyNode
 from .utils import crc32
 from .helpers import (
     create_empty,
@@ -117,9 +117,11 @@ def import_hierarchy_as_armature(hierarchy: Hierarchy, name: str = None):
             ebone.parent = (
                 ebones[parent.name] if parent and parent.name != root.name else None
             )
+            ebone[KEY_HIERARCHY_BONE_PATHID] = str(child.path_id)
             ebones[child.name] = ebone
 
     bpy.ops.object.mode_set(mode="OBJECT")
+    obj[KEY_HIERARCHY_PATHID] = str(hierarchy.path_id)
     return armature, obj
 
 
@@ -353,6 +355,7 @@ def import_fallback_material(name: str, data: Material, texture_cache=None, **kw
     return material
 
 
+# region Sekai Specific
 def import_sekai_eyelight_material(
     name: str, data: Material, texture_cache=None, **kwargs
 ):
@@ -625,3 +628,6 @@ def import_sekai_stage_color_add_material(
                 mainTex.outputs["Color"], sekaiShader.inputs["Sekai C"]
             )
     return material
+
+
+# endregion

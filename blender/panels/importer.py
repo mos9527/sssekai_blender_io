@@ -18,13 +18,15 @@ from UnityPy.enums import ClassIDType
 from UnityPy.classes import AnimationClip, Animator
 
 from ..core.consts import *
-from ..core.utils import encode_asset_id
 from .. import register_class, register_wm_props, logger
 
 from ..core.asset import build_scene_hierarchy
 from .. import sssekai_global, SSSekaiEnvironmentContainer
 
-from ..operators.importer import SSSekaiBlenderImportHierarchyOperator
+from ..operators.importer import (
+    SSSekaiBlenderImportHierarchyOperator,
+    SSSekaiBlenderImportHierarchyAnimationOperaotr,
+)
 
 EMPTY_OPT = ("--", "Not Available", "", "ERROR", 0)
 EMPTY_CONTAINER = "<default>"
@@ -159,11 +161,18 @@ register_wm_props(
         ),
         default=False,
     ),
+    sssekai_animation_root_bone=StringProperty(
+        name=T("Root Bone"),
+        description=T(
+            "Root bone of the animation. Leave empty to use the armature root(s)"
+        ),
+        default="",
+    ),
     sssekai_animation_import_offset=IntProperty(
         name=T("Offset"), description=T("Animation Offset in frames"), default=0
     ),
     sssekai_animation_import_use_nla=BoolProperty(
-        name=T("Use NLA"), description=T("Import as NLA Track"), default=False
+        name=T("Use NLA"), description=T("Import as NLA Track"), default=True
     ),
     sssekai_animation_import_nla_always_new_tracks=BoolProperty(
         name=T("Create new NLA tracks"),
@@ -327,6 +336,10 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 row.prop(wm, "sssekai_animation_use_animator", icon="DECORATE_ANIMATE")
                 row.prop(wm, "sssekai_animation_append_exisiting", icon="OVERLAY")
                 row = layout.row()
+                if not wm.sssekai_animation_use_animator:
+                    row.prop(wm, "sssekai_animation_root_bone", icon="BONE_DATA")
+                    row = layout.row()
+                row.operator(SSSekaiBlenderImportHierarchyAnimationOperaotr.bl_idname)
             case "IMPORT_HIERARCHY":
                 row.label(text=T("Hierarchy Options"), icon="OUTLINER_OB_ARMATURE")
                 row = layout.row()

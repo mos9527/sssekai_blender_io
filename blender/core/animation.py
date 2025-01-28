@@ -21,7 +21,7 @@ from .math import (
     swizzle_vector_scale,
 )
 from .helpers import create_empty, time_to_frame, ensure_action, create_action
-from utils import crc32
+from .utils import crc32
 from .consts import *
 from .. import logger
 
@@ -60,9 +60,9 @@ def load_curve(
         data_path (str): data path
         curve (Curve): curve data
         bl_values (List[float | blEuler | blVector | blQuaternion]): values in Blender types
-        slope_transform (callable, optional): swizzle function applied on the slope values. Read the note below
+        swizzle_func (callable, optional): swizzle function applied on the slope values. Read the note below
 
-    Notes on slope_transform:
+    Notes on swizzle_func:
         Swizzling `g(x) = kx` would be STRICTLY linear and `f(x), f'(x)` are known, this implies that:
         `F(x) = g(f(x))`->`F'(x) = g'(f(x)) * f'(x) = k * f'(x) = g(f'(x))`
 
@@ -70,6 +70,8 @@ def load_curve(
 
         Affine transform (non-Scale, Shear) in 3D space only needs the swizzling on the slope values since
         affine transforms don't affect slopes.
+
+        If your value transform isn't linear (e.g. FOV to Lens) - you should probably consider using a Driver instead
     """
     num_curves = 1
     bl_inSlopes = []
@@ -96,20 +98,20 @@ def load_curve(
         action.fcurves.new(data_path=data_path, index=i) for i in range(num_curves)
     ]
 
-    for i in range(num_curves):
+    for index in range(num_curves):
         curve_data = [0] * (len(frames) * 2)
         curve_data[::2] = frames
-        curve_data[1::2] = [v[i] if num_curves > 1 else v for v in bl_values]
+        curve_data[1::2] = [v[index] if num_curves > 1 else v for v in bl_values]
 
-        fcurve[i].keyframe_points.clear()
-        fcurve[i].keyframe_points.add(len(frames))
-        fcurve[i].keyframe_points.foreach_set("co", curve_data)
+        fcurve[index].keyframe_points.clear()
+        fcurve[index].keyframe_points.add(len(frames))
+        fcurve[index].keyframe_points.foreach_set("co", curve_data)
         # Setup interpolation
-        fcurve[i].keyframe_points.foreach_set(
+        fcurve[index].keyframe_points.foreach_set(
             "interpolation",
             [
                 interpolation_to_blender(
-                    keyframe.interpolation_segment(keyframe, keyframe.next)[i]
+                    keyframe.interpolation_segment(keyframe, keyframe.next)[index]
                 )
                 for keyframe in curve.Data
             ],
@@ -117,8 +119,8 @@ def load_curve(
         # Setup Hermite to cubic Bezier CPs
         # For non-Bezier segments the would not have any effect
         free_handles = [BEZIER_FREE] * len(frames)
-        fcurve[i].keyframe_points.foreach_set("handle_left_type", free_handles)
-        fcurve[i].keyframe_points.foreach_set("handle_right_type", free_handles)
+        fcurve[index].keyframe_points.foreach_set("handle_left_type", free_handles)
+        fcurve[index].keyframe_points.foreach_set("handle_right_type", free_handles)
         p1 = [0] * (len(frames) * 2)
         p2 = [0] * (len(frames) * 2)
         # Cubic Bezier H(t) = (1-t)^3 * P0 + 3(1-t)^2 * t * P1 + 3(1-t) * t^2 * P2 + t^3 * P3
@@ -126,16 +128,30 @@ def load_curve(
         # H'(0) = 3(P1 - P0) = m0 \therefore P1 = P0 + m0/3
         # H'(1) = 3(P3 - P2) = m1 \therefore P2 = P3 - m1/3
         # This is also where the rule of 1/3rd comes from
-        delta_t_3 = lambda keyframe: (
-            ((keyframe.next.time - keyframe.time) if keyframe.next else 0) / 3
+        delta_t_3 = lambda i: (
+            (curve.Data[i + 1].time - curve.Data[i].time) / 3
+            if i + 1 < len(curve.Data)
+            else 0.1  # Arbitrary value
         )
-        p1[::2] = [time_to_frame(k.time + delta_t_3(k)) for k in curve.Data]
-        p1[1::2] = [bl_values[i] + k * delta_t_3(k) for i, k in enumerate(bl_outSlopes)]
-        p2[::2] = [time_to_frame(k.time - delta_t_3(k)) for k in curve.Data]
-        p2[1::2] = [bl_values[i] - k * delta_t_3(k) for i, k in enumerate(bl_inSlopes)]
-        fcurve[i].keyframe_points.foreach_set("handle_left", p2)
-        fcurve[i].keyframe_points.foreach_set("handle_right", p1)
-        fcurve[i].update()
+        p1[::2] = [
+            time_to_frame(k.time + delta_t_3(i)) for i, k in enumerate(curve.Data)
+        ]
+        p1[1::2] = [
+            (bl_values[i][index] if num_curves > 1 else bl_values[i])
+            + (k[index] if num_curves > 1 else k) * delta_t_3(i)
+            for i, k in enumerate(bl_outSlopes)
+        ]
+        p2[::2] = [
+            time_to_frame(k.time - delta_t_3(i)) for i, k in enumerate(curve.Data)
+        ]
+        p2[1::2] = [
+            (bl_values[i][index] if num_curves > 1 else bl_values[i])
+            - (k[index] if num_curves > 1 else k) * delta_t_3(i)
+            for i, k in enumerate(bl_inSlopes)
+        ]
+        fcurve[index].keyframe_points.foreach_set("handle_left", p2)
+        fcurve[index].keyframe_points.foreach_set("handle_right", p1)
+        fcurve[index].update()
 
 
 def load_float_curve(
@@ -217,7 +233,7 @@ def load_curve_quatnerion(
 
 
 def load_armature_animation(
-    name: str, anim: Animation, target: bpy.types.Object, crc_bone_table: dict
+    name: str, anim: Animation, target: bpy.types.Object, tos_leaf: dict
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to the armature
 
@@ -227,7 +243,7 @@ def load_armature_animation(
         name (str): name of the action
         anim (Animation): animation data
         target (bpy.types.Object): target armature object
-        crc_bone_table (dict): Animation path CRC32 value to Bone name table
+        tos_leaf (dict): TOS. Animation *FULL* path CRC32 to *LEAF* bone name table
 
     Returns:
         bpy.types.Action: the created action
@@ -293,66 +309,62 @@ def load_armature_animation(
     action = create_action(name)
     # Quaternions
     for path, curve in anim.Curves[kBindTransformRotation].items():
-        bone = crc_bone_table.get(path, None)
+        bone = tos_leaf.get(path, None)
         if not bone:
             logger.warning("Quaternion: Failed to bind CRC32 %s to bone" % path)
             continue
-        frames = [time_to_frame(keyframe.time, 0) for keyframe in curve.Data]
         values = [
             to_pose_quaternion(bone, swizzle_quaternion(keyframe.value))
             for keyframe in curve.Data
         ]
         load_curve_quatnerion(
-            action, 'pose.bones["%s"].rotation_quaternion' % bone, frames, values
+            action, 'pose.bones["%s"].rotation_quaternion' % bone, curve, values
         )
     # Euler Rotations
     for path, curve in anim.Curves[kBindTransformEuler].items():
-        bone = crc_bone_table.get(path, None)
+        bone = tos_leaf.get(path, None)
         if not bone:
             logger.warning("Euler: Failed to bind CRC32 %s to bone" % path)
             continue
         pose_bone = target.pose.bones.get(bone)
         pose_bone.rotation_mode = "YXZ"  # see swizzle_euler
-        frames = [time_to_frame(keyframe.time, 0) for keyframe in curve.Data]
         values = [
             to_pose_euler(bone, swizzle_euler(keyframe.value))
             for keyframe in curve.Data
         ]
-        load_curve(
-            action, 'pose.bones["%s"].rotation_euler' % bone, curve, frames, values
-        )
+        load_curve(action, 'pose.bones["%s"].rotation_euler' % bone, curve, values)
     # Translations
     for path, curve in anim.Curves[kBindTransformPosition].items():
-        bone = crc_bone_table.get(path, None)
+        bone = tos_leaf.get(path, None)
         if not bone:
             logger.warning("Translation: Failed to bind CRC32 %s to bone" % path)
             continue
-        frames = [time_to_frame(keyframe.time, 0) for keyframe in curve.Data]
         values = [
             to_pose_translation(bone, swizzle_vector(keyframe.value))
             for keyframe in curve.Data
         ]
-        load_curve(action, 'pose.bones["%s"].location' % bone, curve, frames, values)
+        load_curve(action, 'pose.bones["%s"].location' % bone, curve, values)
     # Scale
     for path, curve in anim.Curves[kBindTransformScale].items():
-        bone = crc_bone_table.get(path, None)
+        bone = tos_leaf.get(path, None)
         if not bone:
             logger.warning("Scale: Failed to bind CRC32 %s to bone" % path)
             continue
-        frames = [time_to_frame(keyframe.time, 0) for keyframe in curve.Data]
         values = [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data]
         load_curve(
             action,
             'pose.bones["%s"].scale' % bone,
             curve,
-            frames,
             values,
             swizzle_func=swizzle_vector_scale,
         )
     return action
 
 
-def load_keyshape_animation(
+# region Sekai Specific
+
+
+def load_sekai_keyshape_animation(
     name: str,
     data: Animation,
     crc_keyshape_table: dict,
@@ -386,17 +398,19 @@ def load_keyshape_animation(
 
 
 def ensure_sekai_camera_rig(camera: bpy.types.Object):
+    """
+    The 'rig' Offsets the camera's look-at direction w/o modifying the Euler angles themselves, which
+    would otherwise cause interpolation issues.
+    This is simliar to how mmd_tools handles camera animations.
+
+    We store the FOV in degrees in the X scale of the parent object so that it's easy to interpolate
+    and we'd only need one action for the entire FOV animation.
+
+    FOV = 2 arctan [sensor_height / (2*focalLength)]
+    focalLength = sensor_height / (2 * tan(FOV/2))
+    -> sensor_height / (2 * tan(radians(fov) / 2))
+    """
     if not camera.parent or not KEY_SEKAI_CAMERA_RIG in camera.parent:
-        # The 'rig' Offsets the camera's look-at direction w/o modifying the Euler angles themselves, which
-        # would otherwise cause interpolation issues.
-        # This is simliar to how mmd_tools handles camera animations.
-        #
-        # We store the FOV in degrees in the X scale of the parent object so that it's easy to interpolate
-        # and we'd only need one action for the entire FOV animation.
-        #
-        # FOV = 2 arctan [sensor_height / (2*focalLength)]
-        # focalLength = sensor_height / (2 * tan(FOV/2))
-        # -> sensor_height / (2 * tan(radians(fov) / 2))
         rig = create_empty("SekaiCameraRig", camera.parent)
         rig[KEY_SEKAI_CAMERA_RIG] = "<marker>"
         camera.parent = rig
@@ -419,7 +433,7 @@ def ensure_sekai_camera_rig(camera: bpy.types.Object):
     return camera.parent
 
 
-def load_camera_animation(
+def load_sekai_camera_animation(
     name: str,
     data: Animation,
     camera: bpy.types.Object,
@@ -488,5 +502,9 @@ def load_camera_animation(
                 "scale",
                 curve,
                 [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data],
+                swizzle_func=swizzle_vector_scale,
             )
     return action
+
+
+# endregion

@@ -1,7 +1,124 @@
+from .utils import crc32
+
 # Plugin custom attribute keys
+KEY_HIERARCHY_PATHID = "sssekai_hierarchy_pathid"
+KEY_HIERARCHY_BONE_PATHID = "sssekai_bone_hierarchy_pathid"
+# Hashes of names prefixed `blendShape.`
 KEY_SHAPEKEY_HASH_TABEL = "sssekai_shapekey_name_hash_tbl"
 
-KEY_SEKAI_CAMERA_RIG = "sssekai_camera_rig"
+# region Unity Specific
+# AnimatorController::BuildAsset()
+UNITY_MECANIM_RESERVED_TOS = {
+    crc32(x): x
+    for x in [
+        "T",
+        "Q",
+        "S",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "X",
+        "Y",
+        "Z",
+        "W",
+        "Result",
+        "Min",
+        "Max",
+        "Value",
+        "MinMin",
+        "MinMax",
+        "MaxMin",
+        "MaxMax",
+        "In",
+        "Out",
+        "RangeA",
+        "RangeB",
+        "RangeC",
+        "RangeD",
+        "RangeE",
+        "WeightA",
+        "WeightB",
+        "WeightC",
+        "WeightD",
+        "WeightE",
+        "OutA",
+        "OutB",
+        "OutC",
+        "OutD",
+        "OutE",
+        "Num",
+        "Den",
+        "Rem",
+        "DampTime",
+        "DeltaTime",
+        "PreviousValue",
+        "GravityWeight",
+        "SrcRefX",
+        "DstRefX",
+        "SrcPivotX",
+        "DstPivotX",
+        "RefWeight",
+        "PivotWeight",
+        "XI",
+        "XO",
+        "Condition",
+        "StateTime",
+        "StateSpeed",
+        "StateExitTime",
+        "DoTransition",
+        "NextStateStartTime",
+        "TransitionDuration",
+        "TransitionOffset",
+        "TransitionStartTime",
+        "StateMachineWeight",
+        "TransitionTime",
+        "BlendWeight",
+        "StateWeight",
+        "StabilizeFeet",
+        "RootX",
+        "LeftFoot.WeightT",
+        "LeftFoot.WeightR",
+        "RightFoot.WeightT",
+        "RightFoot.WeightR",
+        "ComputeSource",
+        "LookAt",
+        "LeftFootX",
+        "RightFootX",
+        "LeftFootSpeedT",
+        "LeftFootSpeedQ",
+        "RightFootSpeedT",
+        "RightFootSpeedQ",
+        "LeftFootStableT",
+        "LeftFootStableQ",
+        "RightFootStableT",
+        "RightFootStableQ",
+        "RootSpeedT",
+        "RootSpeedQ",
+        "RootStableT",
+        "RootStableQ",
+        "LeftFootProjX",
+        "RightFootProjX",
+        "PlantFeet",
+        "LeftFootSafeX",
+        "RightFootSafeX);",
+        "PositionX",
+        "PositionY",
+        "PositionZ",
+        "QuaternionX",
+        "QuaternionY",
+        "QuaternionZ",
+        "QuaternionW",
+        "ScaleX",
+        "ScaleY",
+        "ScaleZ",
+        "DynamicCurve",
+    ]
+}
+# endregion
+# region Sekai Specific
+KEY_SEKAI_CAMERA_RIG = "sssekai_sekai_camera_rig"
 KEY_SEKAI_CHARACTER_ROOT_STUB = "sssekai_sekai_character_root_stub"
 KEY_SEKAI_CHARACTER_HEIGHT = "sssekai_sekai_character_height"
 KEY_SEKAI_CHARACTER_BODY_OBJ = "sssekai_sekai_character_body_obj"
@@ -99,7 +216,8 @@ SEKAI_RLA_VALID_BLENDSHAPES = [
 ]
 SEKAI_RLA_ROOT_BONE = "Hip"
 SEKAI_RLA_TIME_MAGNITUDE = 1e7  # 1e7 = 1 second
-
+# Hardcoded names for Sekai
 SEKAI_BLENDSHAPE_NAME = "BS_"  # XXX: Incorrect!!
 SEKAI_CAMERA_MAIN_NAME = "mainCam"
 SEKAI_CAMERA_PARAM_NAME = "mainCam/CamParam"
+# endregion

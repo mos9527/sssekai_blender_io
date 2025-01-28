@@ -13,49 +13,6 @@ from .math import (
 from UnityPy.classes import GameObject
 
 
-class SekaiBonePhysicsType(IntEnum):
-    NoPhysics = 0x00
-
-    Bone = 0x10
-    SpringBone = 0x11
-
-    Collider = 0x20
-    SphereCollider = 0x21
-    CapsuleCollider = 0x22
-
-    Manager = 0x30
-    SpringManager = 0x30
-
-
-@dataclass
-class SekaiBoneAngularLimit:
-    active: bool = 0
-    # In degrees
-    min: float = 0
-    max: float = 0
-
-
-@dataclass
-class SekaiBonePhysics:
-    type: SekaiBonePhysicsType = SekaiBonePhysicsType.NoPhysics
-
-    radius: float = 0
-    height: float = 0
-
-    # SpringBones only
-    pivot: str = ""  # Bone name. Could be None
-    springForce: float = 0
-    dragForce: float = 0
-    angularStiffness: float = 0
-    yAngleLimits: SekaiBoneAngularLimit = None
-    zAngleLimits: SekaiBoneAngularLimit = None
-
-    @staticmethod
-    def from_dict(data: dict):
-        phy = dataclass_from_dict(SekaiBonePhysics, data, warn_missing_fields=False)
-        return phy
-
-
 @dataclass
 class HierarchyNode:
     name: str

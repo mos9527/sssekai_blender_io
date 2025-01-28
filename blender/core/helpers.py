@@ -110,7 +110,7 @@ def auto_setup_shader_node_driver(node_group, target_obj, target_bone=None):
 
 
 def time_to_frame(time: float, frame_offset: int = 0):
-    return int(time * bpy.context.scene.render.fps) + 1 + frame_offset
+    return time * bpy.context.scene.render.fps + frame_offset
 
 
 def retrive_action(object: bpy.types.Object):
@@ -174,3 +174,30 @@ def apply_action(
         frame_begin = max(0, action.frame_range[0])
         strip = nla_track.strips.new(action.name, int(frame_begin), action)
         strip.action_frame_start = max(0, frame_begin)
+
+
+def editbone_children_recursive(root: bpy.types.EditBone):
+    """Yields a tuple of (parent, child, depth) for children of a edit bone.
+
+    The tree is traversed in depth-first order and from top to bottom.
+    """
+
+    def dfs(bone: bpy.types.EditBone, parent=None, depth=0):
+        yield parent, bone, depth
+        for child in bone.children:
+            yield from dfs(child, bone, depth + 1)
+
+    yield from dfs(root)
+
+
+def armature_editbone_children_recursive(arma: bpy.types.Armature):
+    """Yields a tuple of (parent, child, depth) for edit bones in an Armature.
+
+    Armature MUST be in Edit Mode.
+
+    The tree is traversed in depth-first order and from top to bottom.
+    """
+
+    for ebone in arma.edit_bones:
+        if ebone.parent is None:
+            yield from editbone_children_recursive(ebone)

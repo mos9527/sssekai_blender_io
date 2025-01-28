@@ -3,10 +3,6 @@ import bpy, bpy.utils.previews, bpy_extras
 
 from typing import List, Tuple
 from UnityPy.classes import PPtr
-from sssekai.unity.AnimationClip import (
-    TransformType,
-    read_animation,
-)
 
 from UnityPy.classes import (
     Mesh,
@@ -15,6 +11,7 @@ from UnityPy.classes import (
     MeshFilter,
     MeshRenderer,
 )
+from sssekai.unity.AnimationClip import read_animation
 
 from ..core.consts import *
 from ..core.helpers import create_empty
@@ -22,6 +19,8 @@ from ..core.helpers import (
     ensure_sssekai_shader_blend,
     retrive_action,
     apply_action,
+    editbone_children_recursive,
+    armature_editbone_children_recursive,
 )
 
 from ..core.asset import (
@@ -37,13 +36,13 @@ from ..core.asset import (
 )
 from ..core.animation import (
     load_armature_animation,
-    load_camera_animation,
-    load_keyshape_animation,
-    import_articulation_animation,
+    load_sekai_camera_animation,
+    load_sekai_keyshape_animation,
 )
 from ..core.types import Hierarchy
 from .. import register_class, register_wm_props, logger
 from .. import sssekai_global
+from .utils import crc32
 
 
 @register_class
@@ -112,6 +111,8 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 mesh_obj.parent = armature_obj
                 mesh_obj.parent_type = "BONE"
                 mesh_obj.parent_bone = node.name
+                # Add an armature modifier
+                mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
                 logger.debug("Imported Mesh (skinned) %s" % game_object.m_Name)
                 imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
 
@@ -228,6 +229,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         return {"FINISHED"}
 
 
+@register_class
 class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
     bl_idname = "sssekai.import_hierarchy_animation_op"
     bl_label = T("Import Hierarchy Animation")
@@ -236,4 +238,61 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
     )
 
     def execute(self, context):
-        pass
+        global sssekai_global
+        wm = context.window_manager
+        ensure_sssekai_shader_blend()
+        obj = context.active_object
+        assert obj.type == "ARMATURE", "Active object must be an Armature"
+        assert (
+            KEY_HIERARCHY_PATHID in obj
+        ), "Active object must be a Hierarchy imported by the addon itself"
+        # Build TOS
+        # XXX: Does TOS mean To String? Unity uses this nomenclature internally
+        tos_leaf = dict()
+        if wm.sssekai_animation_use_animator:
+            animator = sssekai_global.cotainers[
+                wm.sssekai_selected_animator_container
+            ].animators[int(wm.sssekai_selected_animator)]
+            avatar = animator.m_Avatar.read()
+            # Only take the leaf bone names for the same reason as stated below
+            tos_leaf = {k: v.split("/")[-1] for k, v in avatar.m_TOS}
+            if len(set(tos_leaf.values())) != len(tos_leaf):
+                logger.warning(
+                    "Animator has multiple bones with the same name. Expect issues"
+                )
+        else:
+            # Again, this is only accessable in edit mode
+            bpy.ops.object.mode_set(mode="EDIT")
+            dfngen = None
+            if wm.sssekai_animation_root_bone:
+                ebone = obj.data.edit_bones.get(wm.sssekai_animation_root_bone, None)
+                assert ebone, "Selected root bone not found in the Armature"
+                dfngen = editbone_children_recursive(ebone)
+            else:
+                dfngen = armature_editbone_children_recursive(obj.data)
+            for parent, child, depth in dfngen:
+                # Obivously the won't work when leaf bones aren't named uniquely
+                # However the assumption should hold true since...well, Blender doesn't allow it -_-||
+                # XXX: Figure out if we'd ever need to support multiple bones with the same name
+                if not parent:
+                    tos_leaf[child.name] = child.name
+                else:
+                    tos_leaf[child.name] = tos_leaf[parent.name] + "/" + child.name
+            tos_leaf = {crc32(v): k for k, v in tos_leaf.items()}
+            bpy.ops.object.mode_set(mode="OBJECT")
+        # Load Animation
+        anim = sssekai_global.cotainers[
+            wm.sssekai_selected_animation_container
+        ].animations[int(wm.sssekai_selected_animation)]
+        self.report({"INFO"}, T("Loading Animation %s") % anim.m_Name)
+        anim = read_animation(anim)
+        bpy.context.scene.render.fps = int(anim.SampleRate)
+        self.report({"INFO"}, T("Sample Rate: %d FPS") % anim.SampleRate)
+        action = load_armature_animation(anim.Name, anim, obj, tos_leaf)
+        # Set frame range
+        bpy.context.scene.frame_end = max(
+            bpy.context.scene.frame_end, int(action.curve_frame_range[1])
+        )
+        apply_action(obj, action, wm.sssekai_animation_import_use_nla)
+        self.report({"INFO"}, T("Imported Animation %s") % anim.Name)
+        return {"FINISHED"}

@@ -17,7 +17,7 @@ from .. import register_class, logger
 
 from ..core.animation import (
     load_armature_animation,
-    load_keyshape_animation,
+    load_sekai_keyshape_animation,
 )
 from .. import sssekai_global
 
@@ -112,7 +112,7 @@ class SSSekaiBlenderImportRLASinglePoseOperator(bpy.types.Operator):
         )
         apply_action(arma_obj, action, False)
         if pose["shapeDatas"]:
-            action = load_keyshape_animation("RLAPose", anim, mesh_obj, 0, None)
+            action = load_sekai_keyshape_animation("RLAPose", anim, mesh_obj, 0, None)
             apply_action(mesh_obj.data.shape_keys, action, False)
         bpy.context.scene.frame_end = max(
             bpy.context.scene.frame_end, wm.sssekai_animation_import_offset
@@ -289,7 +289,7 @@ class SSSekaiBlenderImportRLAShapekeyAnimationOperator(bpy.types.Operator):
                 anim.FloatTracks[BLENDSHAPES_CRC][
                     inv_hash_table[SEKAI_RLA_VALID_BLENDSHAPES[idx]]
                 ].add_keyframe(KeyFrame(timestamp, value, 0, 0, 0))
-        action = load_keyshape_animation(
+        action = load_sekai_keyshape_animation(
             "RLA",
             anim,
             mesh_obj,
