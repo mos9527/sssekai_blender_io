@@ -9,6 +9,7 @@ from .math import (
     uVector3,
     uQuaternion,
     blMatrix,
+    blVector,
 )
 from UnityPy.classes import GameObject
 
@@ -37,14 +38,12 @@ class HierarchyNode:
     def __hash__(self):
         return self.path_id
 
-    def get_blender_local_position(self):
-        return swizzle_vector(self.position)
-
-    def get_blender_local_rotation(self):
-        return swizzle_quaternion(self.rotation)
-
-    def to_translation_matrix(self):
-        return blMatrix.Translation(swizzle_vector(self.position))
+    def to_tr_matrix(self):
+        return blMatrix.LocRotScale(
+            swizzle_vector(self.position),
+            swizzle_quaternion(self.rotation),
+            blVector((1, 1, 1)),
+        )
 
     def to_trs_matrix(self):
         return blMatrix.LocRotScale(
@@ -68,13 +67,14 @@ class HierarchyNode:
 
         yield from dfs(root or self)
 
-    def update_global_transforms(self):
+    def update_global_transforms(self, scale=False):
         """Calculates global transforms for this bone and all its children recursively."""
         for parent, child, _ in self.children_recursive():
+            transform = child.to_trs_matrix() if scale else child.to_tr_matrix()
             if parent:
-                child.global_transform = parent.global_transform @ child.to_trs_matrix()
+                child.global_transform = parent.global_transform @ transform
             else:
-                child.global_transform = child.to_trs_matrix()
+                child.global_transform = transform
 
 
 @dataclass
@@ -84,7 +84,7 @@ class Hierarchy:
     # Graph relations
     root: HierarchyNode = None
     nodes: Dict[int, HierarchyNode] = field(default_factory=dict)
-    named_nodes: Dict[str, HierarchyNode] = field(default_factory=dict)
+    parents: Dict[int, int] = field(default_factory=dict)
 
     @property
     def path_id(self):

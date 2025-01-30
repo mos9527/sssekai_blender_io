@@ -4,10 +4,18 @@ import tempfile, copy
 from typing import Dict, Tuple, List
 from UnityPy.enums import ClassIDType
 from UnityPy.helpers.MeshHelper import MeshHandler
-from UnityPy.classes import ColorRGBA, Texture2D, Material, Mesh, Transform, UnityTexEnv
+from UnityPy.classes import (
+    ColorRGBA,
+    Texture2D,
+    Material,
+    Mesh,
+    Transform,
+    UnityTexEnv,
+    SkinnedMeshRenderer,
+)
 from UnityPy import Environment
 from .types import Hierarchy, HierarchyNode
-from .utils import crc32
+from .utils import crc32, pprint
 from .helpers import (
     create_empty,
     rgba_to_rgb_tuple,
@@ -15,12 +23,15 @@ from .helpers import (
     auto_setup_shader_node_driver,
 )
 from .math import (
+    swizzle_matrix,
     swizzle_vector,
     swizzle_quaternion,
     swizzle_vector_scale,
     swizzle_vector3,
     blVector,
     blMatrix,
+    uMatrix4x4,
+    UNITY_TO_BLENDER,
 )
 from .consts import *
 from .. import logger
@@ -59,18 +70,16 @@ def build_scene_hierarchy(env: Environment) -> List[Hierarchy]:
                 game_object=game_object,
             )
             hierarchy.nodes[node.path_id] = node
-            hierarchy.named_nodes[node.name] = node
             if not parent:
                 # Effectively the bone for `transform`
                 hierarchy.root = node
             else:
                 parent.children.append(node)
+                hierarchy.parents[node.path_id] = parent.path_id
             for child in root.m_Children:
                 dfs(child.read(), node)
 
         dfs(transform)
-        if hierarchy.root:
-            hierarchy.root.update_global_transforms()
         hierarchies.append(hierarchy)
 
     hierarchies = sorted(hierarchies, key=lambda x: x.name)
@@ -95,31 +104,120 @@ def import_hierarchy_as_armature(hierarchy: Hierarchy, name: str = None):
     bpy.context.collection.objects.link(obj)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode="EDIT")
-    root = hierarchy.root
+    # Adjust SkinnedMesh Root bones by the meshes' bindpose
+    root_bindposes: Dict[int, Dict[int, blMatrix]] = dict()
+    bindposes_pa: Dict[int, int] = dict()
+    root_meshes: Dict[int, int] = dict()
+    for path_id, node in hierarchy.nodes.items():
+        if node.game_object and node.game_object.m_SkinnedMeshRenderer:
+            root_meshes[path_id] = node.path_id
+            renderer = node.game_object.m_SkinnedMeshRenderer.read()
+            renderer: SkinnedMeshRenderer
+            root_bone = renderer.m_RootBone.m_PathID
+            root_meshes[root_bone] = node.path_id
+            mesh = renderer.m_Mesh.read()
+            mesh: Mesh
+            bindposes = {
+                p.m_PathID: swizzle_matrix(mesh.m_BindPose[i])
+                for i, p in enumerate(renderer.m_Bones)
+            }
+            for p in renderer.m_Bones:
+                bindposes_pa[p.m_PathID] = root_bone
+            if root_bone in root_bindposes:
+                # Sanity check - only allow this when the bindposes are the same
+                dirty = False
+                for p, bp in root_bindposes[root_bone].items():
+                    # Matrix eq. is done within epsilon
+                    if not p in bindposes or bindposes[p] != bp:
+                        dirty = True
+                        break
+                if dirty:
+                    logger.warning(
+                        "Impossible! Root bone %s has different bindposes!"
+                        % hierarchy.nodes[root_bone].name
+                    )
+                    continue
+            root_bindposes[root_bone] = bindposes
+        pass
     # Build bone hierarchy in blender
+    # Obivously the won't work when leaf bones aren't named uniquely
+    # However the assumption should hold true since...well, Blender doesn't allow it -_-||
+    # XXX: Figure out if we'd ever need to support multiple bones with the same name
+    #
+    # Final = EditBone * PoseBone
     ebones = dict()
-    for parent, child, _ in root.children_recursive():
+    root_bone = hierarchy.root
+    pose_space_adjust: Dict[str, str] = dict()
+    # Don't do scaling on the EditBones since it's going to be a mess
+    # TODO: EXPLAIN WHY
+    hierarchy.root.update_global_transforms(scale=False)
+    for parent, child, _ in root_bone.children_recursive():
         parent: HierarchyNode
         child: HierarchyNode
-        if child.name != root.name:
+        if child.name != root_bone.name:
             ebone = armature.edit_bones.new(child.name)
             ebone.use_local_location = True
             ebone.use_relative_parent = False
             ebone.use_connect = False
             ebone.use_deform = True
+            M_edit = child.global_transform
+            # Use bindposes for the subtree of the root bone
+            # and apply the actual pose in Pose Bones
+            if child.path_id in bindposes_pa:
+                # Needs correction
+                bparent = bindposes_pa[child.path_id]
+                bbind = root_bindposes[bparent][child.path_id]
+                # In armature space it's basically the inverse of the bindpose
+                # Identity = M_bind * M_pose
+                M_pose = bbind.inverted()
+                print("bone", child.name)
+                pprint(M_pose)
+                M_pose = UNITY_TO_BLENDER @ M_pose
+                print("--- blender space")
+                pprint(M_pose)
+                # Bindposes are in the _Root's Parent's_ space (2 levels up)
+                brparent = root_meshes[bparent]
+                M_edit = hierarchy.nodes[brparent].global_transform @ M_pose
+                print("--- final")
+                pprint(M_edit)
+                # Do the same scale adjustment for the pose bones
+                scale = swizzle_vector_scale(child.scale)
+                M_scale = blMatrix.Diagonal((scale.x, scale.y, scale.z, 1))
+                M_final = M_scale @ child.global_transform
+                # PoseBone = EditBone^-1 * Final
+                M_pbone = M_edit.inverted() @ M_final
+                pose_space_adjust[child.name] = M_pbone
+
             # Treat the joints as extremely small bones
             # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198
             # TODO: Alternative shapes for bones
-            ebone.head = child.global_transform @ blVector((0, 0, 0))
-            ebone.tail = child.global_transform @ blVector((0, 1, 0))
-            ebone.length = 0.01
-            ebone.align_roll(child.global_transform @ blVector((0, 0, 1)) - ebone.head)
+            ebone.head = M_edit @ blVector((0, 0, 0))
+            ebone.tail = M_edit @ blVector((0, 1, 0))
+            ebone.length = 0.001
+            ebone.align_roll(M_edit @ blVector((0, 0, 1)) - ebone.head)
+            if not child.name in pose_space_adjust:
+                # Adjust scale in pose mode afterwards
+                scale = swizzle_vector_scale(child.scale)
+                # Don't adjust the scale for ones that attaches the Mesh Renderer
+                # since that would be applied TWICE
+                if not child.path_id in root_meshes:
+                    pose_space_adjust[child.name] = blMatrix.Diagonal(
+                        (scale.x, scale.y, scale.z, 1)
+                    )
             ebone.parent = (
-                ebones[parent.name] if parent and parent.name != root.name else None
+                ebones[parent.name]
+                if parent and parent.name != root_bone.name
+                else None
             )
             ebone[KEY_HIERARCHY_BONE_PATHID] = str(child.path_id)
             ebones[child.name] = ebone
-
+    bpy.ops.object.mode_set(mode="POSE")
+    for name, adjust in pose_space_adjust.items():
+        bone = obj.pose.bones[name]
+        bone.location = adjust.to_translation()
+        bone.rotation_euler = adjust.to_euler("XYZ")
+        bone.rotation_mode = "XYZ"
+        bone.scale = adjust.to_scale()
     bpy.ops.object.mode_set(mode="OBJECT")
     obj[KEY_HIERARCHY_PATHID] = str(hierarchy.path_id)
     return armature, obj

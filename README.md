@@ -42,6 +42,7 @@ Currently supported languages and maintainers:
 The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
 
 ## TODO
+- Handle Skinned Mesh with non-Identity Bind Pose
 ### QoL
 - ~~An actual updater~~
 - **Cleanup** temp files after importing.

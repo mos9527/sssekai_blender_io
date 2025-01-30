@@ -161,6 +161,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         for path_id, node in hierarchy.nodes.items():
             game_object = node.game_object
             if game_object.m_SkinnedMeshRenderer:
+                # bool ModelImporter::ImportSkinnedMesh
                 renderer = game_object.m_SkinnedMeshRenderer.read()
                 renderer: SkinnedMeshRenderer
                 mesh = renderer.m_Mesh.read()
@@ -331,9 +332,6 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             else:
                 dfngen = armature_editbone_children_recursive(obj.data)
             for parent, child, depth in dfngen:
-                # Obivously the won't work when leaf bones aren't named uniquely
-                # However the assumption should hold true since...well, Blender doesn't allow it -_-||
-                # XXX: Figure out if we'd ever need to support multiple bones with the same name
                 if not parent:
                     tos_leaf[child.name] = child.name
                 else:

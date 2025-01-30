@@ -1,6 +1,7 @@
 import os, zlib
 from .. import SCRIPT_DIR
 from sssekai.abcache import fromdict as dataclass_from_dict
+from pprint import pprint
 
 
 def crc32(name: str | bytes) -> int:

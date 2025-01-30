@@ -6,12 +6,31 @@ from mathutils import (
     Vector as blVector,
     Euler as blEuler,
 )
-from UnityPy.classes.math import Vector3f as uVector3, Quaternionf as uQuaternion
+from UnityPy.classes.math import (
+    Vector3f as uVector3,
+    Quaternionf as uQuaternion,
+    Matrix4x4f as uMatrix4x4,
+)
 
 
 # Coordinate System | Forward |  Up  |  Left
 # Unity:   LH, Y Up |   Z     |   Y  |  -X
 # Blender: RH, Z Up |  -Y     |   Z  |   X
+UNITY_TO_BLENDER = blMatrix(((-1, 0, 0, 0), (0, 0, 1, 0), (0, -1, 0, 0), (0, 0, 0, 1)))
+
+
+def swizzle_matrix(mat: uMatrix4x4):
+    blmat = blMatrix(
+        (
+            (mat.e00, mat.e01, mat.e02, mat.e03),
+            (mat.e10, mat.e11, mat.e12, mat.e13),
+            (mat.e20, mat.e21, mat.e22, mat.e23),
+            (mat.e30, mat.e31, mat.e32, mat.e33),
+        )
+    )
+    return blmat
+
+
 def swizzle_vector_scale(vec: uVector3):
     return blVector((vec.x, vec.z, vec.y))
 
