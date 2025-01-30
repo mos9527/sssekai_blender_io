@@ -444,17 +444,19 @@ def load_sekai_camera_animation(
     """
     action = create_action(name)
 
-    def swizzle_translation_camera(vector: blVector):
-        result = swizzle_vector(vector)
-        return result
-
-    def swizzle_euler_camera(euler: blEuler):
-        result = swizzle_euler(euler)
-        result.y *= -1  # Invert Y (Unity's Roll)
-        return result
-
     def swizzle_param_camera(param: blVector):
         return blVector((-param.x, param.y, param.z))
+
+    def swizzle_euler_camera(euler: blEuler):
+        # XXX: In game there's a hierarchy leading down to the Camera Transform
+        # This emulates it.
+        # TODO: Finish Avatar & Pose matrix import
+        return blEuler(
+            (math.radians(euler.x), -math.radians(euler.y), -math.radians(euler.z))
+        )
+
+    def swizzle_vector_camera(vector: blVector):
+        return blVector((-vector.x, vector.y, vector.z))
 
     mainCam = data.CurvesT.get(
         crc32(SEKAI_CAMERA_MAIN_NAME), None
@@ -479,8 +481,8 @@ def load_sekai_camera_animation(
                 action,
                 "location",
                 curve,
-                [swizzle_translation_camera(keyframe.value) for keyframe in curve.Data],
-                swizzle_func=swizzle_translation_camera,
+                [swizzle_vector_camera(keyframe.value) for keyframe in curve.Data],
+                swizzle_func=swizzle_vector_camera,
                 always_lerp=always_lerp,
             )
     else:

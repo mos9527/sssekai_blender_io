@@ -87,9 +87,12 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         camera = context.active_object
         assert camera.type == "CAMERA", "Active object must be a Camera"
 
-        rig = create_empty("SekaiCameraRig", camera.parent)
+        pre = create_empty("SekaiCameraPreRig")
+        pre.rotation_mode = "XYZ"
+        pre.rotation_euler.x = math.radians(90)
+        rig = create_empty("SekaiCameraRig", pre)
         rig[KEY_SEKAI_CAMERA_RIG] = "<marker>"
-        rig.rotation_mode = "YXZ"
+        rig.rotation_mode = "XYZ"
         rig.scale.y = 60  # Arbitrary default - FOV
         rig[KEY_SEKAI_CAMERA_RIG_SENSOR_HEIGHT] = (
             24  # Arbitrary default - Sensor Height (mm)
@@ -97,7 +100,7 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         camera.parent = rig
         camera.data.lens_unit = "MILLIMETERS"
         camera.location = blVector((0, 0, 0))
-        camera.rotation_euler = blEuler((math.radians(90), 0, math.radians(180)))
+        camera.rotation_euler = blEuler((0, math.radians(90), 0))
         camera.rotation_mode = "XYZ"
         camera.scale = blVector((1, 1, 1))
         # Driver for FOV
