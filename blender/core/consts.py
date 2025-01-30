@@ -120,6 +120,7 @@ UNITY_MECANIM_RESERVED_TOS = {
 # endregion
 # region Sekai Specific
 KEY_SEKAI_CAMERA_RIG = "sssekai_sekai_camera_rig"
+KEY_SEKAI_CAMERA_RIG_SENSOR_HEIGHT = "sssekai_sekai_camera_rig_sensor_height"
 KEY_SEKAI_CHARACTER_ROOT = "sssekai_sekai_character_root_stub"
 KEY_SEKAI_CHARACTER_HEIGHT = "sssekai_sekai_character_height"
 KEY_SEKAI_CHARACTER_BODY_OBJ = "sssekai_sekai_character_body_obj"

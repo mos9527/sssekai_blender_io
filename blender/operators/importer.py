@@ -90,7 +90,10 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         rig = create_empty("SekaiCameraRig", camera.parent)
         rig[KEY_SEKAI_CAMERA_RIG] = "<marker>"
         rig.rotation_mode = "YXZ"
-        rig.scale.x = 60  # Arbitrary default
+        rig.scale.y = 60  # Arbitrary default - FOV
+        rig[KEY_SEKAI_CAMERA_RIG_SENSOR_HEIGHT] = (
+            24  # Arbitrary default - Sensor Height (mm)
+        )
         camera.parent = rig
         camera.data.lens_unit = "MILLIMETERS"
         camera.location = blVector((0, 0, 0))
@@ -100,17 +103,20 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         # Driver for FOV
         driver = camera.data.driver_add("lens")
         driver.driver.type = "SCRIPTED"
+
+        var_sensor = driver.driver.variables.new()
+        var_sensor.name = "sensor_height"
+        var_sensor.type = "SINGLE_PROP"
+        var_sensor.targets[0].id = rig
+        var_sensor.targets[0].data_path = f'["{KEY_SEKAI_CAMERA_RIG_SENSOR_HEIGHT}"]'
+
         var_scale = driver.driver.variables.new()
         var_scale.name = "fov"
         var_scale.type = "TRANSFORMS"
         var_scale.targets[0].id = rig
         var_scale.targets[0].transform_space = "WORLD_SPACE"
-        var_scale.targets[0].transform_type = "SCALE_Z"
-        var_sensor = driver.driver.variables.new()
-        var_sensor.name = "sensor_height"
-        var_sensor.type = "SINGLE_PROP"
-        var_sensor.targets[0].id = camera
-        var_sensor.targets[0].data_path = "data.sensor_height"
+        var_scale.targets[0].transform_type = "SCALE_Y"
+
         driver.driver.expression = "sensor_height / (2 * tan(radians(fov) / 2))"
         bpy.context.view_layer.objects.active = rig
         return {"FINISHED"}
@@ -166,6 +172,8 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 # bool ModelImporter::ImportSkinnedMesh
                 renderer = game_object.m_SkinnedMeshRenderer.read()
                 renderer: SkinnedMeshRenderer
+                if not renderer.m_Mesh:
+                    continue
                 mesh = renderer.m_Mesh.read()
                 bone_names = [
                     hierarchy.nodes[pptr.m_PathID].name for pptr in renderer.m_Bones
@@ -189,6 +197,8 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 renderer: MeshRenderer
                 mesh_filter = game_object.m_MeshFilter.read()
                 mesh_filter: MeshFilter
+                if not mesh_filter.m_Mesh:
+                    continue
                 mesh = mesh_filter.m_Mesh.read()
                 mesh_data, mesh_obj = import_mesh_data(game_object.m_Name, mesh)
                 mesh_obj.parent = armature_obj
@@ -352,7 +362,9 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         anim = read_animation(anim)
         bpy.context.scene.render.fps = int(anim.SampleRate)
         self.report({"INFO"}, T("Sample Rate: %d FPS") % anim.SampleRate)
-        action = load_armature_animation(anim.Name, anim, obj, tos_leaf)
+        action = load_armature_animation(
+            anim.Name, anim, obj, tos_leaf, wm.sssekai_animation_always_lerp
+        )
         # Set frame range
         bpy.context.scene.frame_end = max(
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])
@@ -382,7 +394,9 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
         anim = read_animation(anim)
         bpy.context.scene.render.fps = int(anim.SampleRate)
         self.report({"INFO"}, T("Sample Rate: %d FPS") % anim.SampleRate)
-        action = load_sekai_camera_animation(anim.Name, anim)
+        action = load_sekai_camera_animation(
+            anim.Name, anim, wm.sssekai_animation_always_lerp
+        )
         # Set frame range
         bpy.context.scene.frame_end = max(
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])

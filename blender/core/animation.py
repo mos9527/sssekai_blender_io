@@ -52,6 +52,7 @@ def load_curve(
     curve: Curve,
     bl_values: List[float | blEuler | blVector | blQuaternion],
     swizzle_func: callable = None,
+    always_lerp: bool = False,
 ):
     """Creates an arbitrary amount of FCurves for a sssekai Curve
 
@@ -61,6 +62,7 @@ def load_curve(
         curve (Curve): curve data
         bl_values (List[float | blEuler | blVector | blQuaternion]): values in Blender types
         swizzle_func (callable, optional): swizzle function applied on the slope values. Read the note below
+        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
 
     Notes on swizzle_func:
         Swizzling `g(x) = kx` would be STRICTLY linear and `f(x), f'(x)` are known, this implies that:
@@ -112,6 +114,8 @@ def load_curve(
             [
                 interpolation_to_blender(
                     keyframe.interpolation_segment(keyframe, keyframe.next)[index]
+                    if not always_lerp
+                    else Interpolation.Linear
                 )
                 for keyframe in curve.Data
             ],
@@ -159,6 +163,7 @@ def load_float_curve(
     data_path: str,
     curve: Curve,
     bl_values: List[float] = None,
+    always_lerp: bool = False,
 ):
     """Helper fuction that creates an FCurve for a sssekai Float Curve
 
@@ -167,9 +172,11 @@ def load_float_curve(
         data_path (str): data path
         curve (Curve): curve data
         bl_values (List[float], optional): values in Blender types. will be extracted from curve if not provided. Defaults to None.
+        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
+
     """
     bl_values = bl_values or [k.value for k in curve.Data]
-    return load_curve(action, data_path, curve, bl_values)
+    return load_curve(action, data_path, curve, bl_values, always_lerp=always_lerp)
 
 
 def load_curve_quatnerion(
@@ -233,7 +240,11 @@ def load_curve_quatnerion(
 
 
 def load_armature_animation(
-    name: str, anim: Animation, target: bpy.types.Object, tos_leaf: dict
+    name: str,
+    anim: Animation,
+    target: bpy.types.Object,
+    tos_leaf: dict,
+    always_lerp: bool = False,
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to the armature
 
@@ -244,6 +255,7 @@ def load_armature_animation(
         anim (Animation): animation data
         target (bpy.types.Object): target armature object
         tos_leaf (dict): TOS. Animation *FULL* path CRC32 to *LEAF* bone name table
+        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
 
     Returns:
         bpy.types.Action: the created action
@@ -332,7 +344,13 @@ def load_armature_animation(
             to_pose_euler(bone, swizzle_euler(keyframe.value))
             for keyframe in curve.Data
         ]
-        load_curve(action, 'pose.bones["%s"].rotation_euler' % bone, curve, values)
+        load_curve(
+            action,
+            'pose.bones["%s"].rotation_euler' % bone,
+            curve,
+            values,
+            always_lerp=always_lerp,
+        )
     # Translations
     for path, curve in anim.Curves[kBindTransformPosition].items():
         bone = tos_leaf.get(path, None)
@@ -343,7 +361,13 @@ def load_armature_animation(
             to_pose_translation(bone, swizzle_vector(keyframe.value))
             for keyframe in curve.Data
         ]
-        load_curve(action, 'pose.bones["%s"].location' % bone, curve, values)
+        load_curve(
+            action,
+            'pose.bones["%s"].location' % bone,
+            curve,
+            values,
+            always_lerp=always_lerp,
+        )
     # Scale
     for path, curve in anim.Curves[kBindTransformScale].items():
         bone = tos_leaf.get(path, None)
@@ -357,6 +381,7 @@ def load_armature_animation(
             curve,
             values,
             swizzle_func=swizzle_vector_scale,
+            always_lerp=always_lerp,
         )
     return action
 
@@ -368,6 +393,7 @@ def load_sekai_keyshape_animation(
     name: str,
     data: Animation,
     crc_keyshape_table: dict,
+    always_lerp: bool = False,
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to any mesh
 
@@ -379,6 +405,7 @@ def load_sekai_keyshape_animation(
         crc_keyshape_table (dict): Animation path CRC32 value to Blend Shape name table
         frame_offset (int): frame offset
         action (bpy.types.Action, optional): existing action to append to. Defaults to None
+        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
 
     Returns:
         bpy.types.Action: the created action
@@ -393,6 +420,7 @@ def load_sekai_keyshape_animation(
             action,
             'key_blocks["%s"].value' % bsName,
             [keyframe.value / 100.0 for keyframe in curve.Data],
+            always_lerp=always_lerp,
         )
     return action
 
@@ -400,6 +428,7 @@ def load_sekai_keyshape_animation(
 def load_sekai_camera_animation(
     name: str,
     data: Animation,
+    always_lerp: bool = False,
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to the camera rig
 
@@ -408,6 +437,8 @@ def load_sekai_camera_animation(
     Args:
         name (str): name of the action
         data (Animation): animation data
+        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
+
     Returns:
         bpy.types.Action: the created action
     """
@@ -421,6 +452,9 @@ def load_sekai_camera_animation(
         result = swizzle_euler(euler)
         result.y *= -1  # Invert Y (Unity's Roll)
         return result
+
+    def swizzle_param_camera(param: blVector):
+        return blVector((-param.x, param.y, param.z))
 
     mainCam = data.CurvesT.get(
         crc32(SEKAI_CAMERA_MAIN_NAME), None
@@ -437,6 +471,7 @@ def load_sekai_camera_animation(
                 curve,
                 [swizzle_euler_camera(keyframe.value) for keyframe in curve.Data],
                 swizzle_func=swizzle_euler_camera,
+                always_lerp=always_lerp,
             )
         if kBindTransformPosition in mainCam:
             curve = mainCam[kBindTransformPosition]
@@ -446,6 +481,7 @@ def load_sekai_camera_animation(
                 curve,
                 [swizzle_translation_camera(keyframe.value) for keyframe in curve.Data],
                 swizzle_func=swizzle_translation_camera,
+                always_lerp=always_lerp,
             )
     else:
         logger.warning(
@@ -458,8 +494,9 @@ def load_sekai_camera_animation(
                 action,
                 "scale",
                 curve,
-                [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data],
-                swizzle_func=swizzle_vector_scale,
+                [swizzle_param_camera(keyframe.value) for keyframe in curve.Data],
+                swizzle_func=swizzle_param_camera,
+                always_lerp=always_lerp,
             )
     else:
         logger.warning(

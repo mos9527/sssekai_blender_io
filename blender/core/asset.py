@@ -106,17 +106,21 @@ def import_hierarchy_as_armature(
     bpy.context.collection.objects.link(obj)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode="EDIT")
+    root_meshes: Dict[int, int] = dict()
+    for path_id, node in hierarchy.nodes.items():
+        if node.game_object and node.game_object.m_SkinnedMeshRenderer:
+            root_meshes[path_id] = node
     # Adjust SkinnedMesh Root bones by the meshes' bindpose
     root_bindposes: Dict[int, Dict[int, blMatrix]] = dict()
     bindposes_pa: Dict[int, int] = dict()
-    root_meshes: Dict[int, int] = dict()
     if use_bindpose:
         for path_id, node in hierarchy.nodes.items():
             if node.game_object and node.game_object.m_SkinnedMeshRenderer:
-                root_meshes[path_id] = node
                 renderer = node.game_object.m_SkinnedMeshRenderer.read()
                 renderer: SkinnedMeshRenderer
                 root_bone = renderer.m_RootBone.m_PathID
+                if not renderer.m_Mesh:
+                    continue
                 mesh = renderer.m_Mesh.read()
                 mesh: Mesh
                 bindposes = {
@@ -192,6 +196,10 @@ def import_hierarchy_as_armature(
             ebone[KEY_HIERARCHY_BONE_PATHID] = str(child.path_id)
             ebones[child.name] = ebone
     # Pose space adjustment
+    # Make Scene Hierachy transform the Pose Bones so the final pose is correct
+    # XXX: Kinda broken rn. This currently doesn't respect parenting
+    # Not going to fix this until I have a good reason to do so since animation imports
+    # will always override this anyways
     if use_bindpose:
         edit_space = {bone.name: bone.matrix for bone in armature.edit_bones}
         bpy.ops.object.mode_set(mode="POSE")
@@ -201,11 +209,21 @@ def import_hierarchy_as_armature(
             # Apply pose specified in the hierarchy
             M_final = child.global_transform
             # PoseBone = EditBone^-1 * Final
+            M_pose = M_edit.inverted() @ M_final
             # See `animation.py` for more details
-            obj.pose.bones[child.name].matrix = M_final
-            print("pose final")
-            pprint(obj.pose.bones[child.name].matrix)
-        bpy.ops.object.mode_set(mode="OBJECT")
+            pbone = obj.pose.bones[child.name]
+            pbone.location = M_pose.to_translation()
+            pbone.rotation_quaternion = M_pose.to_quaternion()
+            pbone.rotation_mode = "QUATERNION"
+    # Scale adjustment
+    bpy.ops.object.mode_set(mode="POSE")
+    for node in hierarchy.nodes.values():
+        if node.path_id in root_meshes:
+            continue
+        pbone = obj.pose.bones.get(node.name, None)
+        if pbone:
+            pbone.scale = swizzle_vector_scale(node.scale)
+    bpy.ops.object.mode_set(mode="OBJECT")
     obj[KEY_HIERARCHY_PATHID] = str(hierarchy.path_id)
     return armature, obj
 

@@ -174,6 +174,13 @@ register_wm_props(
     sssekai_animation_import_offset=IntProperty(
         name=T("Offset"), description=T("Animation Offset in frames"), default=0
     ),
+    sssekai_animation_always_lerp=BoolProperty(
+        name=T("Always Lerp"),
+        description=T(
+            "Always interpolate keyframes linearly. Useful for densely packed keyframes"
+        ),
+        default=False,
+    ),
     sssekai_animation_import_use_nla=BoolProperty(
         name=T("Use NLA"), description=T("Import as NLA Track"), default=True
     ),
@@ -373,6 +380,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 row.label(text=T("Animation Options"), icon="ANIM_DATA")
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_offset", icon="TIME")
+                row.prop(wm, "sssekai_animation_always_lerp", icon="IPO_LINEAR")
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_use_nla", icon="NLA")
                 row.prop(
