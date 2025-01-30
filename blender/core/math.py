@@ -16,7 +16,22 @@ from UnityPy.classes.math import (
 # Coordinate System | Forward |  Up  |  Left
 # Unity:   LH, Y Up |   Z     |   Y  |  -X
 # Blender: RH, Z Up |  -Y     |   Z  |   X
-UNITY_TO_BLENDER = blMatrix(((-1, 0, 0, 0), (0, 0, 1, 0), (0, -1, 0, 0), (0, 0, 0, 1)))
+UNITY_TO_BLENDER_AXIS = blMatrix(
+    (
+        (-1.0, 0.0, 0.0, 0.0),
+        (0.0, 0.0, 1.0, 0.0),
+        (0.0, -1.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0, 1.0),
+    )
+)
+UNITY_TO_BLENDER_HAND = blMatrix(
+    (
+        (1.0, 0.0, 0.0, 0.0),
+        (0.0, -1.0, 0.0, 0.0),
+        (0.0, 0.0, -1.0, 0.0),
+        (0.0, 0.0, 0.0, 1.0),
+    )
+)
 
 
 def swizzle_matrix(mat: uMatrix4x4):
@@ -29,6 +44,10 @@ def swizzle_matrix(mat: uMatrix4x4):
         )
     )
     return blmat
+
+
+def unity_to_blender(mat: blMatrix):
+    return UNITY_TO_BLENDER_HAND @ UNITY_TO_BLENDER_AXIS @ mat @ UNITY_TO_BLENDER_AXIS
 
 
 def swizzle_vector_scale(vec: uVector3):

@@ -1,5 +1,6 @@
 from .utils import crc32
 
+DEFAULT_BONE_SIZE = 0.001
 # Plugin custom attribute keys
 KEY_HIERARCHY_PATHID = "sssekai_hierarchy_pathid"
 KEY_HIERARCHY_BONE_PATHID = "sssekai_bone_hierarchy_pathid"

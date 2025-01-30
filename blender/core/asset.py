@@ -31,7 +31,7 @@ from .math import (
     blVector,
     blMatrix,
     uMatrix4x4,
-    UNITY_TO_BLENDER,
+    unity_to_blender,
 )
 from .consts import *
 from .. import logger
@@ -170,30 +170,32 @@ def import_hierarchy_as_armature(hierarchy: Hierarchy, name: str = None):
                 # In armature space it's basically the inverse of the bindpose
                 # Identity = M_bind * M_pose
                 M_pose = bbind.inverted()
-                print("bone", child.name)
-                pprint(M_pose)
-                M_pose = UNITY_TO_BLENDER @ M_pose
-                print("--- blender space")
-                pprint(M_pose)
+                M_pose = unity_to_blender(M_pose)
                 # Bindposes are in the _Root's Parent's_ space (2 levels up)
-                brparent = root_meshes[bparent]
-                M_edit = hierarchy.nodes[brparent].global_transform @ M_pose
-                print("--- final")
-                pprint(M_edit)
-                # Do the same scale adjustment for the pose bones
-                scale = swizzle_vector_scale(child.scale)
-                M_scale = blMatrix.Diagonal((scale.x, scale.y, scale.z, 1))
-                M_final = M_scale @ child.global_transform
+                brparent = hierarchy.parents[bparent]
+                M_parent = hierarchy.nodes[brparent].global_transform
+                # XXX: Assume no scaling in M_pose
+                M_edit = M_parent @ M_pose
+                # Apply pose specified in the hierarchy
+                M_final = child.global_transform
                 # PoseBone = EditBone^-1 * Final
-                M_pbone = M_edit.inverted() @ M_final
-                pose_space_adjust[child.name] = M_pbone
+                # See `animation.py` for more details
+                et, er = M_edit.to_translation(), M_edit.to_quaternion()
+                ft, fr = M_final.to_translation(), M_final.to_quaternion()
+                pr = er.conjugated() @ fr
+                pt = er.conjugated() @ (ft - et)
+                ps = swizzle_vector_scale(child.scale)
+                # Do the same scale adjustment for the pose bones
+                # scale = swizzle_vector_scale(child.scale)
+                # M_pbone = M_pbone @ blMatrix.Diagonal((scale.x, scale.y, scale.z, 1))
+                pose_space_adjust[child.name] = blMatrix.LocRotScale(pt, pr, ps)
 
             # Treat the joints as extremely small bones
             # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198
             # TODO: Alternative shapes for bones
             ebone.head = M_edit @ blVector((0, 0, 0))
             ebone.tail = M_edit @ blVector((0, 1, 0))
-            ebone.length = 0.001
+            ebone.length = DEFAULT_BONE_SIZE
             ebone.align_roll(M_edit @ blVector((0, 0, 1)) - ebone.head)
             if not child.name in pose_space_adjust:
                 # Adjust scale in pose mode afterwards
@@ -214,10 +216,7 @@ def import_hierarchy_as_armature(hierarchy: Hierarchy, name: str = None):
     bpy.ops.object.mode_set(mode="POSE")
     for name, adjust in pose_space_adjust.items():
         bone = obj.pose.bones[name]
-        bone.location = adjust.to_translation()
-        bone.rotation_euler = adjust.to_euler("XYZ")
-        bone.rotation_mode = "XYZ"
-        bone.scale = adjust.to_scale()
+        bone.matrix_basis = adjust
     bpy.ops.object.mode_set(mode="OBJECT")
     obj[KEY_HIERARCHY_PATHID] = str(hierarchy.path_id)
     return armature, obj

@@ -174,6 +174,10 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 mesh_obj.parent = armature_obj
                 mesh_obj.parent_type = "BONE"
                 mesh_obj.parent_bone = node.name
+                # Bone parenting by default snaps to tail
+                # Offset this manually
+                mesh_obj.parent.track_axis = "POS_Y"
+                mesh_obj.location.y = -DEFAULT_BONE_SIZE
                 # Add an armature modifier
                 mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
                 imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
