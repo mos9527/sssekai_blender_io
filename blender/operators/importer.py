@@ -135,7 +135,9 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         hierarchy = sssekai_global.cotainers[container].hierarchies[int(selected)]
         logger.debug("Loading selected hierarchy: %s" % hierarchy.name)
         # Import the scene as an Armature
-        armature, armature_obj = import_hierarchy_as_armature(hierarchy)
+        armature, armature_obj = import_hierarchy_as_armature(
+            hierarchy, hierarchy.name, wm.sssekai_hierarchy_import_bindpose
+        )
         if wm.sssekai_hierarchy_import_mode == "SEKAI_CHARACTER":
             assert (
                 KEY_SEKAI_CHARACTER_ROOT in active_object

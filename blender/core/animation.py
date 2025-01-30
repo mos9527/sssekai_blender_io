@@ -351,9 +351,6 @@ def load_armature_animation(
             logger.warning("Scale: Failed to bind CRC32 %s to bone" % path)
             continue
         values = [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data]
-        # In a bit of a pickle here. The way Blender scales bones changes the bone's length
-        # which would in turn affect translation/rotation.
-        # XXX: Handle this properly
         load_curve(
             action,
             'pose.bones["%s"].scale' % bone,

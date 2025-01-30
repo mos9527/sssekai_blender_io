@@ -28,6 +28,7 @@ from ..operators.importer import (
     SSSekaiBlenderImportHierarchyOperator,
     SSSekaiBlenderImportHierarchyAnimationOperaotr,
     SSSekaiBlenderImportSekaiCameraAnimationOperator,
+    SSSekaiBlenderCreateCharacterControllerOperator,
 )
 
 EMPTY_OPT = ("--", "Not Available", "", "ERROR", 0)
@@ -200,6 +201,13 @@ register_wm_props(
                 2,
             ),
         ],
+    ),
+    sssekai_hierarchy_import_bindpose=BoolProperty(
+        name=T("Bind Pose"),
+        description=T(
+            "Import the hierarchy in bind pose, if applicable (experimental, known to be broken for some models)"
+        ),
+        default=False,
     ),
     sssekai_hierarchy_import_mode=EnumProperty(
         name=T("Hierarchy Import Mode"),
@@ -464,7 +472,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             row.label(text=T("Click the button below to create one"))
                             row = layout.row()
                             row.operator(
-                                "sssekai.create_character_controller_op",
+                                SSSekaiBlenderCreateCharacterControllerOperator.bl_idname,
                                 icon="OUTLINER_OB_ARMATURE",
                             )
                         else:
@@ -493,6 +501,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             row = layout.row()
                             row.prop(wm, "sssekai_character_type", expand=True)
                             row = layout.row()
+                            wm.sssekai_hierarchy_import_bindpose = False
                             row.operator(
                                 SSSekaiBlenderImportHierarchyOperator.bl_idname,
                                 icon="APPEND_BLEND",
@@ -505,6 +514,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                         row = layout.row()
                         row.label(text=T("Not implemented yet"))
                         row = layout.row()
+                        wm.sssekai_hierarchy_import_bindpose = False
                         row.operator(
                             SSSekaiBlenderImportHierarchyOperator.bl_idname,
                             icon="APPEND_BLEND",
@@ -512,7 +522,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     case "GENERIC":
                         row.label(text=T("Generic Options"), icon="ARMATURE_DATA")
                         row = layout.row()
-                        row.label(text=T("Not implemented yet"))
+                        row.prop(wm, "sssekai_hierarchy_import_bindpose")
                         row = layout.row()
                         row.operator(
                             SSSekaiBlenderImportHierarchyOperator.bl_idname,
