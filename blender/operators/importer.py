@@ -1,6 +1,6 @@
 from bpy.app.translations import pgettext as T
 import bpy, bpy.utils.previews, bpy_extras
-import math
+import math, json
 
 from typing import List, Tuple
 from UnityPy.classes import PPtr
@@ -70,6 +70,16 @@ class SSSekaiBlenderCreateCharacterControllerOperator(bpy.types.Operator):
         bpy.context.collection.objects.link(rim_controller)
 
         bpy.context.view_layer.objects.active = root
+        # Apply scaling drivers to self
+        scale_driver = root.driver_add("scale")
+        for ch in scale_driver:
+            ch.driver.type = "SCRIPTED"
+            var = ch.driver.variables.new()
+            var.name = "height"
+            var.type = "SINGLE_PROP"
+            var.targets[0].id = root
+            var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
+            ch.driver.expression = "height"
         return {"FINISHED"}
 
 
@@ -135,7 +145,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         global sssekai_global
         wm = context.window_manager
         ensure_sssekai_shader_blend()
-        active_object = context.active_object
+        active_obj = context.active_object
 
         container = wm.sssekai_selected_hierarchy_container
         selected = wm.sssekai_selected_hierarchy
@@ -148,19 +158,19 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         )
         if wm.sssekai_hierarchy_import_mode == "SEKAI_CHARACTER":
             assert (
-                KEY_SEKAI_CHARACTER_ROOT in active_object
+                KEY_SEKAI_CHARACTER_ROOT in active_obj
             ), "Active object is not a Character Controller"
             match wm.sssekai_character_type:
                 case "HEAD":
-                    assert not active_object[
+                    assert not active_obj[
                         KEY_SEKAI_CHARACTER_FACE_OBJ
                     ], "Face already imported"
-                    active_object[KEY_SEKAI_CHARACTER_FACE_OBJ] = armature_obj
+                    active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ] = armature_obj
                 case "BODY":
-                    assert not active_object[
+                    assert not active_obj[
                         KEY_SEKAI_CHARACTER_BODY_OBJ
                     ], "Body already imported"
-                    active_object[KEY_SEKAI_CHARACTER_BODY_OBJ] = armature_obj
+                    active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ] = armature_obj
         # Import Skinned Meshes and Static Meshes
         # - Just like with Unity scene graph, everything is going to have a parent
         # - Once expressed as a Blender Armature, the direct translation of that is a Bone Parent
@@ -238,7 +248,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
             rimlight = next(
                 filter(
                     lambda o: o.name.startswith("SekaiCharaRimLight"),
-                    active_object.children_recursive,
+                    active_obj.children_recursive,
                 ),
                 None,
             )
@@ -304,7 +314,10 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 bpy.ops.mesh.select_all(action="DESELECT")
                 bpy.ops.object.mode_set(mode="OBJECT")  # Deselects all vertices
 
-        armature_obj.parent = active_object
+        armature_obj.parent = active_obj
+        # Restore
+        bpy.context.view_layer.objects.active = active_obj
+        bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}
 
 
@@ -320,10 +333,10 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         global sssekai_global
         wm = context.window_manager
         ensure_sssekai_shader_blend()
-        obj = context.active_object
-        assert obj.type == "ARMATURE", "Active object must be an Armature"
+        active_obj = context.active_object
+        assert active_obj.type == "ARMATURE", "Active object must be an Armature"
         assert (
-            KEY_HIERARCHY_PATHID in obj
+            KEY_HIERARCHY_PATHID in active_obj
         ), "Active object must be a Hierarchy imported by the addon itself"
         # Build TOS
         # XXX: Does TOS mean To String? Unity uses this nomenclature internally
@@ -333,7 +346,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
                 wm.sssekai_selected_animator_container
             ].animators[int(wm.sssekai_selected_animator)]
             avatar = animator.m_Avatar.read()
-            # Only take the leaf bone names for the same reason as stated below
+            # Only take the leaf bone names for the same reason as stated in `import_hierarchy_as_armature`
             tos_leaf = {k: v.split("/")[-1] for k, v in avatar.m_TOS}
             if len(set(tos_leaf.values())) != len(tos_leaf):
                 logger.warning(
@@ -344,11 +357,13 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             bpy.ops.object.mode_set(mode="EDIT")
             dfngen = None
             if wm.sssekai_animation_root_bone:
-                ebone = obj.data.edit_bones.get(wm.sssekai_animation_root_bone, None)
+                ebone = active_obj.data.edit_bones.get(
+                    wm.sssekai_animation_root_bone, None
+                )
                 assert ebone, "Selected root bone not found in the Armature"
                 dfngen = editbone_children_recursive(ebone)
             else:
-                dfngen = armature_editbone_children_recursive(obj.data)
+                dfngen = armature_editbone_children_recursive(active_obj.data)
             for parent, child, depth in dfngen:
                 if not parent:
                     tos_leaf[child.name] = child.name
@@ -365,14 +380,85 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         bpy.context.scene.render.fps = int(anim.SampleRate)
         self.report({"INFO"}, T("Sample Rate: %d FPS") % anim.SampleRate)
         action = load_armature_animation(
-            anim.Name, anim, obj, tos_leaf, wm.sssekai_animation_always_lerp
+            anim.Name, anim, active_obj, tos_leaf, wm.sssekai_animation_always_lerp
         )
         # Set frame range
         bpy.context.scene.frame_end = max(
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])
         )
-        apply_action(obj, action, wm.sssekai_animation_import_use_nla)
-        self.report({"INFO"}, T("Imported Animation %s") % anim.Name)
+        apply_action(active_obj, action, wm.sssekai_animation_import_use_nla)
+        # Restore
+        bpy.context.view_layer.objects.active = active_obj
+        bpy.ops.object.mode_set(mode="OBJECT")
+        return {"FINISHED"}
+
+
+@register_class
+class SSSekaiBlenderImportSekaiCharacterMotionOperator(bpy.types.Operator):
+    bl_idname = "sssekai.import_sekai_character_motion_op"
+    bl_label = T("Import Sekai Character Motion")
+    bl_description = T("Import the selected Sekai Character Motion")
+
+    def execute(self, context):
+        global sssekai_global
+        wm = context.window_manager
+        ensure_sssekai_shader_blend()
+        active_obj = context.active_object
+        assert (
+            active_obj and KEY_SEKAI_CHARACTER_ROOT in active_obj
+        ), "Active object must be a Character Controller"
+        body = active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ]
+        assert body, "Body not found"
+        # Set active object to the body
+        bpy.context.view_layer.objects.active = body
+        bpy.ops.sssekai.import_hierarchy_animation_op()
+        # Restore
+        bpy.context.view_layer.objects.active = active_obj
+        bpy.ops.object.mode_set(mode="OBJECT")
+        return {"FINISHED"}
+
+
+@register_class
+class SSSekaiBlenderImportSekaiCharacterFaceMotionOperator(bpy.types.Operator):
+    bl_idname = "sssekai.import_sekai_character_face_motion_op"
+    bl_label = T("Import Sekai Character Face Motion")
+    bl_description = T("Import the selected Sekai Character Face Motion")
+
+    def execute(self, context):
+        global sssekai_global
+        wm = context.window_manager
+        ensure_sssekai_shader_blend()
+        active_obj = context.active_object
+        assert (
+            active_obj and KEY_SEKAI_CHARACTER_ROOT in active_obj
+        ), "Active object must be a Character Controller"
+        face = active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ]
+        face: bpy.types.Object
+        assert face, "Face not found"
+        # Find the shapekey name hashtable
+        # hash is simply crc32("blendShape." + Shape key name). This is baked in.
+        morphs = list(
+            filter(lambda obj: KEY_SHAPEKEY_HASH_TABEL in obj for obj in face.children)
+        )
+        assert morphs, "No meshes with shapekey found"
+        assert (
+            len(morphs) == 1
+        ), "Multiple meshes with shapekeys found. Please keep only one"
+        crc_table = json.loads(morphs[0][KEY_SHAPEKEY_HASH_TABEL])
+        # Set active object to the face
+        bpy.context.view_layer.objects.active = face
+        # Load Animation
+        anim = sssekai_global.cotainers[
+            wm.sssekai_selected_animation_container
+        ].animations[int(wm.sssekai_selected_animation)]
+        self.report({"INFO"}, T("Loading Animation %s") % anim.m_Name)
+        anim = read_animation(anim)
+        action = load_sekai_keyshape_animation(
+            anim.Name, anim, crc_table, wm.sssekai_animation_always_lerp
+        )
+        apply_action(face, action, wm.sssekai_animation_import_use_nla)
+        bpy.context.view_layer.objects.active = active_obj
+        bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}
 
 
@@ -386,8 +472,8 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
         global sssekai_global
         wm = context.window_manager
         ensure_sssekai_shader_blend()
-        obj = context.active_object
-        assert KEY_SEKAI_CAMERA_RIG in obj, "Active object must be a Camera Rig"
+        active_obj = context.active_object
+        assert KEY_SEKAI_CAMERA_RIG in active_obj, "Active object must be a Camera Rig"
         # Load Animation
         anim = sssekai_global.cotainers[
             wm.sssekai_selected_animation_container
@@ -403,6 +489,7 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
         bpy.context.scene.frame_end = max(
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])
         )
-        apply_action(obj, action, wm.sssekai_animation_import_use_nla)
-        self.report({"INFO"}, T("Imported Animation %s") % anim.Name)
+        apply_action(active_obj, action, wm.sssekai_animation_import_use_nla)
+        bpy.context.view_layer.objects.active = active_obj
+        bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}

@@ -95,6 +95,7 @@ def import_hierarchy_as_armature(
     Args:
         arma (Armature): Armature as genereated by previous steps
         name (str): Armature Object name
+        use_bindpose (bool): Whether to use the bindpose for the bones
 
     Returns:
         Tuple[bpy.types.Armature, bpy.types.Object]: Created armature and its parent object

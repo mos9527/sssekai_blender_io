@@ -29,6 +29,13 @@ from ..operators.importer import (
     SSSekaiBlenderImportHierarchyAnimationOperaotr,
     SSSekaiBlenderImportSekaiCameraAnimationOperator,
     SSSekaiBlenderCreateCharacterControllerOperator,
+    SSSekaiBlenderImportSekaiCharacterMotionOperator,
+    SSSekaiBlenderImportSekaiCharacterFaceMotionOperator,
+)
+
+from ..operators.utils import (
+    SSSekaiBlenderUtilCharaNeckAttachOperator,
+    SSSekaiBlenderUtilCharaNeckMergeOperator,
 )
 
 EMPTY_OPT = ("--", "Not Available", "", "ERROR", 0)
@@ -160,7 +167,7 @@ register_wm_props(
     sssekai_animation_use_animator=BoolProperty(
         name=T("Use Animator"),
         description=T(
-            "Use the selected Animator to import the Animation, instead of building the relations in runtime"
+            "Use the selected Animator to import the Animation, instead of building the relations in runtime. NOTE: Does not restore bind pose yet!"
         ),
         default=False,
     ),
@@ -183,11 +190,6 @@ register_wm_props(
     ),
     sssekai_animation_import_use_nla=BoolProperty(
         name=T("Use NLA"), description=T("Import as NLA Track"), default=True
-    ),
-    sssekai_animation_import_nla_always_new_tracks=BoolProperty(
-        name=T("Create new NLA tracks"),
-        description=T("Always create new NLA tracks"),
-        default=False,
     ),
     sssekai_import_type=EnumProperty(
         name=T("Import Type"),
@@ -383,11 +385,6 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 row.prop(wm, "sssekai_animation_always_lerp", icon="IPO_LINEAR")
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_use_nla", icon="NLA")
-                row.prop(
-                    wm,
-                    "sssekai_animation_import_nla_always_new_tracks",
-                    icon="NLA_PUSHDOWN",
-                )
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_mode", expand=True)
                 row = layout.row()
@@ -396,7 +393,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     case "SEKAI_MOTION":
                         if active_obj and KEY_SEKAI_CHARACTER_BODY_OBJ in active_obj:
                             row.operator(
-                                SSSekaiBlenderImportHierarchyAnimationOperaotr.bl_idname
+                                SSSekaiBlenderImportSekaiCharacterMotionOperator.bl_idname
                             )
                             row = layout.row()
                         else:
@@ -407,7 +404,18 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             )
                             row = layout.row()
                     case "SEKAI_FACE":
-                        raise NotImplementedError
+                        if active_obj and KEY_SEKAI_CHARACTER_FACE_OBJ in active_obj:
+                            row.operator(
+                                SSSekaiBlenderImportSekaiCharacterFaceMotionOperator.bl_idname
+                            )
+                            row = layout.row()
+                        else:
+                            row.label(
+                                text=T(
+                                    "Please select a SekaiCharacterRoot with a Face armature first"
+                                )
+                            )
+                            row = layout.row()
                     case "SEKAI_CAMERA":
                         if active_obj and KEY_SEKAI_CAMERA_RIG in active_obj:
                             row.operator(
@@ -498,11 +506,19 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                                 '["%s"]' % KEY_SEKAI_CHARACTER_FACE_OBJ,
                                 text=T("Face"),
                             )
-                            row = layout.row()
                             row.prop(
                                 active_obj,
                                 '["%s"]' % KEY_SEKAI_CHARACTER_BODY_OBJ,
                                 text=T("Body"),
+                            )
+                            row = layout.row()
+                            row.operator(
+                                SSSekaiBlenderUtilCharaNeckAttachOperator.bl_idname,
+                                icon="CONSTRAINT_BONE",
+                            )
+                            row.operator(
+                                SSSekaiBlenderUtilCharaNeckMergeOperator.bl_idname,
+                                icon="AREA_JOIN",
                             )
                             row = layout.row()
                             row.label(text=T("Mesh Type"))

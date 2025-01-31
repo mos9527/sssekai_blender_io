@@ -182,39 +182,38 @@ class SSSekaiBlenderUtilApplyModifersOperator(bpy.types.Operator):
 
 
 @register_class
-class SSSekaiBlenderUtilArmatureMergeOperator(bpy.types.Operator):
-    bl_idname = "sssekai.util_armature_merge_op"
-    bl_label = T("Merge Armatures")
+class SSSekaiBlenderUtilCharaNeckMergeOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_chara_root_armature_merge_op"
+    bl_label = T("Merge")
     bl_description = T(
-        "Merge one armature into another, taking constraints & modifed rest poses into consideration.  With the active one as the newly merged armature."
+        "Merge character Face and Body meshes,taking constraints & modifed rest poses into consideration."
     )
 
     def execute(self, context):
-        scene = context.scene
+        active_obj = context.active_object
         assert (
-            len(bpy.context.selected_objects) == 2
-        ), "Please select 2 and only 2 objects."
-        child_obj = bpy.context.selected_objects[1]
-        parent_obj = bpy.context.selected_objects[0]
-        if child_obj == bpy.context.active_object:
-            child_obj, parent_obj = parent_obj, child_obj
-        assert (
-            child_obj.type == "ARMATURE" and parent_obj.type == "ARMATURE"
-        ), "Please select 2 Armatures."
-        child_arma = child_obj.data
-        parent_arma = parent_obj.data
+            active_obj and KEY_SEKAI_CHARACTER_ROOT in active_obj
+        ), "Please select a Character Root"
+        face = active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ]
+        body = active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ]
+        face: bpy.types.Object
+        body: bpy.types.Object
+        assert face and body, "Face and Body must be set"
+        assert face != body, "Face and Body must be different."
+        # Always try to attach first
+        bpy.ops.sssekai.util_chara_root_armature_attach_op()
         # For the child armature, we:
         # - Apply the modifier so the mesh matches the new rest pose
-        for child in child_obj.children:
+        for child in face.children:
             if child.type == "MESH":
                 bpy.context.view_layer.objects.active = child
                 bpy.ops.sssekai.util_apply_modifiers_op()
-        bpy.context.view_layer.objects.active = child_obj
+        bpy.context.view_layer.objects.active = face
         bpy.ops.object.mode_set(mode="POSE")
         # With the armature in pose mode, we:
         # - Apply all bone constraints
-        for bone in child_obj.pose.bones:
-            child_arma.bones.active = bone.bone
+        for bone in face.pose.bones:
+            face.data.bones.active = bone.bone
             for constraint in bone.constraints:
                 bpy.ops.constraint.apply(constraint=constraint.name, owner="BONE")
         # - Set the pose to rest pose
@@ -223,39 +222,45 @@ class SSSekaiBlenderUtilArmatureMergeOperator(bpy.types.Operator):
         # - Merge the child armature with the parent armature
         # - Assign new modifers to the merged mesh
         bpy.ops.object.mode_set(mode="OBJECT")
-        child_obj.select_set(True)
-        parent_obj.select_set(True)
-        bpy.context.view_layer.objects.active = parent_obj
+        face.select_set(True)
+        body.select_set(True)
+        bpy.context.view_layer.objects.active = body
         bpy.ops.object.join()
-        for child in parent_obj.children:
+        for child in body.children:
             if child.type == "MESH" and len(child.modifiers) == 0:
-                child.modifiers.new("Armature", "ARMATURE").object = parent_obj
+                child.modifiers.new("Armature", "ARMATURE").object = body
+        active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ] = body
         return {"FINISHED"}
 
 
 @register_class
-class SSSekaiBlenderUtilNeckAttachOperator(bpy.types.Operator):
-    bl_idname = "sssekai.util_neck_attach_op"
+class SSSekaiBlenderUtilCharaNeckAttachOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_chara_root_armature_attach_op"
     bl_label = T("Attach")
     bl_description = T(
-        "Attach the selected face armature to the selected body armature"
+        "Attach the selected character Face armature to the selected Body armature by binding Neck and Head bones."
     )
 
     def execute(self, context):
         scene = context.scene
         wm = context.window_manager
-        face_arma = wm.sssekai_util_neck_attach_obj_face
-        body_arma = wm.sssekai_util_neck_attach_obj_body
-        assert face_arma and body_arma, "Please select both face and body armatures"
-        face_obj = scene.objects.get(face_arma.name)
-        body_obj = scene.objects.get(body_arma.name)
-        bpy.context.view_layer.objects.active = face_obj
+        active_obj = context.active_object
+        assert (
+            active_obj and KEY_SEKAI_CHARACTER_ROOT in active_obj
+        ), "Please select a Character Root"
+        face = active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ]
+        body = active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ]
+        face: bpy.types.Object
+        body: bpy.types.Object
+        assert face and body, "Face and Body must be set"
+        assert face != body, "Face and Body must be different."
+        bpy.context.view_layer.objects.active = face
         bpy.ops.object.mode_set(mode="POSE")
 
         def add_constraint(name):
-            bone = face_obj.pose.bones[name]
+            bone = face.pose.bones[name]
             constraint = bone.constraints.new("COPY_TRANSFORMS")
-            constraint.target = body_obj
+            constraint.target = body
             constraint.subtarget = name
 
         add_constraint("Neck")

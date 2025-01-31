@@ -165,7 +165,7 @@ def load_float_curve(
     bl_values: List[float] = None,
     always_lerp: bool = False,
 ):
-    """Helper fuction that creates an FCurve for a sssekai Float Curve
+    """Helper function that creates an FCurve for a sssekai Float Curve
 
     Args:
         action (bpy.types.Action): target action.
