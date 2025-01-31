@@ -1,6 +1,6 @@
 import bpy
 import logging, json, math
-from typing import List
+from typing import List, Dict
 from sssekai.unity.AnimationClip import (
     Animation,
     Interpolation,

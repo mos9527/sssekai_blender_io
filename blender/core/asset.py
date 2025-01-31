@@ -21,6 +21,7 @@ from .helpers import (
     rgba_to_rgb_tuple,
     auto_connect_shader_nodes_by_name,
     auto_setup_shader_node_driver,
+    apply_pose_matrix,
 )
 from .math import (
     swizzle_matrix,
@@ -197,24 +198,15 @@ def import_hierarchy_as_armature(
             ebones[child.name] = ebone
     # Pose space adjustment
     # Make Scene Hierachy transform the Pose Bones so the final pose is correct
-    # XXX: Kinda broken rn. This currently doesn't respect parenting
-    # Not going to fix this until I have a good reason to do so since animation imports
-    # will always override this anyways
     if use_bindpose:
-        edit_space = {bone.name: bone.matrix for bone in armature.edit_bones}
-        bpy.ops.object.mode_set(mode="POSE")
-        for node in bindposes_pa:
-            child = hierarchy.nodes[node]
-            M_edit = edit_space[child.name]
-            # Apply pose specified in the hierarchy
-            M_final = child.global_transform
-            # PoseBone = EditBone^-1 * Final
-            M_pose = M_edit.inverted() @ M_final
-            # See `animation.py` for more details
-            pbone = obj.pose.bones[child.name]
-            pbone.location = M_pose.to_translation()
-            pbone.rotation_quaternion = M_pose.to_quaternion()
-            pbone.rotation_mode = "QUATERNION"
+        # i hate this
+        # https://docs.blender.org/api/current/info_gotcha.html#stale-data
+        bpy.context.view_layer.update()
+        pose_matrix = {
+            hierarchy.nodes[node].name: hierarchy.nodes[node].global_transform
+            for node in bindposes_pa
+        }
+        apply_pose_matrix(obj, pose_matrix, edit_mode=False)
     # Scale adjustment
     bpy.ops.object.mode_set(mode="POSE")
     for node in hierarchy.nodes.values():

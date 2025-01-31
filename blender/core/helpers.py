@@ -1,5 +1,8 @@
 import bpy
+from typing import Dict
+from .math import blMatrix, blVector
 from .utils import get_addon_relative_path
+from .consts import DEFAULT_BONE_SIZE
 from .. import logger
 
 
@@ -201,3 +204,47 @@ def armature_editbone_children_recursive(arma: bpy.types.Armature):
     for ebone in arma.edit_bones:
         if ebone.parent is None:
             yield from editbone_children_recursive(ebone)
+
+
+def apply_pose_matrix(
+    dest: bpy.types.Object,
+    pose_matrix: Dict[str, blMatrix],
+    edit_mode: bool = False,
+):
+    """Applies a pose matrix to an armature object
+
+    Args:
+        dest (bpy.types.Object): target armature object
+        pose_matrix (Dict[str, blMatrix]): bone name to pose TRS matrix in Armature space
+        edit_mode (bool, optional): apply in Edit Mode. otherwise done in Pose Mode. this resets the pose-space transforms. Defaults to False.
+    """
+    bpy.context.view_layer.objects.active = dest
+    bpy.ops.object.mode_set(mode="EDIT")
+    edit_space = {bone.name: bone.matrix for bone in dest.data.edit_bones}
+    if not edit_mode:
+        bpy.ops.object.mode_set(mode="POSE")
+        bpy.ops.pose.select_all(action="SELECT")
+        bpy.ops.pose.transforms_clear()
+        bpy.ops.pose.select_all(action="DESELECT")
+    for bone_name, M_final in pose_matrix.items():
+        if edit_mode:
+            ebone = dest.data.edit_bones.get(bone_name)
+            ebone.head = M_final @ blVector((0, 0, 0))
+            ebone.tail = M_final @ blVector((0, 1, 0))
+            ebone.length = DEFAULT_BONE_SIZE
+            ebone.align_roll(M_final @ blVector((0, 0, 1)) - ebone.head)
+        else:
+            pbone = dest.pose.bones.get(bone_name)
+            M_edit = edit_space[pbone.name]
+            M_parent = (
+                edit_space[pbone.parent.name] if pbone.parent else blMatrix.Identity(4)
+            )
+            M_local = M_parent.inverted() @ M_edit
+            M_final_parent = pose_matrix.get(pbone.parent.name, blMatrix.Identity(4))
+            M_final_local = M_final_parent.inverted() @ M_final
+            # Apply pose specified in the hierarchy
+            # PoseBone = EditBone^-1 * Final
+            # Also applies to local space
+            M_pose = M_local.inverted() @ M_final_local
+            pbone.matrix_basis = M_pose
+    bpy.ops.object.mode_set(mode="POSE")
