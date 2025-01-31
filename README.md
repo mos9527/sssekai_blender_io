@@ -40,8 +40,9 @@ The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
 - Custom `Animator` for animation import
   - Path CRC32 table can now be done through `m_Avatar`
   - TODO: Implement Animator bindpose
-#### Lighting
-NOTE: Mostly done
+#### Rendering
+- Outline (World-space, normal offset + stencil masking)
+  - See also https://mos9527.com/posts/pjsk/shading-reverse-part-2/
 - 1-to-1 approximation of the game's lighting system
   - ~~Face light (SDF for v2, simple $N \cdot L$ for legacy)~~
     - ~~*NOTE*: Current SDF implementation does not handle relative light directions~~
@@ -59,6 +60,8 @@ NOTE: Mostly done
 - Blob shadows
 - Particles
 #### Animation
+- Light animation
+- Effect animation
 - Approximate Unity's IK system
   - Since [My Sekai](https://pjsekai.sega.jp/news/archive/index.html?hash=ecca5cb23ea530edb669fc0d2ae302fd0f374a4b) is a thing now and the chibi models are rigged with Unity's IK system.  
   - Also would be nice since all Unity games with humanoid characters use this system.
