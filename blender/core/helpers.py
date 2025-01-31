@@ -227,7 +227,6 @@ def apply_pose_matrix(
         bpy.ops.pose.transforms_clear()
         bpy.ops.pose.select_all(action="DESELECT")
     for bone_name, M_final in pose_matrix.items():
-        print("adjust", bone_name)
         if edit_mode:
             ebone = dest.data.edit_bones.get(bone_name)
             if not ebone:

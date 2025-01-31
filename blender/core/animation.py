@@ -448,15 +448,12 @@ def load_sekai_camera_animation(
         return blVector((-param.x, param.y, param.z))
 
     def swizzle_euler_camera(euler: blEuler):
-        # XXX: In game there's a hierarchy leading down to the Camera Transform
-        # This emulates it.
-        # TODO: Finish Avatar & Pose matrix import
-        return blEuler(
-            (math.radians(euler.x), -math.radians(euler.y), -math.radians(euler.z))
-        )
+        final = swizzle_euler(euler)
+        return final
 
     def swizzle_vector_camera(vector: blVector):
-        return blVector((-vector.x, vector.y, vector.z))
+        vector = swizzle_vector(vector)
+        return vector
 
     mainCam = data.CurvesT.get(
         crc32(SEKAI_CAMERA_MAIN_NAME), None

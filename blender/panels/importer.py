@@ -214,7 +214,7 @@ register_wm_props(
         description=T(
             "Import the hierarchy in bind pose, if applicable (experimental, known to be broken for some models)"
         ),
-        default=False,
+        default=True,
     ),
     sssekai_hierarchy_import_mode=EnumProperty(
         name=T("Hierarchy Import Mode"),

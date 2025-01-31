@@ -87,12 +87,11 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         camera = context.active_object
         assert camera.type == "CAMERA", "Active object must be a Camera"
 
-        pre = create_empty("SekaiCameraPreRig")
-        pre.rotation_mode = "XYZ"
-        pre.rotation_euler.x = math.radians(90)
-        rig = create_empty("SekaiCameraRig", pre)
+        rig = create_empty("SekaiCameraRig")
         rig[KEY_SEKAI_CAMERA_RIG] = "<marker>"
-        rig.rotation_mode = "XYZ"
+        rig.rotation_mode = "XZY"
+        # NOTE: Not YXZ since there's a 90 degree Y offset at the root of the in game camera
+        # Can be done in anim import stage but that messes up the slopes. Eulers are weird...
         rig.scale.y = 60  # Arbitrary default - FOV
         rig[KEY_SEKAI_CAMERA_RIG_SENSOR_HEIGHT] = (
             24  # Arbitrary default - Sensor Height (mm)
@@ -100,8 +99,8 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         camera.parent = rig
         camera.data.lens_unit = "MILLIMETERS"
         camera.location = blVector((0, 0, 0))
-        camera.rotation_euler = blEuler((0, math.radians(90), 0))
-        camera.rotation_mode = "XYZ"
+        camera.rotation_euler = blEuler((math.radians(90), 0, math.radians(180)))
+        camera.rotation_mode = "YXZ"
         camera.scale = blVector((1, 1, 1))
         # Driver for FOV
         driver = camera.data.driver_add("lens")
