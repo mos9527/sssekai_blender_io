@@ -220,6 +220,7 @@ SEKAI_RLA_ROOT_BONE = "Hip"
 SEKAI_RLA_TIME_MAGNITUDE = 1e7  # 1e7 = 1 second
 # Hardcoded names for Sekai
 SEKAI_BLENDSHAPE_NAME = "BS_"  # XXX: Incorrect!!
+SEKAI_BLENDSHAPE_CRC = 2770785369
 SEKAI_CAMERA_MAIN_NAME = "mainCam"
 SEKAI_CAMERA_PARAM_NAME = "mainCam/CamParam"
 # endregion

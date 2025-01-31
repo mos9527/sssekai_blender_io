@@ -438,13 +438,17 @@ class SSSekaiBlenderImportSekaiCharacterFaceMotionOperator(bpy.types.Operator):
         # Find the shapekey name hashtable
         # hash is simply crc32("blendShape." + Shape key name). This is baked in.
         morphs = list(
-            filter(lambda obj: KEY_SHAPEKEY_HASH_TABEL in obj for obj in face.children)
+            filter(
+                lambda obj: obj.type == "MESH" and KEY_SHAPEKEY_HASH_TABEL in obj.data,
+                face.children_recursive,
+            )
         )
         assert morphs, "No meshes with shapekey found"
         assert (
             len(morphs) == 1
         ), "Multiple meshes with shapekeys found. Please keep only one"
-        crc_table = json.loads(morphs[0][KEY_SHAPEKEY_HASH_TABEL])
+        morph = morphs[0]
+        crc_table = json.loads(morph.data[KEY_SHAPEKEY_HASH_TABEL])
         # Set active object to the face
         bpy.context.view_layer.objects.active = face
         # Load Animation
@@ -456,7 +460,7 @@ class SSSekaiBlenderImportSekaiCharacterFaceMotionOperator(bpy.types.Operator):
         action = load_sekai_keyshape_animation(
             anim.Name, anim, crc_table, wm.sssekai_animation_always_lerp
         )
-        apply_action(face, action, wm.sssekai_animation_import_use_nla)
+        apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla)
         bpy.context.view_layer.objects.active = active_obj
         bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}

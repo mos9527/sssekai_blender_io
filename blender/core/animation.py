@@ -414,12 +414,14 @@ def load_sekai_keyshape_animation(
         KeyShape value range [0,100]
     """
     action = create_action(name)
-    for attr, curve in data.CurvesT[crc32(SEKAI_BLENDSHAPE_NAME)].items():
+    for attr, curve in data.CurvesT[SEKAI_BLENDSHAPE_CRC].items():
         bsName = crc_keyshape_table[str(attr)]
         load_curve(
             action,
             'key_blocks["%s"].value' % bsName,
+            curve,
             [keyframe.value / 100.0 for keyframe in curve.Data],
+            swizzle_func=lambda x: x / 100.0,
             always_lerp=always_lerp,
         )
     return action
