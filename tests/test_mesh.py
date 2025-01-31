@@ -1,18 +1,18 @@
 from tests import *
-from blender.asset import build_scene_hierarchy
 
 from UnityPy.classes import MeshRenderer, UnityTexEnv, Texture2D
 from UnityPy.helpers import MeshHelper
+from UnityPy.enums import ClassIDType
 
 
 def test_mesh():
     PATH = sample_file_path("mesh", "face_31_0001")
     with open(PATH, "rb") as f:
         env = load_assetbundle(f)
-        articulations, armatures = build_scene_hierarchy(env)
-        for arma in armatures:
-            go = arma.skinnedMeshGameObject
-            rnd: MeshRenderer = go.m_SkinnedMeshRenderer.read()
+        for rnd in filter(
+            lambda obj: obj.type == ClassIDType.MeshRenderer, env.objects
+        ):
+            rnd = rnd.read()
             mesh = rnd.m_Mesh.read()
             mesh = MeshHelper.MeshHandler(mesh)
             mesh.process()
@@ -33,7 +33,7 @@ def test_mesh():
                         logger.info("tex %s pass" % k)
                     except Exception as e:
                         logger.warning("tex %s fail: %s" % (k, e))
-            logger.info("ok. armature was: %s" % arma.name)
+            logger.info("ok. mesh was: %s" % rnd.m_GameObject.m_Name)
 
 
 if __name__ == "__main__":

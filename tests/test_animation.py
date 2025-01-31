@@ -1,16 +1,17 @@
 from tests import *
-from blender.asset import search_env_animations
 from sssekai.unity.AnimationClip import read_animation
+from UnityPy.enums import ClassIDType
 
 
 def test_animation():
     PATH = sample_file_path("animation", "pv001_character")
     with open(PATH, "rb") as f:
         env = load_assetbundle(f)
-        anims = search_env_animations(env)
-        for anim in anims:
-            clip = read_animation(anim)
-            print("ok. animation was: %s" % anim.m_Name)
+        for anim in filter(
+            lambda obj: obj.type == ClassIDType.AnimationClip, env.objects
+        ):
+            clip = read_animation(anim.read())
+            print("ok. animation was: %s" % clip.Name)
 
 
 if __name__ == "__main__":
