@@ -97,6 +97,20 @@ def import_hierarchy_as_armature(
         name (str): Armature Object name
         use_bindpose (bool): Whether to use the bindpose for the bones
 
+    Note:
+        In Unity Bindpose is generated in the asset import process (e.g. FBX)
+        which may or may not be correct.
+        * For example, in Project SEKAI's case bindpose for Face armatures are incorrect
+            and is adjusted in post (Game) with a Transform parent which fixes the axis alignment.
+            This is possibly due to a misconfigured FBX export on the dev's side.
+            With that in mind, only use `use_bindpose` when:
+        * The imported mesh does not align with the armature
+            Could happen if the Hierarchy has some pose defined for it.
+            With this enabled - the armature would be adjusted to the bindpose
+            And the defined pose will be applied in Blender's Pose Mode (Pose Space)
+        * Do note, however, that *any* animation imports overrides Blender's Pose Space which may
+            or may not make this adjustment irrelavant.
+
     Returns:
         Tuple[bpy.types.Armature, bpy.types.Object]: Created armature and its parent object
     """
@@ -148,15 +162,14 @@ def import_hierarchy_as_armature(
                 root_bindposes[root_bone] = bindposes
             pass
     # Build bone hierarchy in blender
-    # Obivously the won't work when leaf bones aren't named uniquely
+    # Obivously won't work when leaf bones aren't named uniquely
     # However the assumption should hold true since...well, Blender doesn't allow it -_-||
     # XXX: Figure out if we'd ever need to support multiple bones with the same name
-    #
-    # Final = EditBone * PoseBone
     ebones = dict()
     root_bone = hierarchy.root
     # Build EditBones.
-    # No scaling is ever applied here since otherwise this messes up bind pose calculations
+    # No scaling is ever applied here since otherwise scaling becomes
+    # erroneouslly commutative which is *never* the case in any DCC software you'd use
     hierarchy.root.update_global_transforms(scale=False)
     for parent, child, _ in root_bone.children_recursive():
         parent: HierarchyNode
@@ -186,6 +199,7 @@ def import_hierarchy_as_armature(
             # Treat the joints as extremely small bones
             # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198
             # TODO: Alternative shapes for bones
+            # TODO: Better bone size heuristic
             ebone.head = M_edit @ blVector((0, 0, 0))
             ebone.tail = M_edit @ blVector((0, 1, 0))
             ebone.length = DEFAULT_BONE_SIZE
@@ -215,7 +229,6 @@ def import_hierarchy_as_armature(
         pbone = obj.pose.bones.get(node.name, None)
         if pbone:
             pbone.scale = swizzle_vector_scale(node.scale)
-    bpy.ops.object.mode_set(mode="OBJECT")
     obj[KEY_HIERARCHY_PATHID] = str(hierarchy.path_id)
     return armature, obj
 
@@ -356,24 +369,28 @@ def import_mesh_data(
 
 
 def import_texture(name: str, data: Texture2D):
-    """Imports Texture2D assets into blender
+    """Imports Texture2D assets into blender.
 
     Args:
         name (str): asset name
         data (Texture2D): source texture
 
+    Note:
+        An intermediate PNG file is created to import the texture into Blender.
+
     Returns:
         bpy.types.Image: Created image
     """
-    with tempfile.NamedTemporaryFile(suffix=".tga", delete=False) as temp:
-        logger.debug("Saving Texture %s->%s" % (data.m_Name, temp.name))
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp:
         image = data.image
         image.save(temp)
         temp.close()
         img = bpy.data.images.load(temp.name, check_existing=True)
         img.name = name
-        logger.debug("Imported Texture %s" % name)
-        return img
+        img.pack()
+        logger.debug("Packed Texture %s" % name)
+        temp.delete = True
+    return img
 
 
 def make_material_texture_node(

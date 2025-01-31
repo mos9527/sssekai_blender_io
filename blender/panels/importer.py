@@ -38,7 +38,7 @@ from ..operators.utils import (
     SSSekaiBlenderUtilCharaNeckMergeOperator,
 )
 
-EMPTY_OPT = ("--", "Not Available", "", "ERROR", 0)
+EMPTY_OPT = ("<no assest selected!>", "Not Available", "", "ERROR", 0)
 EMPTY_CONTAINER = "<default>"
 ALL_CONTAINER = "<all>"
 
@@ -214,9 +214,9 @@ register_wm_props(
     sssekai_hierarchy_import_bindpose=BoolProperty(
         name=T("Bind Pose"),
         description=T(
-            "Import the hierarchy in bind pose, if applicable (experimental, known to be broken for some models)"
+            "Correct the hierarchy to match the bind pose of the Skinned Meshes that might be imported. Only use this if the pose is incorrect"
         ),
-        default=True,
+        default=False,
     ),
     sssekai_hierarchy_import_mode=EnumProperty(
         name=T("Hierarchy Import Mode"),

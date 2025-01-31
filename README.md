@@ -3,20 +3,10 @@
 
 Blender asset importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク) asset bundles.
 
-# Features
-## Asset Types
-- Character (legacy and 'v2') armatures and stage objects (with hierarchy) from asset bundles are generally supported.
-- Animations from asset bundles (and [RLA/RTVL packets](https://github.com/mos9527/sssekai/wiki#streaming-live-rla-segments)) for characters and stage objects are generally supported
-- Hair/Cloth physics are approximated with the game's own definition, and implemented as rigid body simulations.
-## Shading
-NPR toon shading is approximated with [SekaiShaderStandalone](https://github.com/mos9527/sssekai_blender_io/blob/master/assets/SekaiShaderStandalone.blend), which supports
-- Customized diffuse/shadow textures
-- Artist-authored outline strength
-- SDF face shadows from 'v2' assets
 ## Documentation
 Read the [wiki page](https://github.com/mos9527/sssekai_blender_io/wiki) for more!
 
-# Supported Languages
+## Supported Languages
 PRs are welcome for additions. 
 - You can find the translation file [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations.py).
 - The script used to generate the translation file is [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations_codegen.py). Run this in the root of this repo, with any Python 3.8+ interpreter to update the translation file. Existing translations will be preserved.
@@ -27,7 +17,7 @@ Currently supported languages and maintainers:
 - English (en_US, mos9527, @Rypie109)
 - 简体中文 (zh_HANS, mos9527)
 
-# Installing & Updating
+## Installing & Updating
   **PLEASE NOTE:**
   The updater is still a W.I.P and has bugs! Please report them in the [issues](https://github.com/mos9527/sssekai_blender_io/issues) tab if you encounter one.
   
@@ -41,32 +31,47 @@ Currently supported languages and maintainers:
 
 The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
 
-## TODO
-- Handle Skinned Mesh with non-Identity Bind Pose
-### QoL
-- ~~An actual updater~~
-- **Cleanup** temp files after importing.
-### Lighting
+### Roadmap
+#### Asset
+- ~~Handle Skinned Mesh with non-Identity Bind Pose~~
+  - Done. Also applies to generic Unity assets
+- ~~Handle Skinned Mesh with non-Identity Rest Pose~~
+  - Done. Also applies to generic Unity assets
+- Custom `Animator` for animation import
+  - Path CRC32 table can now be done through `m_Avatar`
+  - TODO: Implement Animator bindpose
+#### Lighting
+NOTE: Mostly done
 - 1-to-1 approximation of the game's lighting system
-  - Face light (SDF for v2, simple $N \cdot L$ for legacy) [?]
-    - *NOTE*: Current SDF implementation does not handle relative light directions
-  - Directional Light (`SekaiCharacterDirectionalLight`) [?]
-    - Not specialized at all and does not support colors as of now
-  - Rim Light (`SekaiCharacterRimLight`) []
-  - Ambient Light (`SekaiAmbientLight`, `SekaiCharacterAmbientLight`) []
+  - ~~Face light (SDF for v2, simple $N \cdot L$ for legacy)~~
+    - ~~*NOTE*: Current SDF implementation does not handle relative light directions~~
+    - Fixed. See also https://mos9527.com/en/posts/pjsk/shading-reverse-part-3/
+  - ~~Directional Light (`SekaiCharacterDirectionalLight`)~~
+    - ~~Not specialized at all and does not support colors as of now~~
+    - Fixed. See also https://mos9527.com/posts/pjsk/shading-reverse-part-2/
+  - ~~Rim Light (`SekaiCharacterRimLight`)~~
+  - ~~Ambient Light (`SekaiAmbientLight`, `SekaiCharacterAmbientLight`)~~
   - ...
-### Effects
-- Approximate the game's particle system []
-  - Some are observed to be implemented with simple articulated objects  
-### Animation
-- Approximate Unity's IK system []
+#### Effects
+- Post processing
+  - See also https://mos9527.com/posts/pjsk/shading-reverse-part-1/
+- Sub-cameras (off-screen cameras)
+- Blob shadows
+- Particles
+#### Animation
+- Approximate Unity's IK system
   - Since [My Sekai](https://pjsekai.sega.jp/news/archive/index.html?hash=ecca5cb23ea530edb669fc0d2ae302fd0f374a4b) is a thing now and the chibi models are rigged with Unity's IK system.  
   - Also would be nice since all Unity games with humanoid characters use this system.
   - This would also make retargeting trivial.
-# License
+#### QoL
+- ~~An actual updater~~
+  - Use the [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py)
+- ~~**Cleanup** temp files after importing.~~
+  - Done. Images will be cleaned up after import and packed into the blend file.
+## License
 MIT
 
-# References
+## References
 - https://github.com/K0lb3/UnityPy
 - https://github.com/KhronosGroup/glTF-Blender-IO
 - https://github.com/theturboturnip/yk_gmd_io
