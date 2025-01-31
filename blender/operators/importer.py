@@ -112,6 +112,17 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         camera.rotation_euler = blEuler((math.radians(90), 0, math.radians(180)))
         camera.rotation_mode = "YXZ"
         camera.scale = blVector((1, 1, 1))
+        camera.data.sensor_fit = "VERTICAL"
+
+        height = camera.data.driver_add("sensor_height")
+        height.driver.type = "SCRIPTED"
+        var = height.driver.variables.new()
+        var.name = "height"
+        var.type = "SINGLE_PROP"
+        var.targets[0].id = rig
+        var.targets[0].data_path = f'["{KEY_SEKAI_CAMERA_RIG_SENSOR_HEIGHT}"]'
+        height.driver.expression = "height"
+
         # Driver for FOV
         driver = camera.data.driver_add("lens")
         driver.driver.type = "SCRIPTED"
@@ -127,9 +138,9 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         var_scale.type = "TRANSFORMS"
         var_scale.targets[0].id = rig
         var_scale.targets[0].transform_space = "WORLD_SPACE"
-        var_scale.targets[0].transform_type = "SCALE_Y"
+        var_scale.targets[0].transform_type = "SCALE_Z"
 
-        driver.driver.expression = "sensor_height / (2 * tan(radians(fov) / 2))"
+        driver.driver.expression = "sensor_height / (2 * tan(radians(fov * 100) / 2))"
         bpy.context.view_layer.objects.active = rig
         return {"FINISHED"}
 
@@ -316,8 +327,9 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
 
         armature_obj.parent = active_obj
         # Restore
-        bpy.context.view_layer.objects.active = active_obj
-        bpy.ops.object.mode_set(mode="OBJECT")
+        if active_obj:
+            bpy.context.view_layer.objects.active = active_obj
+            bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}
 
 
