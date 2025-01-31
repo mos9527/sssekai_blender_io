@@ -203,8 +203,7 @@ def import_hierarchy_as_armature(
         # https://docs.blender.org/api/current/info_gotcha.html#stale-data
         bpy.context.view_layer.update()
         pose_matrix = {
-            hierarchy.nodes[node].name: hierarchy.nodes[node].global_transform
-            for node in bindposes_pa
+            node.name: node.global_transform for node in hierarchy.nodes.values()
         }
         apply_pose_matrix(obj, pose_matrix, edit_mode=False)
     # Scale adjustment

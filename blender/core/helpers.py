@@ -227,20 +227,29 @@ def apply_pose_matrix(
         bpy.ops.pose.transforms_clear()
         bpy.ops.pose.select_all(action="DESELECT")
     for bone_name, M_final in pose_matrix.items():
+        print("adjust", bone_name)
         if edit_mode:
             ebone = dest.data.edit_bones.get(bone_name)
+            if not ebone:
+                continue
             ebone.head = M_final @ blVector((0, 0, 0))
             ebone.tail = M_final @ blVector((0, 1, 0))
             ebone.length = DEFAULT_BONE_SIZE
             ebone.align_roll(M_final @ blVector((0, 0, 1)) - ebone.head)
         else:
             pbone = dest.pose.bones.get(bone_name)
+            if not pbone:
+                continue
             M_edit = edit_space[pbone.name]
             M_parent = (
                 edit_space[pbone.parent.name] if pbone.parent else blMatrix.Identity(4)
             )
             M_local = M_parent.inverted() @ M_edit
-            M_final_parent = pose_matrix.get(pbone.parent.name, blMatrix.Identity(4))
+            M_final_parent = (
+                pose_matrix.get(pbone.parent.name)
+                if pbone.parent
+                else blMatrix.Identity(4)
+            )
             M_final_local = M_final_parent.inverted() @ M_final
             # Apply pose specified in the hierarchy
             # PoseBone = EditBone^-1 * Final
