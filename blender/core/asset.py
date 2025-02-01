@@ -381,7 +381,9 @@ def import_texture(name: str, data: Texture2D):
     Returns:
         bpy.types.Image: Created image
     """
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp:
+    with tempfile.NamedTemporaryFile(
+        suffix=".png", delete=False, delete_on_close=False
+    ) as temp:
         image = data.image
         image.save(temp)
         temp.close()
