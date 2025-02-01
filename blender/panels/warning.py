@@ -8,6 +8,9 @@ All functions are subject to change without notice
 and does not represent the final state of the addon
 ?Generic Unity games besides Project SEKAI
 are supported intentionally, however with lower priority.
+!RLA functionalites are currently on hold. Use the
+"legacy" branch and sssekai before version 0.6.0 (non-inclusive)
+if you need to use them
 ?In doubt, please refer to the wiki or the issues page
 *Links are available here""".split("\n")
 

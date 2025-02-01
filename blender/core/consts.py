@@ -123,6 +123,7 @@ KEY_SEKAI_CAMERA_RIG = "sssekai_sekai_camera_rig"
 KEY_SEKAI_CAMERA_RIG_SENSOR_HEIGHT = "sssekai_sekai_camera_rig_sensor_height"
 KEY_SEKAI_CHARACTER_ROOT = "sssekai_sekai_character_root_stub"
 KEY_SEKAI_CHARACTER_HEIGHT = "sssekai_sekai_character_height"
+KEY_SEKAI_CHARACTER_LIGHT_OBJ = "sssekai_sekai_character_light_obj"
 KEY_SEKAI_CHARACTER_BODY_OBJ = "sssekai_sekai_character_body_obj"
 KEY_SEKAI_CHARACTER_FACE_OBJ = "sssekai_sekai_character_face_obj"
 # Hardcoded orders for RLA import
@@ -223,4 +224,36 @@ SEKAI_BLENDSHAPE_NAME = "BS_"  # XXX: Incorrect!!
 SEKAI_BLENDSHAPE_CRC = 2770785369
 SEKAI_CAMERA_MAIN_NAME = "mainCam"
 SEKAI_CAMERA_PARAM_NAME = "mainCam/CamParam"
+
+SEKAI_LIGHT_INTENSITY = "intensity"
+SEKAI_LIGHT_EDGE_SMOOTHNESS = "edgeSmoothness"
+SEKAI_LIGHT_SHADOW_SHARPNESS = "shadowSharpness"
+
+SEKAI_LIGHT_AMBIENT_COLOR_R = "ambientColor.r"
+SEKAI_LIGHT_AMBIENT_COLOR_G = "ambientColor.g"
+SEKAI_LIGHT_AMBIENT_COLOR_B = "ambientColor.b"
+
+SEKAI_LIGHT_SHADOW_COLOR_R = "shadowColor.r"
+SEKAI_LIGHT_SHADOW_COLOR_G = "shadowColor.g"
+SEKAI_LIGHT_SHADOW_COLOR_B = "shadowColor.b"
+
+SEKAI_LIGHT_SHADOW_RIM_COLOR_R = "shadowRimColor.r"
+SEKAI_LIGHT_SHADOW_RIM_COLOR_G = "shadowRimColor.g"
+SEKAI_LIGHT_SHADOW_RIM_COLOR_B = "shadowRimColor.b"
+
+SEKAI_LIGHT_OUTLINE_BLENDING = "outlineBlending"
+SEKAI_LIGHT_OUTLINE_COLOR_R = "outlineColor.r"
+SEKAI_LIGHT_OUTLINE_COLOR_G = "outlineColor.g"
+SEKAI_LIGHT_OUTLINE_COLOR_B = "outlineColor.b"
+
+SEKAI_LIGHT_RIM_COLOR_R = "rimColor.r"
+SEKAI_LIGHT_RIM_COLOR_G = "rimColor.g"
+SEKAI_LIGHT_RIM_COLOR_B = "rimColor.b"
+
+SEKAI_LIGHT_RANGE = "range"
+SEKAI_LIGHT_INFLUENCE = "lightInfluence"
+SEKAI_LIGHT_USE_FACE_SHADOW_LIMITER = "useFaceShadowLimiter"
+SEKAI_LIGHT_EMISSION = "emission"
+SEKAI_LIGHT_FACE_SHADOW_LIMIT_RANGE = "faceShadowLimitRange"
+SEKAI_LIGHT_IS_USE_SHADOW_COLOR = "isUseShadowColor"
 # endregion

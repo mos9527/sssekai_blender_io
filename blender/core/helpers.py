@@ -116,24 +116,6 @@ def time_to_frame(time: float, frame_offset: int = 0):
     return time * bpy.context.scene.render.fps + frame_offset
 
 
-def retrive_action(object: bpy.types.Object):
-    """Retrieves the action bound to an object, if any"""
-    return object.animation_data.action if object.animation_data else None
-
-
-def ensure_action(object: bpy.types.Object, name: str, always_create_new: bool):
-    """Creates (or retrieves) an action for an object, whilst ensuring that the action is bound to animation_data"""
-    existing_action = retrive_action(object)
-    if always_create_new or not existing_action:
-        object.animation_data_clear()
-        object.animation_data_create()
-        action = bpy.data.actions.new(name)
-        object.animation_data.action = action
-        return action
-    else:
-        return object.animation_data.action
-
-
 def create_action(name: str):
     """Creates a new action"""
     action = bpy.data.actions.new(name)

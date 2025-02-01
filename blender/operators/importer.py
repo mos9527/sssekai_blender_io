@@ -18,7 +18,7 @@ from ..core.consts import *
 from ..core.helpers import create_empty
 from ..core.helpers import (
     ensure_sssekai_shader_blend,
-    retrive_action,
+    create_action,
     apply_action,
     editbone_children_recursive,
     armature_editbone_children_recursive,
@@ -39,6 +39,8 @@ from ..core.animation import (
     load_armature_animation,
     load_sekai_camera_animation,
     load_sekai_keyshape_animation,
+    load_sekai_ambient_light_animation,
+    load_sekai_directional_light_animation,
 )
 from ..core.types import Hierarchy
 from ..core.math import blVector, blEuler
@@ -99,9 +101,9 @@ class SSSekaiBlenderCreateCharacterControllerOperator(bpy.types.Operator):
         root[KEY_SEKAI_CHARACTER_HEIGHT] = wm.sssekai_character_height
         root[KEY_SEKAI_CHARACTER_BODY_OBJ] = None
         root[KEY_SEKAI_CHARACTER_FACE_OBJ] = None
-
         rim_controller = bpy.data.objects["SekaiCharaRimLight"].copy()
         rim_controller.parent = root
+        root[KEY_SEKAI_CHARACTER_LIGHT_OBJ] = rim_controller
         bpy.context.collection.objects.link(rim_controller)
 
         bpy.context.view_layer.objects.active = root
@@ -425,7 +427,12 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         bpy.context.scene.frame_end = max(
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])
         )
-        apply_action(active_obj, action, wm.sssekai_animation_import_use_nla)
+        apply_action(
+            active_obj,
+            action,
+            wm.sssekai_animation_import_use_nla,
+            wm.sssekai_animation_import_nla_always_new_track,
+        )
         self.report({"INFO"}, T("Hierarchy Animation %s Imported") % anim.Name)
         # Restore
         bpy.context.view_layer.objects.active = active_obj
@@ -502,7 +509,12 @@ class SSSekaiBlenderImportSekaiCharacterFaceMotionOperator(bpy.types.Operator):
         action = load_sekai_keyshape_animation(
             anim.Name, anim, crc_table, wm.sssekai_animation_always_lerp
         )
-        apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla)
+        apply_action(
+            morph.data.shape_keys,
+            action,
+            wm.sssekai_animation_import_use_nla,
+            wm.sssekai_animation_import_nla_always_new_track,
+        )
         self.report({"INFO"}, T("Sekai Shapekey Animation %s Imported") % anim.Name)
         bpy.context.view_layer.objects.active = active_obj
         bpy.ops.object.mode_set(mode="OBJECT")
@@ -536,8 +548,97 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
         bpy.context.scene.frame_end = max(
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])
         )
-        apply_action(active_obj, action, wm.sssekai_animation_import_use_nla)
+        apply_action(
+            active_obj,
+            action,
+            wm.sssekai_animation_import_use_nla,
+            wm.sssekai_animation_import_nla_always_new_track,
+        )
         self.report({"INFO"}, T("Sekai Camera Animation %s Imported") % anim.Name)
         bpy.context.view_layer.objects.active = active_obj
         bpy.ops.object.mode_set(mode="OBJECT")
+        return {"FINISHED"}
+
+
+@register_class
+class SSSekaiBlenderImportGlobalLightAnimationOperator(bpy.types.Operator):
+    bl_idname = "sssekai.import_global_light_animation_op"
+    bl_label = T("Import Global Light Animation")
+    bl_description = T("Import the selected Light Animation to the Global Light")
+
+    def execute(self, context):
+        global sssekai_global
+        wm = context.window_manager
+        ensure_sssekai_shader_blend()
+        # Load Animation
+        anim = sssekai_global.cotainers[
+            wm.sssekai_selected_animation_container
+        ].animations[int(wm.sssekai_selected_animation)]
+        logger.info("Loading Animation %s" % anim.m_Name)
+        anim = read_animation(anim)
+        bpy.context.scene.render.fps = int(anim.SampleRate)
+        logger.info("Sample Rate: %d FPS" % anim.SampleRate)
+        global_obj = bpy.data.objects["SekaiShaderGlobals"]
+        dir_light_obj = bpy.data.objects["SekaiDirectionalLight"]
+        match wm.sssekai_animation_light_type:
+            case "AMBIENT":
+                action = load_sekai_ambient_light_animation(
+                    anim.Name, anim, wm.sssekai_animation_always_lerp
+                )
+                apply_action(
+                    global_obj,
+                    action,
+                    wm.sssekai_animation_import_use_nla,
+                    wm.sssekai_animation_import_nla_always_new_track,
+                )
+            case "DIRECTIONAL":
+                global_action, directional_light_action = (
+                    load_sekai_directional_light_animation(
+                        anim.Name, anim, wm.sssekai_animation_always_lerp
+                    )
+                )
+                apply_action(
+                    global_obj,
+                    global_action,
+                    wm.sssekai_animation_import_use_nla,
+                    wm.sssekai_animation_import_nla_always_new_track,
+                )
+                apply_action(
+                    dir_light_obj,
+                    directional_light_action,
+                    wm.sssekai_animation_import_use_nla,
+                    wm.sssekai_animation_import_nla_always_new_track,
+                )
+
+        return {"FINISHED"}
+
+
+@register_class
+class SSSekaiBlenderImportCharacterLightAnimationOperator(bpy.types.Operator):
+    bl_idname = "sssekai.import_character_light_animation_op"
+    bl_label = T("Import Character Light Animation")
+    bl_description = T("Import the selected Light Animation to the Character Light")
+
+    def execute(self, context):
+        global sssekai_global
+        wm = context.window_manager
+        ensure_sssekai_shader_blend()
+        active_obj = context.active_object
+        assert (
+            active_obj and KEY_SEKAI_CHARACTER_ROOT in active_obj
+        ), "Active object must be a Character Controller"
+        controler = active_obj[KEY_SEKAI_CHARACTER_LIGHT_OBJ]
+        # Load Animation
+        anim = sssekai_global.cotainers[
+            wm.sssekai_selected_animation_container
+        ].animations[int(wm.sssekai_selected_animation)]
+        logger.info("Loading Animation %s" % anim.m_Name)
+        anim = read_animation(anim)
+        bpy.context.scene.render.fps = int(anim.SampleRate)
+        logger.info("Sample Rate: %d FPS" % anim.SampleRate)
+        match wm.sssekai_animation_light_type:
+            case "CHARACTER_RIM":
+                pass
+            case "CHARACTER_AMBIENT":
+                pass
         return {"FINISHED"}

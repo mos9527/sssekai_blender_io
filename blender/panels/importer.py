@@ -31,6 +31,8 @@ from ..operators.importer import (
     SSSekaiBlenderCreateCharacterControllerOperator,
     SSSekaiBlenderImportSekaiCharacterMotionOperator,
     SSSekaiBlenderImportSekaiCharacterFaceMotionOperator,
+    SSSekaiBlenderImportGlobalLightAnimationOperator,
+    SSSekaiBlenderImportCharacterLightAnimationOperator,
 )
 
 from ..operators.utils import (
@@ -189,7 +191,16 @@ register_wm_props(
         default=False,
     ),
     sssekai_animation_import_use_nla=BoolProperty(
-        name=T("Use NLA"), description=T("Import as NLA Track"), default=True
+        name=T("Use NLA"),
+        description=T(
+            "Import as NLA Track. Otherwise, the imported animation overwrites the exisiting one."
+        ),
+        default=True,
+    ),
+    sssekai_animation_import_nla_always_new_track=BoolProperty(
+        name=T("Always New Track"),
+        description=T("Always create a new NLA Track"),
+        default=True,
     ),
     sssekai_import_type=EnumProperty(
         name=T("Import Type"),
@@ -303,12 +314,53 @@ register_wm_props(
                 3,
             ),
             (
+                "SEKAI_LIGHT",
+                T("Sekai Light"),
+                T("Import the selected animation as a Project SEKAI Light Animation"),
+                "LIGHT_DATA",
+                4,
+            ),
+            (
                 "GENERIC",
                 T("Generic Transform"),
                 T(
                     "Import the selected animation as generic animation data applied on Transforms"
                 ),
                 "ANIM_DATA",
+                5,
+            ),
+        ],
+    ),
+    sssekai_animation_light_type=EnumProperty(
+        name=T("Light Animation Type"),
+        description=T("Type of light animation to import."),
+        items=[
+            (
+                "DIRECTIONAL",
+                T("Directional"),
+                T("Directional Light"),
+                "LIGHT_SUN",
+                1,
+            ),
+            (
+                "AMBIENT",
+                T("Ambient"),
+                T("Ambient Light"),
+                "LIGHT_HEMI",
+                2,
+            ),
+            (
+                "CHARACTER_RIM",
+                T("Chara Rim"),
+                T("Character Rim Light"),
+                "LIGHT_POINT",
+                3,
+            ),
+            (
+                "CHARACTER_AMBIENT",
+                T("Chara Ambient"),
+                T("Character Ambient Light"),
+                "LIGHT_HEMI",
                 4,
             ),
         ],
@@ -385,6 +437,9 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 row.prop(wm, "sssekai_animation_always_lerp", icon="IPO_LINEAR")
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_use_nla", icon="NLA")
+                row.prop(
+                    wm, "sssekai_animation_import_nla_always_new_track", icon="NLA"
+                )
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_mode", expand=True)
                 row = layout.row()
@@ -440,6 +495,56 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                                     SSSekaiBlenderCreateCameraRigControllerOperator.bl_idname,
                                     icon="OUTLINER_OB_ARMATURE",
                                 )
+                    case "SEKAI_LIGHT":
+                        row.prop(wm, "sssekai_animation_light_type", expand=True)
+                        row = layout.row()
+                        row.label(
+                            text="NOTE: Some animation settings are enforced with this import mode"
+                        )
+                        row = layout.row()
+                        wm.sssekai_animation_import_use_nla = True
+                        wm.sssekai_animation_import_nla_always_new_track = True
+                        match wm.sssekai_animation_light_type:
+                            case "DIRECTIONAL":
+                                row.operator(
+                                    SSSekaiBlenderImportGlobalLightAnimationOperator.bl_idname
+                                )
+                                row = layout.row()
+                            case "AMBIENT":
+                                row.operator(
+                                    SSSekaiBlenderImportGlobalLightAnimationOperator.bl_idname
+                                )
+                                row = layout.row()
+                            case "CHARACTER_RIM":
+                                if (
+                                    active_obj
+                                    and KEY_SEKAI_CHARACTER_LIGHT_OBJ in active_obj
+                                ):
+                                    row.operator(
+                                        SSSekaiBlenderImportCharacterLightAnimationOperator.bl_idname
+                                    )
+                                else:
+                                    row.label(
+                                        text=T(
+                                            "Please select a SekaiCharacterRoot first"
+                                        )
+                                    )
+                                row = layout.row()
+                            case "CHARACTER_AMBIENT":
+                                if (
+                                    active_obj
+                                    and KEY_SEKAI_CHARACTER_LIGHT_OBJ in active_obj
+                                ):
+                                    row.operator(
+                                        SSSekaiBlenderImportCharacterLightAnimationOperator.bl_idname
+                                    )
+                                else:
+                                    row.label(
+                                        text=T(
+                                            "Please select a SekaiCharacterRoot first"
+                                        )
+                                    )
+                                row = layout.row()
                     case "GENERIC":
                         if active_obj and KEY_HIERARCHY_PATHID in active_obj:
                             row.prop(

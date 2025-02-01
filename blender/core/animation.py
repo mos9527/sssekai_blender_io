@@ -1,16 +1,18 @@
 import bpy
 import logging, json, math
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from sssekai.unity.AnimationClip import (
     Animation,
     Interpolation,
     Curve,
+    KeyFrame,
     kBindTransformEuler,
     kBindTransformPosition,
     kBindTransformRotation,
     kBindTransformScale,
 )
 from .math import (
+    uVector3,
     blEuler,
     blQuaternion,
     blVector,
@@ -20,7 +22,7 @@ from .math import (
     swizzle_vector,
     swizzle_vector_scale,
 )
-from .helpers import create_empty, time_to_frame, ensure_action, create_action
+from .helpers import create_empty, time_to_frame, create_action
 from .utils import crc32
 from .consts import *
 from .. import logger
@@ -46,23 +48,25 @@ def interpolation_to_blender(ipo: Interpolation):
     )
 
 
-def load_curve(
+def load_fcurves(
     action: bpy.types.Action,
     data_path: str,
     curve: Curve,
     bl_values: List[float | blEuler | blVector | blQuaternion],
     swizzle_func: callable = None,
     always_lerp: bool = False,
+    override_data_index: int = 0,
 ):
     """Creates an arbitrary amount of FCurves for a sssekai Curve
 
     Args:
         action (bpy.types.Action): target action.
         data_path (str): data path
-        curve (Curve): curve data
+        curve (Curve): curve data. used to access slope values
         bl_values (List[float | blEuler | blVector | blQuaternion]): values in Blender types
         swizzle_func (callable, optional): swizzle function applied on the slope values. Read the note below
         always_lerp (bool, optional): always use linear interpolation. Defaults to False.
+        override_data_index (int, optional): override the data index. only used when value type is float. Defaults to 0.
 
     Notes on swizzle_func:
         Swizzling `g(x) = kx` would be STRICTLY linear and `f(x), f'(x)` are known, this implies that:
@@ -96,10 +100,12 @@ def load_curve(
     bl_inSlopes = [swizzle_func(k.inSlope) for k in curve.Data]
     bl_outSlopes = [swizzle_func(k.outSlope) for k in curve.Data]
     frames = [time_to_frame(keyframe.time) for keyframe in curve.Data]
-    fcurve = [
-        action.fcurves.new(data_path=data_path, index=i) for i in range(num_curves)
-    ]
-
+    if num_curves > 1:
+        fcurve = [
+            action.fcurves.new(data_path=data_path, index=i) for i in range(num_curves)
+        ]
+    else:
+        fcurve = [action.fcurves.new(data_path=data_path, index=override_data_index)]
     for index in range(num_curves):
         curve_data = [0] * (len(frames) * 2)
         curve_data[::2] = frames
@@ -158,12 +164,13 @@ def load_curve(
         fcurve[index].update()
 
 
-def load_float_curve(
+def load_float_fcurve(
     action: bpy.types.Action,
     data_path: str,
     curve: Curve,
     bl_values: List[float] = None,
     always_lerp: bool = False,
+    override_data_index: int = 0,
 ):
     """Helper function that creates an FCurve for a sssekai Float Curve
 
@@ -173,13 +180,21 @@ def load_float_curve(
         curve (Curve): curve data
         bl_values (List[float], optional): values in Blender types. will be extracted from curve if not provided. Defaults to None.
         always_lerp (bool, optional): always use linear interpolation. Defaults to False.
+        override_data_index (int, optional): override the data index. Defaults to 0.
 
     """
     bl_values = bl_values or [k.value for k in curve.Data]
-    return load_curve(action, data_path, curve, bl_values, always_lerp=always_lerp)
+    return load_fcurves(
+        action,
+        data_path,
+        curve,
+        bl_values,
+        always_lerp=always_lerp,
+        override_data_index=override_data_index,
+    )
 
 
-def load_curve_quatnerion(
+def load_quatnerion_fcurves(
     action: bpy.types.Action,
     data_path: str,
     curve: Curve,
@@ -329,7 +344,7 @@ def load_armature_animation(
             to_pose_quaternion(bone, swizzle_quaternion(keyframe.value))
             for keyframe in curve.Data
         ]
-        load_curve_quatnerion(
+        load_quatnerion_fcurves(
             action, 'pose.bones["%s"].rotation_quaternion' % bone, curve, values
         )
     # Euler Rotations
@@ -344,7 +359,7 @@ def load_armature_animation(
             to_pose_euler(bone, swizzle_euler(keyframe.value))
             for keyframe in curve.Data
         ]
-        load_curve(
+        load_fcurves(
             action,
             'pose.bones["%s"].rotation_euler' % bone,
             curve,
@@ -361,7 +376,7 @@ def load_armature_animation(
             to_pose_translation(bone, swizzle_vector(keyframe.value))
             for keyframe in curve.Data
         ]
-        load_curve(
+        load_fcurves(
             action,
             'pose.bones["%s"].location' % bone,
             curve,
@@ -375,7 +390,7 @@ def load_armature_animation(
             logger.warning("Scale: Failed to bind CRC32 %s to bone" % path)
             continue
         values = [swizzle_vector_scale(keyframe.value) for keyframe in curve.Data]
-        load_curve(
+        load_fcurves(
             action,
             'pose.bones["%s"].scale' % bone,
             curve,
@@ -416,7 +431,7 @@ def load_sekai_keyshape_animation(
     action = create_action(name)
     for attr, curve in data.CurvesT[SEKAI_BLENDSHAPE_CRC].items():
         bsName = crc_keyshape_table[str(attr)]
-        load_curve(
+        load_fcurves(
             action,
             'key_blocks["%s"].value' % bsName,
             curve,
@@ -466,7 +481,7 @@ def load_sekai_camera_animation(
     if mainCam:
         if kBindTransformEuler in mainCam:
             curve = mainCam[kBindTransformEuler]
-            load_curve(
+            load_fcurves(
                 action,
                 "rotation_euler",
                 curve,
@@ -476,7 +491,7 @@ def load_sekai_camera_animation(
             )
         if kBindTransformPosition in mainCam:
             curve = mainCam[kBindTransformPosition]
-            load_curve(
+            load_fcurves(
                 action,
                 "location",
                 curve,
@@ -491,7 +506,7 @@ def load_sekai_camera_animation(
     if camParam:
         if kBindTransformPosition in camParam:
             curve = camParam[kBindTransformPosition]
-            load_curve(
+            load_fcurves(
                 action,
                 "scale",
                 curve,
@@ -504,6 +519,96 @@ def load_sekai_camera_animation(
             "Camera Param Transform not found. Camera FOV curve will be unavailable"
         )
     return action
+
+
+def load_sekai_ambient_light_animation(
+    name: str,
+    data: Animation,
+    always_lerp: bool = False,
+):
+    """
+    AmbientLight
+        --- Ambient Intensity
+        3920803986	intensity
+        --- Ambient Color
+        3163355018	ambientColor.r
+        3511751521	ambientColor.g
+        2705057774	ambientColor.b
+        -- unk
+        942847572	NOT FOUND
+        190802317	NOT FOUND
+    """
+    # fmt: off
+    action = create_action(name)
+    curves = data.CurvesT[0]
+    curve = curves.get(crc32(SEKAI_LIGHT_INTENSITY), None)
+    if curve:
+        load_float_fcurve(
+            action, '["Ambient Intensity"]', curve, always_lerp=always_lerp
+        )
+    curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_R), None)
+    if curve:
+        load_float_fcurve(action, '["Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+    curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_G), None)
+    if curve:
+        load_float_fcurve(action, '["Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+    curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_B), None)
+    if curve:
+        load_float_fcurve(action, '["Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+    # fmt: on
+    return action
+
+
+def load_sekai_directional_light_animation(
+    name: str,
+    data: Animation,
+    always_lerp: bool = False,
+) -> Tuple[bpy.types.Action, bpy.types.Action]:
+    """
+    DirectionalLight
+        --- rotation_euler
+        4	        Euler
+        --- Shadow Color
+        464682304	shadowColor.r
+        1987025323	shadowColor.g
+        101018916	shadowColor.b
+        --- unk
+        2668379294	NOT FOUND
+        3305885265	NOT FOUND
+        --- (not used for now. still broken in-game)
+        2309651703	faceShadowLimitRange
+        2381373797	useFaceShadowLimiter
+
+    Returns:
+        Tuple[bpy.types.Action, bpy.types.Action]: (Global Action, Directional Light Action)
+    """
+    # fmt: off
+    curves = data.CurvesT[0]
+    curve = curves.get(kBindTransformEuler, None)
+    action = create_action(name)
+    def swizzle_euler_light(euler: blEuler):
+        # XXX: No proof why this works. But it does.
+        return blEuler((math.radians(euler.x), math.radians(euler.z), math.radians(-euler.y)), "YXZ")
+    if curve:
+        load_fcurves(
+            action, 'rotation_euler', curve, 
+            [swizzle_euler_light(keyframe.value) for keyframe in curve.Data],
+            swizzle_func=swizzle_euler_light, always_lerp=always_lerp
+        )
+    directional_light_action = action
+
+    action = create_action(name)
+    curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_R), None)
+    if curve:
+        load_float_fcurve(action, '["Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+    curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_G), None)
+    if curve:
+        load_float_fcurve(action, '["Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+    curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_B), None)
+    if curve:
+        load_float_fcurve(action, '["Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+    # fmt: on
+    return action, directional_light_action
 
 
 # endregion
