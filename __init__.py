@@ -13,7 +13,7 @@ bl_info = {
 
 import sys, os
 
-REQUIRED_SSSEKAI_MIN_VERSION = (0, 5, 15)
+REQUIRED_SSSEKAI_MIN_VERSION = (0, 6, 9)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 try:
@@ -46,7 +46,7 @@ except ImportError as e:
 import importlib, bpy, logging
 from logging import getLogger
 
-logger = getLogger(__name__)
+logger = getLogger("init")
 
 
 def register():
@@ -57,7 +57,23 @@ def register():
 
     bpy.app.translations.register(__package__, translations_dict)
 
-    install(level="DEBUG", fmt="sssekai | %(levelname)s | %(module)s | %(message)s")
+    install(
+        level="DEBUG",
+        fmt="%(asctime)s %(name)s\t%(levelname).1s %(message)s",
+        datefmt="%H:%M:%S.%f",
+        millisecond=True,
+        level_styles=dict(
+            spam=dict(color="green", faint=True),
+            debug=dict(color="green"),
+            verbose=dict(color="blue"),
+            info=dict(),
+            notice=dict(color="magenta"),
+            warning=dict(color="yellow"),
+            success=dict(color="green", bold=True),
+            error=dict(color="red"),
+            critical=dict(color="red", bold=True),
+        ),
+    )
 
     ADDONS = ["addon"]
     logger.debug("Blender version: %s", bpy.app.version_string)

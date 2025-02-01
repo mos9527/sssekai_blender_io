@@ -414,10 +414,10 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         anim = sssekai_global.cotainers[
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
-        self.report({"INFO"}, T("Loading Animation %s") % anim.m_Name)
+        logger.info("Loading Animation %s" % anim.m_Name)
         anim = read_animation(anim)
         bpy.context.scene.render.fps = int(anim.SampleRate)
-        self.report({"INFO"}, T("Sample Rate: %d FPS") % anim.SampleRate)
+        logger.info("Sample Rate: %d FPS" % anim.SampleRate)
         action = load_armature_animation(
             anim.Name, anim, active_obj, tos_leaf, wm.sssekai_animation_always_lerp
         )
@@ -426,6 +426,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])
         )
         apply_action(active_obj, action, wm.sssekai_animation_import_use_nla)
+        self.report({"INFO"}, T("Hierarchy Animation %s Imported") % anim.Name)
         # Restore
         bpy.context.view_layer.objects.active = active_obj
         bpy.ops.object.mode_set(mode="OBJECT")
@@ -496,12 +497,13 @@ class SSSekaiBlenderImportSekaiCharacterFaceMotionOperator(bpy.types.Operator):
         anim = sssekai_global.cotainers[
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
-        self.report({"INFO"}, T("Loading Animation %s") % anim.m_Name)
+        logger.info("Loading Animation %s" % anim.m_Name)
         anim = read_animation(anim)
         action = load_sekai_keyshape_animation(
             anim.Name, anim, crc_table, wm.sssekai_animation_always_lerp
         )
         apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla)
+        self.report({"INFO"}, T("Sekai Shapekey Animation %s Imported") % anim.Name)
         bpy.context.view_layer.objects.active = active_obj
         bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}
@@ -523,10 +525,10 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
         anim = sssekai_global.cotainers[
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
-        self.report({"INFO"}, T("Loading Animation %s") % anim.m_Name)
+        logger.info("Loading Animation %s" % anim.m_Name)
         anim = read_animation(anim)
         bpy.context.scene.render.fps = int(anim.SampleRate)
-        self.report({"INFO"}, T("Sample Rate: %d FPS") % anim.SampleRate)
+        logger.info("Sample Rate: %d FPS" % anim.SampleRate)
         action = load_sekai_camera_animation(
             anim.Name, anim, wm.sssekai_animation_always_lerp
         )
@@ -535,6 +537,7 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])
         )
         apply_action(active_obj, action, wm.sssekai_animation_import_use_nla)
+        self.report({"INFO"}, T("Sekai Camera Animation %s Imported") % anim.Name)
         bpy.context.view_layer.objects.active = active_obj
         bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}
