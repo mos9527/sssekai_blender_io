@@ -63,6 +63,14 @@ class SSSekaiAddonEnviornmentStatus:
                     check=True,
                 )
                 self.addon_installed = result.stdout.strip()
+                result = subprocess.run(
+                    ["git", "branch", "--show-current"],
+                    cwd=self.addon_link_path,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                self.addon_installed += f" ({result.stdout.strip()})"
             except Exception:
                 self.addon_installed = None
         else:
@@ -295,7 +303,10 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
                 text=env.addon_installed or "(not installed or invalid source path)"
             )
             row = layout.row()
-            row.separator()
+            row.label(
+                text="After an update, you should restart Blender for changes to take effect.",
+                icon="INFO_LARGE",
+            )
             row = layout.row()
             if env.is_currently_installed:
                 row.label(
