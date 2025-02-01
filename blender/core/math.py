@@ -62,8 +62,22 @@ def swizzle_vector(vec: uVector3):
     return swizzle_vector3(vec.x, vec.y, vec.z)
 
 
+def swizzle_vector_slope(vec: uVector3):
+    return swizzle_vector(vec)
+
+
 def swizzle_euler3(X, Y, Z):
     return blEuler((X, Z, -Y), "YXZ")
+
+
+def swizzle_euler_slope(euler: uVector3, isDegrees=True):
+    """mode -> YXZ on the objects that support it. see euler3_to_quat_swizzled"""
+    if isDegrees:
+        return blVector(
+            (math.radians(euler.x), math.radians(euler.z), -math.radians(euler.y))
+        )
+    else:
+        return swizzle_euler3(euler.x, euler.z, -euler.y)
 
 
 def swizzle_euler(euler: uVector3, isDegrees=True):
@@ -82,6 +96,10 @@ def swizzle_quaternion4(X, Y, Z, W):
 
 def swizzle_quaternion(quat: uQuaternion):
     return swizzle_quaternion4(quat.x, quat.y, quat.z, quat.w)
+
+
+def swizzle_quaternion_slope(quat: uQuaternion):
+    return blVector((quat.w, quat.x, quat.z, -quat.y))
 
 
 # See swizzle_quaternion4. This is the inverse of that since we're reproducing Unity's quaternion

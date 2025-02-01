@@ -18,8 +18,11 @@ from .math import (
     blVector,
     blMatrix,
     swizzle_euler,
+    swizzle_euler_slope,
     swizzle_quaternion,
+    swizzle_quaternion_slope,
     swizzle_vector,
+    swizzle_vector_slope,
     swizzle_vector_scale,
 )
 from .helpers import create_empty, time_to_frame, create_action
@@ -85,13 +88,13 @@ def load_fcurves(
 
     if type(bl_values[0]) == blEuler:
         num_curves = 3
-        swizzle_func = swizzle_func or swizzle_euler
+        swizzle_func = swizzle_func or swizzle_euler_slope
     elif type(bl_values[0]) == blVector:
         num_curves = 3
-        swizzle_func = swizzle_func or swizzle_vector
+        swizzle_func = swizzle_func or swizzle_vector_slope
     elif type(bl_values[0]) == blQuaternion:
         num_curves = 4
-        swizzle_func = swizzle_func or swizzle_quaternion
+        swizzle_func = swizzle_func or swizzle_quaternion_slope
     elif type(bl_values[0]) == float:
         num_curves = 1
         swizzle_func = swizzle_func or (lambda x: x)
@@ -143,12 +146,15 @@ def load_fcurves(
             if i + 1 < len(curve.Data)
             else 0.1  # Arbitrary value
         )
+        # XXX: Somehow stepped keys with IPO set to Constant
+        # can still affect neighboring keys.
+        finite = lambda x: x if x != float("inf") and x != float("-inf") else 0
         p1[::2] = [
             time_to_frame(k.time + delta_t_3(i)) for i, k in enumerate(curve.Data)
         ]
         p1[1::2] = [
             (bl_values[i][index] if num_curves > 1 else bl_values[i])
-            + (k[index] if num_curves > 1 else k) * delta_t_3(i)
+            + finite((k[index] if num_curves > 1 else k) * delta_t_3(i))
             for i, k in enumerate(bl_outSlopes)
         ]
         p2[::2] = [
@@ -156,7 +162,7 @@ def load_fcurves(
         ]
         p2[1::2] = [
             (bl_values[i][index] if num_curves > 1 else bl_values[i])
-            - (k[index] if num_curves > 1 else k) * delta_t_3(i)
+            - finite((k[index] if num_curves > 1 else k) * delta_t_3(i))
             for i, k in enumerate(bl_inSlopes)
         ]
         fcurve[index].keyframe_points.foreach_set("handle_left", p2)
@@ -464,14 +470,6 @@ def load_sekai_camera_animation(
     def swizzle_param_camera(param: blVector):
         return blVector((-param.x, param.y, param.z))
 
-    def swizzle_euler_camera(euler: blEuler):
-        final = swizzle_euler(euler)
-        return final
-
-    def swizzle_vector_camera(vector: blVector):
-        vector = swizzle_vector(vector)
-        return vector
-
     mainCam = data.CurvesT.get(
         crc32(SEKAI_CAMERA_MAIN_NAME), None
     )  # Euler, Position in transform tracks
@@ -485,8 +483,7 @@ def load_sekai_camera_animation(
                 action,
                 "rotation_euler",
                 curve,
-                [swizzle_euler_camera(keyframe.value) for keyframe in curve.Data],
-                swizzle_func=swizzle_euler_camera,
+                [swizzle_euler(keyframe.value) for keyframe in curve.Data],
                 always_lerp=always_lerp,
             )
         if kBindTransformPosition in mainCam:
@@ -495,8 +492,7 @@ def load_sekai_camera_animation(
                 action,
                 "location",
                 curve,
-                [swizzle_vector_camera(keyframe.value) for keyframe in curve.Data],
-                swizzle_func=swizzle_vector_camera,
+                [swizzle_vector(keyframe.value) for keyframe in curve.Data],
                 always_lerp=always_lerp,
             )
     else:
@@ -586,14 +582,13 @@ def load_sekai_directional_light_animation(
     curves = data.CurvesT[0]
     curve = curves.get(kBindTransformEuler, None)
     action = create_action(name)
-    def swizzle_euler_light(euler: blEuler):
-        # XXX: No proof why this works. But it does.
-        return blEuler((math.radians(euler.x), math.radians(euler.z), math.radians(-euler.y)), "YXZ")
+    def swizzle_euler_light(euler: uVector3):
+        euler = swizzle_euler(euler)
+        return euler
     if curve:
         load_fcurves(
             action, 'rotation_euler', curve, 
-            [swizzle_euler_light(keyframe.value) for keyframe in curve.Data],
-            swizzle_func=swizzle_euler_light, always_lerp=always_lerp
+            [swizzle_euler_light(keyframe.value) for keyframe in curve.Data], always_lerp=always_lerp
         )
     directional_light_action = action
 
@@ -609,6 +604,125 @@ def load_sekai_directional_light_animation(
         load_float_fcurve(action, '["Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=2)
     # fmt: on
     return action, directional_light_action
+
+
+def load_sekai_character_ambient_light_animation(
+    name: str,
+    data: Animation,
+    always_lerp: bool = False,
+):
+    """
+    character_ambient_0474_02
+        --- Ambient Color
+        3163355018	ambientColor.r
+        3511751521	ambientColor.g
+        2705057774	ambientColor.b
+        942847572	NOT FOUND
+        --- Ambient Intensity
+        3920803986	intensity
+        --- XXX outline
+        2706170584	outlineColor.r
+        3432056371	outlineColor.g
+        3170628284	outlineColor.b
+        636658438	NOT FOUND
+        2290131282	outlineBlending
+    """
+    # fmt: off
+    action = create_action(name)
+    curves = data.CurvesT[0]
+    curve = curves.get(crc32(SEKAI_LIGHT_INTENSITY), None)
+    if curve:
+        load_float_fcurve(
+            action, '["Character Ambient Intensity"]', curve, always_lerp=always_lerp
+        )
+    curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_R), None)
+    if curve:
+        load_float_fcurve(action, '["Character Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+    curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_G), None)
+    if curve:
+        load_float_fcurve(action, '["Character Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+    curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_B), None)
+    if curve:
+        load_float_fcurve(action, '["Character Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+    # TODO: Outlines
+    # ---
+    # fmt: on
+    return action
+
+
+def load_sekai_character_rim_light_animation(
+    name: str,
+    data: Animation,
+    always_lerp: bool = False,
+) -> Tuple[bpy.types.Action, bpy.types.Action]:
+    """
+    character_rim_0474_01
+        --- rotation_euler
+        4	Euler
+        --- not implemented
+        4028783860	emission
+        1031701497	isUseShadowColor
+        2600596049	lightInfluence
+        2475121225	range
+        --- Rim Color
+        4222072118	rimColor.r
+        2524598749	rimColor.g
+        3859850578	rimColor.b
+        2132407528	NOT FOUND
+        --- Rim Color (Shadowing)
+        2459267540	shadowRimColor.r
+        4282946879	shadowRimColor.g
+        2401395120	shadowRimColor.b
+        371929098	NOT FOUND
+        --- not implemented
+        3526214719	shadowSharpness
+        2163651078	edgeSmoothness
+
+    """
+    # fmt: off
+    curves = data.CurvesT[0]
+    curve = curves.get(kBindTransformEuler, None)
+    action = create_action(name)
+    def swizzle_euler_rimlight(euler: uVector3):
+        euler = swizzle_euler(euler)
+        euler.x *= -1
+        euler.y *= -1
+        euler.z *= -1
+        return euler
+    def swizzle_euler_rimlight_slope(euler: uVector3):
+        euler = swizzle_euler_slope(euler)
+        euler.x *= -1
+        euler.y *= -1
+        euler.z *= -1        
+        return euler
+    if curve:
+        load_fcurves(
+            action, 'rotation_euler', curve, 
+            [swizzle_euler_rimlight(keyframe.value) for keyframe in curve.Data],
+            swizzle_func=swizzle_euler_rimlight_slope,
+            always_lerp=always_lerp
+        )
+    
+    curve = curves.get(crc32(SEKAI_LIGHT_RIM_COLOR_R), None)
+    if curve:
+        load_float_fcurve(action, '["Rim Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+    curve = curves.get(crc32(SEKAI_LIGHT_RIM_COLOR_G), None)
+    if curve:
+        load_float_fcurve(action, '["Rim Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+    curve = curves.get(crc32(SEKAI_LIGHT_RIM_COLOR_B), None)
+    if curve:
+        load_float_fcurve(action, '["Rim Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+    curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_R), None)
+    if curve:
+        load_float_fcurve(action, '["Rim Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+    curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_G), None)
+    if curve:
+        load_float_fcurve(action, '["Rim Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+    curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_B), None)
+    if curve:
+        load_float_fcurve(action, '["Rim Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+    # fmt: on
+    return action
 
 
 # endregion

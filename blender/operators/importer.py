@@ -41,6 +41,8 @@ from ..core.animation import (
     load_sekai_keyshape_animation,
     load_sekai_ambient_light_animation,
     load_sekai_directional_light_animation,
+    load_sekai_character_ambient_light_animation,
+    load_sekai_character_rim_light_animation,
 )
 from ..core.types import Hierarchy
 from ..core.math import blVector, blEuler
@@ -638,7 +640,23 @@ class SSSekaiBlenderImportCharacterLightAnimationOperator(bpy.types.Operator):
         logger.info("Sample Rate: %d FPS" % anim.SampleRate)
         match wm.sssekai_animation_light_type:
             case "CHARACTER_RIM":
-                pass
+                action = load_sekai_character_rim_light_animation(
+                    anim.Name, anim, wm.sssekai_animation_always_lerp
+                )
+                apply_action(
+                    controler,
+                    action,
+                    wm.sssekai_animation_import_use_nla,
+                    wm.sssekai_animation_import_nla_always_new_track,
+                )
             case "CHARACTER_AMBIENT":
-                pass
+                action = load_sekai_character_ambient_light_animation(
+                    anim.Name, anim, wm.sssekai_animation_always_lerp
+                )
+                apply_action(
+                    controler,
+                    action,
+                    wm.sssekai_animation_import_use_nla,
+                    wm.sssekai_animation_import_nla_always_new_track,
+                )
         return {"FINISHED"}
