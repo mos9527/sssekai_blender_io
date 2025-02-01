@@ -6,7 +6,14 @@
 # Pass `nocsv` to disable the CSV output
 # `python inv_crc32.py nocsv`
 # ---
-from sssekai.unity.AnimationClip import read_animation, Animation
+from sssekai.unity.AnimationClip import (
+    read_animation,
+    Animation,
+    kBindTransformEuler,
+    kBindTransformPosition,
+    kBindTransformScale,
+    kBindTransformRotation,
+)
 from sssekai.unity.AssetBundle import load_assetbundle
 from UnityPy.enums import ClassIDType
 from zlib import crc32
@@ -15,7 +22,7 @@ import sys
 
 Col.init()
 logprint = lambda *a, **k: print(*a, **k, file=sys.stderr, sep="")
-pvid = "0474"
+pvid = "0074"
 f = open(
     f"/Volumes/mos9527弄丢的盘/Reverse/proseka_reverse/assets/live_pv/timeline/{pvid}/light",
     "rb",
@@ -54,14 +61,20 @@ kws = [
     # Misc
 ]
 kws = kws + [f"{attr}.{aux}" for attr in kws for aux in aux_kws]
-kws = {crc32(k.encode()): k for k in kws} | {0: "<transform>"}
+kws = {crc32(k.encode()): k for k in kws}
+kws = kws | {
+    kBindTransformEuler: "Euler",
+    kBindTransformPosition: "Position",
+    kBindTransformScale: "Scale",
+    kBindTransformRotation: "Quaternion",
+}
 env = load_assetbundle(f)
 valid_kws, missing_kws = set(), set()
 for anim in filter(lambda obj: obj.type == ClassIDType.AnimationClip, env.objects):
     data = anim.read()
     anim: Animation = read_animation(data)
     logprint(Col.Fore.WHITE, Col.Style.BRIGHT, data.m_Name, Col.Style.RESET_ALL)
-    for attr in anim.FloatTracks.get(0, {}):
+    for attr in anim.CurvesT[0]:
         if attr in kws:
             logprint("\t", Col.Fore.WHITE, attr, "\t", Col.Fore.GREEN, kws[attr])
             valid_kws.add(attr)
