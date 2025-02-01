@@ -517,6 +517,20 @@ def load_sekai_camera_animation(
     return action
 
 
+def swizzle_euler_light(euler: uVector3, flipY=False):
+    euler = swizzle_euler(euler)
+    euler.x *= -1
+    if flipY:
+        euler.y += math.radians(180)
+    return euler
+
+
+def swizzle_euler_light_slope(euler: uVector3):
+    euler = swizzle_euler_slope(euler)
+    euler.x *= -1
+    return euler
+
+
 def load_sekai_ambient_light_animation(
     name: str,
     data: Animation,
@@ -582,13 +596,12 @@ def load_sekai_directional_light_animation(
     curves = data.CurvesT[0]
     curve = curves.get(kBindTransformEuler, None)
     action = create_action(name)
-    def swizzle_euler_light(euler: uVector3):
-        euler = swizzle_euler(euler)
-        return euler
     if curve:
         load_fcurves(
             action, 'rotation_euler', curve, 
-            [swizzle_euler_light(keyframe.value) for keyframe in curve.Data], always_lerp=always_lerp
+            [swizzle_euler_light(keyframe.value) for keyframe in curve.Data], 
+            swizzle_func=swizzle_euler_light_slope,
+            always_lerp=always_lerp
         )
     directional_light_action = action
 
@@ -683,23 +696,11 @@ def load_sekai_character_rim_light_animation(
     curves = data.CurvesT[0]
     curve = curves.get(kBindTransformEuler, None)
     action = create_action(name)
-    def swizzle_euler_rimlight(euler: uVector3):
-        euler = swizzle_euler(euler)
-        euler.x *= -1
-        euler.y *= -1
-        euler.z *= -1
-        return euler
-    def swizzle_euler_rimlight_slope(euler: uVector3):
-        euler = swizzle_euler_slope(euler)
-        euler.x *= -1
-        euler.y *= -1
-        euler.z *= -1        
-        return euler
     if curve:
         load_fcurves(
             action, 'rotation_euler', curve, 
-            [swizzle_euler_rimlight(keyframe.value) for keyframe in curve.Data],
-            swizzle_func=swizzle_euler_rimlight_slope,
+            [swizzle_euler_light(keyframe.value, flipY=True) for keyframe in curve.Data],
+            swizzle_func=swizzle_euler_light_slope,
             always_lerp=always_lerp
         )
     
