@@ -48,6 +48,41 @@ from .utils import crc32
 
 
 @register_class
+class SSSekaiBlenderUpdateCharacterControllerBodyPositionDriverOperator(
+    bpy.types.Operator
+):
+    bl_idname = "sssekai.update_character_controller_body_position_driver_op"
+    bl_label = T("Update Character Controller Driver")
+    bl_description = T(
+        "Update the driver for the Body object of the Character Controller"
+    )
+
+    def execute(self, context):
+        wm = context.window_manager
+        ensure_sssekai_shader_blend()
+        active_obj = context.active_object
+        assert active_obj and KEY_SEKAI_CHARACTER_ROOT in active_obj
+        body = active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ]
+        assert body, "Body not found"
+        body: bpy.types.Object
+        bpy.context.view_layer.objects.active = body
+        bpy.ops.object.mode_set(mode="POSE")
+        bone = body.pose.bones.get("Position", None)
+        bone.driver_remove("scale")
+        for ch in bone.driver_add("scale"):
+            ch.driver.type = "SCRIPTED"
+            var = ch.driver.variables.new()
+            var.name = "height"
+            var.type = "SINGLE_PROP"
+            var.targets[0].id = active_obj
+            var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
+            ch.driver.expression = "height"
+        bpy.context.view_layer.objects.active = active_obj
+        bpy.ops.object.mode_set(mode="OBJECT")
+        return {"FINISHED"}
+
+
+@register_class
 class SSSekaiBlenderCreateCharacterControllerOperator(bpy.types.Operator):
     bl_idname = "sssekai.create_character_controller_op"
     bl_label = T("Create Character Controller")
@@ -70,16 +105,6 @@ class SSSekaiBlenderCreateCharacterControllerOperator(bpy.types.Operator):
         bpy.context.collection.objects.link(rim_controller)
 
         bpy.context.view_layer.objects.active = root
-        # Apply scaling drivers to self
-        scale_driver = root.driver_add("scale")
-        for ch in scale_driver:
-            ch.driver.type = "SCRIPTED"
-            var = ch.driver.variables.new()
-            var.name = "height"
-            var.type = "SINGLE_PROP"
-            var.targets[0].id = root
-            var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
-            ch.driver.expression = "height"
         return {"FINISHED"}
 
 
@@ -182,6 +207,8 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                         KEY_SEKAI_CHARACTER_BODY_OBJ
                     ], "Body already imported"
                     active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ] = armature_obj
+                    bpy.context.view_layer.objects.active = active_obj
+                    bpy.ops.sssekai.update_character_controller_body_position_driver_op()
         # Import Skinned Meshes and Static Meshes
         # - Just like with Unity scene graph, everything is going to have a parent
         # - Once expressed as a Blender Armature, the direct translation of that is a Bone Parent
@@ -427,6 +454,8 @@ class SSSekaiBlenderImportSekaiCharacterMotionOperator(bpy.types.Operator):
         # Restore
         bpy.context.view_layer.objects.active = active_obj
         bpy.ops.object.mode_set(mode="OBJECT")
+        # Drivers get removed post animation import so fix it here too
+        bpy.ops.sssekai.update_character_controller_body_position_driver_op()
         return {"FINISHED"}
 
 
