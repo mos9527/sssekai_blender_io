@@ -242,7 +242,7 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
         if env.git_installed:
             row.label(text=env.git_installed, icon="CHECKMARK")
         else:
-            row.label("Git is NOT available.", icon="ERROR")
+            row.label(text="Git is NOT available.", icon="ERROR")
         row = layout.row()
 
         row.label(text="SSSekai Version")

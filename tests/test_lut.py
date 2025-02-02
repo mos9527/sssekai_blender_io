@@ -2,10 +2,11 @@ from tests import *
 from sssekai.unity.AssetBundle import load_assetbundle
 from UnityPy.enums import ClassIDType
 from UnityPy.export.Texture2DConverter import pillow
+from PIL import Image
 
 
 def test_lut():
-    PATH = sample_file_path("lut", "camera_0181")
+    PATH = sample_file_path("lut", "camera_0409")
     with open(PATH, "rb") as f:
         env = load_assetbundle(f)
     monos = [
