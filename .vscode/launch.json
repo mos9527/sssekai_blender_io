@@ -52,7 +52,7 @@
             "type": "debugpy",
             "request": "launch",
             "justMyCode": false,
-            "program": "${workspaceFolder}/test.lut.py",
+            "module": "tests.test_lut",
         }
     ]
 }
