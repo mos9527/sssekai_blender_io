@@ -46,6 +46,13 @@
             "request": "launch",
             "program": "${workspaceFolder}/scripts/inv_crc32.py",
             "args": ["nocsv"]
+        },
+        {
+            "name": "Python Debugger: LUT tests",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/test.lut.py",
         }
     ]
 }
