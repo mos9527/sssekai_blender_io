@@ -24,7 +24,7 @@ def create_capsule_rigidbody_springbone(name: str, radius: float, length: float)
     obj.rigid_body.type = "ACTIVE"
     obj.rigid_body.kinematic = False
     obj.display_type = "BOUNDS"
-
+    obj.hide_render = obj.hide_viewport = True
     bpy.ops.rigidbody.object_add()
     return obj
 
@@ -38,6 +38,7 @@ def create_sphere_rigidbody(name: str, radius: float):
     obj.rigid_body.type = "ACTIVE"
     obj.rigid_body.kinematic = False
     obj.display_type = "BOUNDS"
+    obj.hide_render = obj.hide_viewport = True
     return obj
 
 
@@ -117,17 +118,20 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
     bl_idname = "sssekai.hierarchy_add_sekai_rigid_bodies"
     bl_label = T("Apply Rigid Bodies")
     bl_description = T(
-        "Secondary animations! NOTE: This feature is very experimental and does not guarantee visual correctness. To use, select the armature in the View Layer *AND* the addon's Asset Selector and run this operator."
+        """Secondary animations! NOTE: This feature is very experimental and does not guarantee visual correctness. 
+        To use, select the armature in the View Layer *AND* the addon's Asset Selector and run this operator
+        *BEFORE* you'd apply Attach/Animation/Modifers to it as this operator REQUIRES the armature to be in Bind Pose"""
     )
 
     def execute(self, context):
         wm = context.window_manager
         active_obj = context.active_object
         assert KEY_HIERARCHY_PATHID in active_obj, "Active object is not a Hierachy"
-        path_id = active_obj[KEY_HIERARCHY_PATHID]
         container = wm.sssekai_selected_hierarchy_container
         # fmt: off
-        hierarchy = sssekai_global.cotainers[container].hierarchies.get(int(path_id), None)
+        selected = wm.sssekai_selected_hierarchy
+        selected: bpy.types.EnumProperty
+        hierarchy = sssekai_global.cotainers[container].hierarchies[int(selected)]
         assert hierarchy, "Hierarchy Data not found. Please ensure you've selected the container the hierarchy is in"
         armature = active_obj.data
         def find_by_script(game_object: GameObject, name: str):

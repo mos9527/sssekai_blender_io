@@ -6,7 +6,7 @@ from PIL import Image
 
 
 def test_lut():
-    PATH = sample_file_path("lut", "camera_0409")
+    PATH = sample_file_path("lut", "camera_0181")
     with open(PATH, "rb") as f:
         env = load_assetbundle(f)
     monos = [
