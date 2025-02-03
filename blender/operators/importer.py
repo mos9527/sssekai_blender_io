@@ -270,6 +270,13 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         # But since there's no guarantee that the PathID would always match across versions therefore we'd pattern-match
         # the name and the properties to determine the correct importer
         def import_material_sekai_character(material: Material):
+            controller = next(
+                filter(
+                    lambda o: o.name.startswith("SekaiCharaRimLight"),
+                    active_obj.children_recursive,
+                ),
+                None,
+            )
             envs = dict(material.m_SavedProperties.m_TexEnvs)
             floats = dict(material.m_SavedProperties.m_Floats)
             name = material.m_Name
@@ -285,20 +292,15 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     material,
                     texture_cache,
                     armature_obj=armature_obj,
+                    rim_light_controller=controller,
                     head_bone_target="Head",
                 )
-            rimlight = next(
-                filter(
-                    lambda o: o.name.startswith("SekaiCharaRimLight"),
-                    active_obj.children_recursive,
-                ),
-                None,
-            )
+
             assert (
-                rimlight
+                controller
             ), "Rim Light controller not found on the active object's hierachy before Import!"
             return import_sekai_character_material(
-                name, material, texture_cache, rimlight
+                name, material, texture_cache, controller
             )
 
         def import_material_sekai_stage(material: Material):
@@ -306,21 +308,21 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
             floats = dict(material.m_SavedProperties.m_Floats)
             name = material.m_Name
             if "_LightMapTex" in envs:
-                if floats.get("_DstBlend", 0) == 10:  # StageLightMapReflection
+                if "Reflection_" in name:
                     return import_sekai_stage_lightmap_material(
                         name, material, texture_cache, has_reflection=True
                     )
-                else:  # StageLightMap
+                else:
                     return import_sekai_stage_lightmap_material(
                         name, material, texture_cache, has_reflection=False
                     )
+            elif "_Color_Add" in name:
+                return import_sekai_stage_color_add_material(
+                    name, material, texture_cache
+                )
             else:
-                if floats.get("_DstBlend", 0) == 10:  # ColorMapAdd
-                    return import_sekai_stage_color_add_material(
-                        name, material, texture_cache
-                    )
-            # XXX: Some other permutations still exist
-            return import_sekai_stage_lightmap_material(name, material, texture_cache)
+                # XXX: Some other permutations still exist
+                return import_fallback_material(name, material, texture_cache)
 
         def import_material_fallback(material: Material):
             name = material.m_Name

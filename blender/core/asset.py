@@ -606,6 +606,7 @@ def import_sekai_character_face_sdf_material(
     texture_cache=None,
     armature_obj=None,
     head_bone_target=None,
+    rim_light_controller=None,
     **kwargs,
 ):
     """Imports Material assets for V2 Face SDF into blender.
@@ -665,6 +666,17 @@ def import_sekai_character_face_sdf_material(
     else:
         logger.warning(
             "Face SDF material imported without bone target. Face shadows will NOT work"
+        )
+    if rim_light_controller:
+        rimController = material.node_tree.nodes.new("ShaderNodeGroup")
+        rimController.node_tree = bpy.data.node_groups["SekaiShaderRimDriver"].copy()
+        auto_setup_shader_node_driver(rimController.node_tree, rim_light_controller)
+        auto_connect_shader_nodes_by_name(
+            material.node_tree, rimController, sekaiShader
+        )
+    else:
+        logger.warning(
+            "Trying to import character material without Rim Light Controller. This is probably not what you want."
         )
     return material
 
