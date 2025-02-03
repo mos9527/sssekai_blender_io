@@ -150,6 +150,11 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                 bpy.context.scene.frame_current = int(
                     tick_min * bpy.context.scene.render.fps
                 )
+                if bpy.context.scene.rigidbody_world:
+                    bpy.context.scene.rigidbody_world.point_cache.frame_end = max(
+                        bpy.context.scene.rigidbody_world.point_cache.frame_end,
+                        bpy.context.scene.frame_end,
+                    )
             except Exception as e:
                 logger.error("Failed to set frame range: %s" % e)
         bpy.context.view_layer.objects.active = active_object

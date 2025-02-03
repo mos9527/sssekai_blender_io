@@ -424,6 +424,11 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         bpy.context.scene.frame_end = max(
             bpy.context.scene.frame_end, int(action.curve_frame_range[1])
         )
+        if bpy.context.scene.rigidbody_world:
+            bpy.context.scene.rigidbody_world.point_cache.frame_end = max(
+                bpy.context.scene.rigidbody_world.point_cache.frame_end,
+                bpy.context.scene.frame_end,
+            )
         apply_action(
             active_obj,
             action,
