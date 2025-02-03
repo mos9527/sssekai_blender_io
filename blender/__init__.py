@@ -134,13 +134,11 @@ class SSSekaiGlobalEnvironment:
     rla_sekai_streaming_live_bundle_path: str = None
     rla_header: dict = field(default_factory=dict)
     rla_clip_data: dict = field(default_factory=dict)
-    rla_selected_raw_clip: str = None
     rla_raw_clips: dict = field(default_factory=dict)
-    rla_animations: dict = field(default_factory=dict)  # character ID -> Animation
+    rla_selected_raw_clip: str = None
     rla_clip_tick_range: tuple = (0, 0)
     rla_clip_charas: set = field(default_factory=set)
     rla_enum_entries: list = None
-    rla_enum_bookmarks: list = field(default_factory=list)
 
     def rla_get_version(self):
         return (

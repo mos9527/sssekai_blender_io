@@ -40,7 +40,7 @@ from ..operators.utils import (
     SSSekaiBlenderUtilCharaNeckMergeOperator,
 )
 
-from ..operators.sekairigidbody import (
+from ..operators.sekai_rigidbody import (
     SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator,
 )
 

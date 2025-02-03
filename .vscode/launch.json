@@ -60,6 +60,20 @@
             "request": "launch",
             "justMyCode": false,
             "module": "tests.test_rigidbody",
-        }
+        },
+        {
+            "name": "Python Debugger: AnimationClip plot",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/scripts/plot_animationClip.py",
+        },
+        {
+            "name": "Python Debugger: DOF tests",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "module": "tests.test_dof",
+        },
     ]
 }

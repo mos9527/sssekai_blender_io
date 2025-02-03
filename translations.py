@@ -217,12 +217,12 @@ translations_tuple = [
     ),
     (
         ("Operator", "Import Armature Animation"),
-        (("bpy.types.SSSEKAI_OT_rla_import_armature_animation_op",), ""),
+        (("bpy.types.SSSEKAI_OT_rla_import_segment_op",), ""),
         ("zh_HANS", "导入骨骼动画", (False, ())),
     ),
     (
         ("*", "Import Armature Animation for the selected character"),
-        (("bpy.types.SSSEKAI_OT_rla_import_armature_animation_op",), ""),
+        (("bpy.types.SSSEKAI_OT_rla_import_segment_op",), ""),
         ("zh_HANS", "为选中的角色导入骨骼动画", (False, ())),
     ),
     (
