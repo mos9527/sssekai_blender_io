@@ -21,6 +21,12 @@ Currently supported languages and maintainers:
   **PLEASE NOTE:**
   The updater is still a W.I.P and has bugs! Please report them in the [issues](https://github.com/mos9527/sssekai_blender_io/issues) tab if you encounter one.
   
+  Use the **portable** version of Blender to avoid any issues with the updater. You can download it [here](https://www.blender.org/download/).
+
+  Remeber to *restart Blender* after updating the addon through the Bootstrapper to see the changes.
+
+  **To Windows 11 Users:** If you'd specify the addon source directory - which in turns creates a symlink - you'll have to enable Developer Mode in Windows 11 otherwise it's **not going to work**.
+
 - Make sure you have [Git](https://git-scm.com/downloads) installed on your system.
 - Download the addon [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py)
 - Install the Bootstrapper in Blender by going to `Edit > Preferences > Add-ons > Install...` and selecting the Bootstrapper, which is a `.py` file.
