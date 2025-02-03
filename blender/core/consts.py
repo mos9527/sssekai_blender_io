@@ -119,6 +119,10 @@ UNITY_MECANIM_RESERVED_TOS = {
 }
 # endregion
 # region Sekai Specific
+DEFAULT_SPRINGBONE_RADIUS_SCALE = 0.8
+DEFAULT_SPRINGBONE_SIZE = 0.01
+DEFAULT_SPRINGBONE_PIVOT_SIZE = 0.01
+DEFAULT_SPRINGBONE_CONSTRAINT_OBJ_SIZE = 0.1
 KEY_SEKAI_CAMERA_RIG = "sssekai_sekai_camera_rig"
 KEY_SEKAI_CAMERA_RIG_SENSOR_HEIGHT = "sssekai_sekai_camera_rig_sensor_height"
 KEY_SEKAI_CHARACTER_ROOT = "sssekai_sekai_character_root_stub"

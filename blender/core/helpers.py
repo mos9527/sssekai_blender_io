@@ -6,6 +6,20 @@ from .consts import DEFAULT_BONE_SIZE
 from .. import logger
 
 
+def set_obj_bone_parent(
+    obj: bpy.types.Object,
+    bone_name: str,
+    parent: bpy.types.Object,
+):
+    obj.parent = parent
+    obj.parent_type = "BONE"
+    obj.parent_bone = bone_name
+    # Bone parenting by default snaps to tail
+    # Offset this manually
+    obj.parent.track_axis = "POS_Y"
+    obj.location.y = -DEFAULT_BONE_SIZE
+
+
 def ensure_sssekai_shader_blend():
     SHADER_BLEND_FILE = get_addon_relative_path("assets", "SekaiShaderStandalone.blend")
     if not "SSSekaiWasHere" in bpy.data.materials:
@@ -26,9 +40,9 @@ def ensure_sssekai_shader_blend():
 rgba_to_rgb_tuple = lambda col: (col.r, col.g, col.b, col.a)
 
 
-def create_empty(name: str, parent=None):
+def create_empty(name: str, parent=None, size=0.1):
     joint = bpy.data.objects.new(name, None)
-    joint.empty_display_size = 0.1
+    joint.empty_display_size = size
     joint.empty_display_type = "ARROWS"
     joint.parent = parent
     bpy.context.collection.objects.link(joint)
@@ -156,8 +170,9 @@ def apply_action(
         else:
             nla_track = nla_tracks[-1]  # Use the last track if available
         nla_track.name = action.name
-        frame_begin = bpy.context.scene.frame_current
+        frame_begin = max(0, action.frame_range[0])
         strip = nla_track.strips.new(action.name, int(frame_begin), action)
+        strip.action_frame_start = max(0, frame_begin)
 
 
 def editbone_children_recursive(root: bpy.types.EditBone):

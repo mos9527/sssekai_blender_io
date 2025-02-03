@@ -40,6 +40,10 @@ from ..operators.utils import (
     SSSekaiBlenderUtilCharaNeckMergeOperator,
 )
 
+from ..operators.sekairigidbody import (
+    SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator,
+)
+
 EMPTY_OPT = ("<no assest selected!>", "Not Available", "", "ERROR", 0)
 EMPTY_CONTAINER = "<default>"
 ALL_CONTAINER = "<all>"
@@ -578,6 +582,12 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             text=T("Project SEKAI Character Options"),
                             icon="OUTLINER_OB_ARMATURE",
                         )
+                        if active_obj and KEY_HIERARCHY_PATHID in active_obj:
+                            row = layout.row()
+                            row.operator(
+                                SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator.bl_idname,
+                                icon="CONSTRAINT_BONE",
+                            )
                         if not (active_obj and KEY_SEKAI_CHARACTER_ROOT in active_obj):
                             row = layout.row()
                             row.label(

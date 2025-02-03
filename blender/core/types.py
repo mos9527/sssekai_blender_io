@@ -54,7 +54,7 @@ class HierarchyNode:
 
     def children_recursive(
         self, root=None
-    ) -> Generator[Tuple[object, object, int], None, None]:
+    ) -> Generator[Tuple["HierarchyNode", "HierarchyNode", int], None, None]:
         """Yields a tuple of (parent, child, depth) for each bone in the hierarchy.
 
         The tree is traversed in depth-first order and from top to bottom.

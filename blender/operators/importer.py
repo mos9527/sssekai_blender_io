@@ -22,6 +22,7 @@ from ..core.helpers import (
     apply_action,
     editbone_children_recursive,
     armature_editbone_children_recursive,
+    set_obj_bone_parent,
 )
 
 from ..core.asset import (
@@ -235,13 +236,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 mesh_data, mesh_obj = import_mesh_data(
                     game_object.m_Name, mesh, bone_names
                 )
-                mesh_obj.parent = armature_obj
-                mesh_obj.parent_type = "BONE"
-                mesh_obj.parent_bone = node.name
-                # Bone parenting by default snaps to tail
-                # Offset this manually
-                mesh_obj.parent.track_axis = "POS_Y"
-                mesh_obj.location.y = -DEFAULT_BONE_SIZE
+                set_obj_bone_parent(mesh_obj, node.name, armature_obj)
                 # Add an armature modifier
                 mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
                 imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
@@ -255,9 +250,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     continue
                 mesh = mesh_filter.m_Mesh.read()
                 mesh_data, mesh_obj = import_mesh_data(game_object.m_Name, mesh)
-                mesh_obj.parent = armature_obj
-                mesh_obj.parent_type = "BONE"
-                mesh_obj.parent_bone = node.name
+                set_obj_bone_parent(mesh_obj, node.name, armature_obj)
                 imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
 
         # Import Materials

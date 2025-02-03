@@ -53,6 +53,13 @@
             "request": "launch",
             "justMyCode": false,
             "module": "tests.test_lut",
+        },
+        {
+            "name": "Python Debugger: RigidBody tests",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "module": "tests.test_rigidbody",
         }
     ]
 }
