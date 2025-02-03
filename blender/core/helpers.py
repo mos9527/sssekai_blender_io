@@ -156,9 +156,8 @@ def apply_action(
         else:
             nla_track = nla_tracks[-1]  # Use the last track if available
         nla_track.name = action.name
-        frame_begin = max(0, action.frame_range[0])
+        frame_begin = bpy.context.scene.frame_current
         strip = nla_track.strips.new(action.name, int(frame_begin), action)
-        strip.action_frame_start = max(0, frame_begin)
 
 
 def editbone_children_recursive(root: bpy.types.EditBone):
