@@ -159,6 +159,7 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                 logger.error("Failed to set frame range: %s" % e)
         bpy.context.view_layer.objects.active = active_object
         bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.ops.sssekai.update_character_controller_body_position_driver_op()
         return {"FINISHED"}
 
 

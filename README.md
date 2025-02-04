@@ -60,13 +60,19 @@ The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
   - ~~Ambient Light (`SekaiAmbientLight`, `SekaiCharacterAmbientLight`)~~
   - ...
 #### Effects
-- Post processing
+- Post processing (PostEffectV2)
+  - LUT. https://github.com/mos9527/blender-image-lut
+  - Bloom from Rim lights
+  - Depth of Field
+  - Vignette
+  - Solarization
+  - Saturation
   - See also https://mos9527.com/posts/pjsk/shading-reverse-part-1/
 - Sub-cameras (off-screen cameras)
 - Blob shadows
 - Particles
 #### Animation
-- Light animation
+- ~~Light animation~~
 - Effect animation
 - Approximate Unity's IK system
   - Since [My Sekai](https://pjsekai.sega.jp/news/archive/index.html?hash=ecca5cb23ea530edb669fc0d2ae302fd0f374a4b) is a thing now and the chibi models are rigged with Unity's IK system.  
