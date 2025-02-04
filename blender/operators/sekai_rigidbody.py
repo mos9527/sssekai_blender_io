@@ -118,7 +118,7 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
         """Secondary animations! NOTE: This feature is very experimental and does not guarantee visual correctness. 
         To use, select the armature in the View Layer *AND* the addon's Asset Selector and run this operator
         *BEFORE* you'd apply Attach/Animation/Modifers to it as this operator REQUIRES the armature to be in Bind Pose
-        If uncertain, Merge the armatures and then run this operator"""
+        TL;DR Merge the armatures and then run this operator before anything else."""
     )
 
     def execute(self, context):

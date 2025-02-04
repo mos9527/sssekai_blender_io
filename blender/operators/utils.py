@@ -230,6 +230,17 @@ class SSSekaiBlenderUtilCharaNeckMergeOperator(bpy.types.Operator):
             if child.type == "MESH" and len(child.modifiers) == 0:
                 child.modifiers.new("Armature", "ARMATURE").object = body
         active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ] = body
+        # In Edit Mode clean up dupe bones and reparent to the main armature
+        bpy.ops.object.mode_set(mode="EDIT")
+        to_remove = set()
+        for bone in body.data.edit_bones:
+            if bone.parent:
+                if bone.parent.name.endswith(".001"):
+                    to_remove.add(bone.parent.name)
+                    bone.parent = body.data.edit_bones[bone.parent.name[:-4]]
+        for bone in to_remove:
+            body.data.edit_bones.remove(body.data.edit_bones[bone])
+        bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}
 
 
@@ -265,4 +276,5 @@ class SSSekaiBlenderUtilCharaNeckAttachOperator(bpy.types.Operator):
 
         add_constraint("Neck")
         add_constraint("Head")
+        add_constraint("Position")
         return {"FINISHED"}
