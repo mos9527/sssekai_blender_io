@@ -24,8 +24,6 @@ def create_capsule_rigidbody_springbone(name: str, radius: float, length: float)
     obj.rigid_body.type = "ACTIVE"
     obj.rigid_body.kinematic = False
     obj.display_type = "BOUNDS"
-    obj.hide_render = obj.hide_viewport = True
-    bpy.ops.rigidbody.object_add()
     return obj
 
 
@@ -38,7 +36,6 @@ def create_sphere_rigidbody(name: str, radius: float):
     obj.rigid_body.type = "ACTIVE"
     obj.rigid_body.kinematic = False
     obj.display_type = "BOUNDS"
-    obj.hide_render = obj.hide_viewport = True
     return obj
 
 
@@ -120,7 +117,8 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
     bl_description = T(
         """Secondary animations! NOTE: This feature is very experimental and does not guarantee visual correctness. 
         To use, select the armature in the View Layer *AND* the addon's Asset Selector and run this operator
-        *BEFORE* you'd apply Attach/Animation/Modifers to it as this operator REQUIRES the armature to be in Bind Pose"""
+        *BEFORE* you'd apply Attach/Animation/Modifers to it as this operator REQUIRES the armature to be in Bind Pose
+        If uncertain, Merge the armatures and then run this operator"""
     )
 
     def execute(self, context):
@@ -299,5 +297,11 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
             pbone = active_obj.pose.bones.get(spring)
             ct = pbone.constraints.new("COPY_TRANSFORMS")
             ct.target = spring_rb
+        bpy.context.view_layer.update()                    
+        # Hide the rigidbodies
+        for pivot_rb in pivotRbs.values():
+            pivot_rb.hide_render = pivot_rb.hide_viewport = True
+        for spring_rb in springBoneRbsFlatten.values():
+            spring_rb.hide_render = spring_rb.hide_viewport = True
         # fmt: on
         return {"FINISHED"}
