@@ -544,7 +544,10 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
         bpy.context.scene.render.fps = int(anim.SampleRate)
         logger.info("Sample Rate: %d FPS" % anim.SampleRate)
         action = load_sekai_camera_animation(
-            anim.Name, anim, wm.sssekai_animation_always_lerp
+            anim.Name,
+            anim,
+            wm.sssekai_animation_always_lerp,
+            wm.sssekai_camera_import_is_sub_camera,
         )
         # Set frame range
         bpy.context.scene.frame_end = max(

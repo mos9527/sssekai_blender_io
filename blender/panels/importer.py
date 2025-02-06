@@ -369,6 +369,11 @@ register_wm_props(
             ),
         ],
     ),
+    sssekai_camera_import_is_sub_camera=BoolProperty(
+        name=T("Sub Camera"),
+        description=T("Import the camera as a sub camera"),
+        default=False,
+    ),
 )
 
 
@@ -477,6 +482,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             row = layout.row()
                     case "SEKAI_CAMERA":
                         if active_obj and KEY_SEKAI_CAMERA_RIG in active_obj:
+                            row.prop(wm, "sssekai_camera_import_is_sub_camera")
+                            row = layout.row()
                             row.operator(
                                 SSSekaiBlenderImportSekaiCameraAnimationOperator.bl_idname
                             )

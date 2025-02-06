@@ -452,6 +452,7 @@ def load_sekai_camera_animation(
     name: str,
     data: Animation,
     always_lerp: bool = False,
+    is_sub_camera: bool = False,
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to the camera rig
 
@@ -470,12 +471,22 @@ def load_sekai_camera_animation(
     def swizzle_param_camera(param: blVector):
         return blVector((-param.x, param.y, param.z))
 
-    mainCam = data.CurvesT.get(
-        crc32(SEKAI_CAMERA_MAIN_NAME), None
-    )  # Euler, Position in transform tracks
-    camParam = data.CurvesT.get(
-        crc32(SEKAI_CAMERA_PARAM_NAME), None
-    )  # Position, Scale(??) in transform tracks, FOV in the last float track
+    if is_sub_camera:
+        mainCam = data.CurvesT.get(
+            crc32(SEKAI_CAMERA_SUB_NAME), None
+        )  # Euler, Position in transform tracks
+        camParam = data.CurvesT.get(
+            crc32(SEKAI_CAMERA_SUB_PARAM_NAME), None
+        )  # Position, Scale(??) in transform tracks, FOV in the last float track
+        target = data.CurvesT.get(crc32(SEKAI_CAMERA_SUB_TARGET_NAME), None)
+        # XXX: Need sample.
+    else:
+        mainCam = data.CurvesT.get(
+            crc32(SEKAI_CAMERA_MAIN_NAME), None
+        )  # Euler, Position in transform tracks
+        camParam = data.CurvesT.get(
+            crc32(SEKAI_CAMERA_PARAM_NAME), None
+        )  # Position, Scale(??) in transform tracks, FOV in the last float track
     if mainCam:
         if kBindTransformEuler in mainCam:
             curve = mainCam[kBindTransformEuler]
