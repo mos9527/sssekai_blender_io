@@ -349,9 +349,22 @@ def load_armature_animation(
 
     def to_pose_euler(name: str, euler: blEuler):
         etrans, erot = local_space_TR[name]
+        erot: blQuaternion
         erot_inv = erot.conjugated()
         result = erot_inv @ euler.to_quaternion()
         result = result.to_euler("XYZ")
+        # XXX: Guess what...animators would wrap around the euler values
+        # and do animations in ranges like 0~69420 so it 'effectively' spins a lot
+        # Transforming euler w/ matrices - then converting to euler again would normalize it
+        # to -180~180 range.
+        # assume \theta = 2k\pi + \phi. we'd just add 2k\pi to the euler value
+        TWOPI = 2 * math.pi
+        k1 = euler.x // TWOPI
+        k2 = euler.y // TWOPI
+        k3 = euler.z // TWOPI
+        result.x += k1 * TWOPI
+        result.y += k2 * TWOPI
+        result.z += k3 * TWOPI
         return result
 
     # Reset the pose
