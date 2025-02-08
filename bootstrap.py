@@ -278,7 +278,7 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
 
             row.label(
                 text="Your Blender environment is ready for the addon installation!",
-                icon="INFO_LARGE",
+                icon="INFO",
             )
             row = layout.row()
             row.prop(self, "source_path")
@@ -297,7 +297,7 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
                 text="Otherwise, the source will be installed directly into the addons folder."
             )
             row = layout.row()
-            row.label(text="Current installed version:", icon="INFO_LARGE")
+            row.label(text="Current installed version:", icon="INFO")
             row = layout.row()
             row.label(
                 text=env.addon_installed or "(not installed or invalid source path)"
@@ -305,13 +305,13 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
             row = layout.row()
             row.label(
                 text="After an update, you should restart Blender for changes to take effect.",
-                icon="INFO_LARGE",
+                icon="INFO",
             )
             row = layout.row()
             if env.is_currently_installed:
                 row.label(
                     text="You can UPDATE the addon by clicking the button below.",
-                    icon="INFO_LARGE",
+                    icon="INFO",
                 )
                 row = layout.row()
                 if env.is_current_installation_symlinked:
@@ -336,7 +336,7 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
             else:
                 row.label(
                     text="You can INSTALL the addon by clicking the button below.",
-                    icon="INFO_LARGE",
+                    icon="INFO",
                 )
                 row = layout.row()
                 if env.addon_link_path == env.install_path:
