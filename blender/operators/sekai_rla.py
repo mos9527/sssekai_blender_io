@@ -204,7 +204,7 @@ NOTE: NLA tracks will be used regardless of the option specified!"""
         wm = context.window_manager
         rla_range = wm.sssekai_rla_import_range
         entries = list(sssekai_global.rla_raw_clips)
-        entries = entries[rla_range[0] : rla_range[1]]
+        entries = entries[rla_range[0] : rla_range[1] + 1]
         wm.sssekai_animation_import_use_nla = True
         for entry in entries:
             sssekai_global.rla_selected_raw_clip = entry
