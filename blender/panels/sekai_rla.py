@@ -124,7 +124,7 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         )
         row = layout.row()
         selected = list(sssekai_global.rla_raw_clips or [])[
-            wm.sssekai_rla_import_range[0] : wm.sssekai_rla_import_range[1]
+            wm.sssekai_rla_import_range[0] : wm.sssekai_rla_import_range[1] + 1
         ]
         row.label(text=T("Selected Clip: %s") % ",".join(selected))
         row = layout.row()
