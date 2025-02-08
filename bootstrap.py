@@ -145,7 +145,7 @@ class SSSekaiUpdateSSSekaiOperator(bpy.types.Operator):
             )
             env.refresh()
         except subprocess.CalledProcessError as e:
-            self.report({"ERROR"}, e.stderr)
+            self.report({"ERROR"}, "Process reported: %s" % e.stderr)
         return {"FINISHED"}
 
 

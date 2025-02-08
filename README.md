@@ -18,15 +18,27 @@ Currently supported languages and maintainers:
 - 简体中文 (zh_HANS, mos9527)
 
 ## Installing & Updating
-  **PLEASE NOTE:**
-  The updater is still a W.I.P and has bugs! Please report them in the [issues](https://github.com/mos9527/sssekai_blender_io/issues) tab if you encounter one.
-  
-  Use the **portable** version of Blender to avoid any issues with the updater. You can download it [here](https://www.blender.org/download/).
+**PLEASE NOTE:**
+The updater is still a W.I.P and has bugs! Please report them in the [issues](https://github.com/mos9527/sssekai_blender_io/issues) tab if you encounter one.
 
-  Remeber to *restart Blender* after updating the addon through the Bootstrapper to see the changes.
+Use the **portable** version of Blender to avoid any issues with the updater. You can download it [here](https://www.blender.org/download/).
 
-  **To Windows 11 Users:** If you'd specify the addon source directory - which in turns creates a symlink - you'll have to enable Developer Mode in Windows 11 otherwise it's **not going to work**.
+Remeber to *restart Blender* after updating the addon through the Bootstrapper to see the changes.
 
+### Attention
+**To Windows 11 Users** 
+- If you'd specify the addon source directory - which in turns creates a symlink - you'll have to enable Developer Mode in Windows 11 otherwise it's **not going to work**.
+
+**To ones who have installed Blender to Program Files**
+- This would be the case if you'd install Blender through the offical MSI installer, or in some cases when Blender is installed through Steam - whilst using the default Steam Library location <sigh>
+- Using a non-portable Blender installation makes the updater unable to modify addon files.
+- Either:
+  1. Download and use the portable version of Blender instead <as-you-should>
+  2. Or run Blender as Administrator when using the Bootstrapper.
+    - You don't have to run Blender as Administrator when using the addon normally, only when updating the addon through the Bootstrapper.
+  3. Setup file permissions for the Blender installation directory to allow the updater to modify files.
+    - This is not recommended as it can be a security risk.
+### Procedure
 - Make sure you have [Git](https://git-scm.com/downloads) installed on your system.
 - Download the addon [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py)
 - Install the Bootstrapper in Blender by going to `Edit > Preferences > Add-ons > Install...` and selecting the Bootstrapper, which is a `.py` file.
