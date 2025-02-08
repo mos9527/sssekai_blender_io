@@ -19,11 +19,14 @@ from .math import (
     blMatrix,
     swizzle_euler,
     swizzle_euler_slope,
+    swizzle_euler_ipo,
     swizzle_quaternion,
     swizzle_quaternion_slope,
+    swizzle_quaternion_ipo,
     swizzle_vector,
     swizzle_vector_slope,
     swizzle_vector_scale,
+    swizzle_vector_ipo,
 )
 from .helpers import create_empty, time_to_frame, create_action
 from .utils import crc32
@@ -57,6 +60,7 @@ def load_fcurves(
     curve: Curve,
     bl_values: List[float | blEuler | blVector | blQuaternion],
     swizzle_func: callable = None,
+    swizzle_ipo_func: callable = None,
     always_lerp: bool = False,
     override_data_index: int = 0,
 ):
@@ -68,6 +72,7 @@ def load_fcurves(
         curve (Curve): curve data. used to access slope values
         bl_values (List[float | blEuler | blVector | blQuaternion]): values in Blender types
         swizzle_func (callable, optional): swizzle function applied on the slope values. Read the note below
+        swizzle_ipo_func (callable, optional): swizzle function applied on the interpolation order with multiple values (e.g. XYZ). Defaults to None.
         always_lerp (bool, optional): always use linear interpolation. Defaults to False.
         override_data_index (int, optional): override the data index. only used when value type is float. Defaults to 0.
 
@@ -89,15 +94,19 @@ def load_fcurves(
     if type(bl_values[0]) == blEuler:
         num_curves = 3
         swizzle_func = swizzle_func or swizzle_euler_slope
+        swizzle_ipo_func = swizzle_ipo_func or swizzle_euler_ipo
     elif type(bl_values[0]) == blVector:
         num_curves = 3
         swizzle_func = swizzle_func or swizzle_vector_slope
+        swizzle_ipo_func = swizzle_ipo_func or swizzle_vector_ipo
     elif type(bl_values[0]) == blQuaternion:
         num_curves = 4
         swizzle_func = swizzle_func or swizzle_quaternion_slope
+        swizzle_ipo_func = swizzle_ipo_func or swizzle_quaternion_ipo
     elif type(bl_values[0]) == float:
         num_curves = 1
         swizzle_func = swizzle_func or (lambda x: x)
+        swizzle_ipo_func = swizzle_ipo_func or (lambda x: x)
     else:
         raise NotImplementedError("Unsupported value type")
     bl_inSlopes = [swizzle_func(k.inSlope) for k in curve.Data]
@@ -122,7 +131,9 @@ def load_fcurves(
             "interpolation",
             [
                 interpolation_to_blender(
-                    keyframe.interpolation_segment(keyframe, keyframe.next)[index]
+                    swizzle_ipo_func(
+                        keyframe.interpolation_segment(keyframe, keyframe.next)
+                    )[index]
                     if not always_lerp
                     else Interpolation.Linear
                 )

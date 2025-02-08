@@ -12,6 +12,7 @@ from UnityPy.classes.math import (
     Matrix4x4f as uMatrix4x4,
 )
 
+from typing import List
 
 # Coordinate System | Forward |  Up  |  Left
 # Unity:   LH, Y Up |   Z     |   Y  |  -X
@@ -66,6 +67,10 @@ def swizzle_vector_slope(vec: uVector3):
     return swizzle_vector(vec)
 
 
+def swizzle_vector_ipo(ipo: List[int]):
+    return [ipo[0], ipo[2], ipo[1]]
+
+
 def swizzle_euler3(X, Y, Z):
     return blEuler((X, Z, -Y), "YXZ")
 
@@ -90,6 +95,10 @@ def swizzle_euler(euler: uVector3, isDegrees=True):
         return swizzle_euler3(euler.x, euler.y, euler.z)
 
 
+def swizzle_euler_ipo(ipo: List[int]):
+    return [ipo[0], ipo[2], ipo[1]]
+
+
 def swizzle_quaternion4(X, Y, Z, W):
     return blQuaternion((W, X, Z, -Y))  # conjugate (W,-X,-Z,Y)
 
@@ -100,6 +109,10 @@ def swizzle_quaternion(quat: uQuaternion):
 
 def swizzle_quaternion_slope(quat: uQuaternion):
     return blVector((quat.w, quat.x, quat.z, -quat.y))
+
+
+def swizzle_quaternion_ipo(ipo: List[int]):
+    return [ipo[3], ipo[0], ipo[2], ipo[1]]
 
 
 # See swizzle_quaternion4. This is the inverse of that since we're reproducing Unity's quaternion
