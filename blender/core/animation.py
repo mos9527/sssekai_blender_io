@@ -59,7 +59,7 @@ def load_fcurves(
     data_path: str,
     curve: Curve,
     bl_values: List[float | blEuler | blVector | blQuaternion],
-    swizzle_func: callable = None,
+    swizzle_slope_func: callable = None,
     swizzle_ipo_func: callable = None,
     always_lerp: bool = False,
     override_data_index: int = 0,
@@ -71,12 +71,12 @@ def load_fcurves(
         data_path (str): data path
         curve (Curve): curve data. used to access slope values
         bl_values (List[float | blEuler | blVector | blQuaternion]): values in Blender types
-        swizzle_func (callable, optional): swizzle function applied on the slope values. Read the note below
+        swizzle_slope_func (callable, optional): swizzle function applied on the slope values. Read the note below
         swizzle_ipo_func (callable, optional): swizzle function applied on the interpolation order with multiple values (e.g. XYZ). Defaults to None.
         always_lerp (bool, optional): always use linear interpolation. Defaults to False.
         override_data_index (int, optional): override the data index. only used when value type is float. Defaults to 0.
 
-    Notes on swizzle_func:
+    Notes on swizzle_slope_func, swizzle_ipo_func:
         Swizzling `g(x) = kx` would be STRICTLY linear and `f(x), f'(x)` are known, this implies that:
         `F(x) = g(f(x))`->`F'(x) = g'(f(x)) * f'(x) = k * f'(x) = g(f'(x))`
 
@@ -93,25 +93,28 @@ def load_fcurves(
 
     if type(bl_values[0]) == blEuler:
         num_curves = 3
-        swizzle_func = swizzle_func or swizzle_euler_slope
+        swizzle_slope_func = swizzle_slope_func or swizzle_euler_slope
         swizzle_ipo_func = swizzle_ipo_func or swizzle_euler_ipo
     elif type(bl_values[0]) == blVector:
         num_curves = 3
-        swizzle_func = swizzle_func or swizzle_vector_slope
+        swizzle_slope_func = swizzle_slope_func or swizzle_vector_slope
         swizzle_ipo_func = swizzle_ipo_func or swizzle_vector_ipo
     elif type(bl_values[0]) == blQuaternion:
         num_curves = 4
-        swizzle_func = swizzle_func or swizzle_quaternion_slope
+        swizzle_slope_func = swizzle_slope_func or swizzle_quaternion_slope
         swizzle_ipo_func = swizzle_ipo_func or swizzle_quaternion_ipo
     elif type(bl_values[0]) == float:
         num_curves = 1
-        swizzle_func = swizzle_func or (lambda x: x)
+        swizzle_slope_func = swizzle_slope_func or (lambda x: x)
         swizzle_ipo_func = swizzle_ipo_func or (lambda x: x)
     else:
         raise NotImplementedError("Unsupported value type")
-    bl_inSlopes = [swizzle_func(k.inSlope) for k in curve.Data]
-    bl_outSlopes = [swizzle_func(k.outSlope) for k in curve.Data]
-    frames = [time_to_frame(keyframe.time) for keyframe in curve.Data]
+    bl_inSlopes = [swizzle_slope_func(k.inSlope) for k in curve.Data]
+    bl_outSlopes = [swizzle_slope_func(k.outSlope) for k in curve.Data]
+    finite = lambda x: (
+        x if math.isfinite(x) and abs(x) < 1e18 else 0
+    )  # XXX: Arbitrary value
+    frames = [finite(time_to_frame(keyframe.time)) for keyframe in curve.Data]
     if num_curves > 1:
         fcurve = [
             action.fcurves.new(data_path=data_path, index=i) for i in range(num_curves)
@@ -121,7 +124,9 @@ def load_fcurves(
     for index in range(num_curves):
         curve_data = [0] * (len(frames) * 2)
         curve_data[::2] = frames
-        curve_data[1::2] = [v[index] if num_curves > 1 else v for v in bl_values]
+        curve_data[1::2] = [
+            finite(v[index] if num_curves > 1 else v) for v in bl_values
+        ]
 
         fcurve[index].keyframe_points.clear()
         fcurve[index].keyframe_points.add(len(frames))
@@ -159,21 +164,26 @@ def load_fcurves(
         )
         # XXX: Somehow stepped keys with IPO set to Constant
         # can still affect neighboring keys.
-        finite = lambda x: x if x != float("inf") and x != float("-inf") else 0
         p1[::2] = [
-            time_to_frame(k.time + delta_t_3(i)) for i, k in enumerate(curve.Data)
+            finite(time_to_frame(k.time + delta_t_3(i)))
+            for i, k in enumerate(curve.Data)
         ]
         p1[1::2] = [
-            (bl_values[i][index] if num_curves > 1 else bl_values[i])
-            + finite((k[index] if num_curves > 1 else k) * delta_t_3(i))
+            finite(
+                (bl_values[i][index] if num_curves > 1 else bl_values[i])
+                + finite((k[index] if num_curves > 1 else k) * delta_t_3(i))
+            )
             for i, k in enumerate(bl_outSlopes)
         ]
         p2[::2] = [
-            time_to_frame(k.time - delta_t_3(i)) for i, k in enumerate(curve.Data)
+            finite(time_to_frame(k.time - delta_t_3(i)))
+            for i, k in enumerate(curve.Data)
         ]
         p2[1::2] = [
-            (bl_values[i][index] if num_curves > 1 else bl_values[i])
-            - finite((k[index] if num_curves > 1 else k) * delta_t_3(i))
+            finite(
+                (bl_values[i][index] if num_curves > 1 else bl_values[i])
+                - finite((k[index] if num_curves > 1 else k) * delta_t_3(i))
+            )
             for i, k in enumerate(bl_inSlopes)
         ]
         fcurve[index].keyframe_points.foreach_set("handle_left", p2)
@@ -412,7 +422,7 @@ def load_armature_animation(
             'pose.bones["%s"].scale' % bone,
             curve,
             values,
-            swizzle_func=swizzle_vector_scale,
+            swizzle_slope_func=swizzle_vector_scale,
             always_lerp=always_lerp,
         )
     return action
@@ -453,7 +463,7 @@ def load_sekai_keyshape_animation(
             'key_blocks["%s"].value' % bsName,
             curve,
             [keyframe.value / 100.0 for keyframe in curve.Data],
-            swizzle_func=lambda x: x / 100.0,
+            swizzle_slope_func=lambda x: x / 100.0,
             always_lerp=always_lerp,
         )
     return action
@@ -529,7 +539,7 @@ def load_sekai_camera_animation(
                 "scale",
                 curve,
                 [swizzle_param_camera(keyframe.value) for keyframe in curve.Data],
-                swizzle_func=swizzle_param_camera,
+                swizzle_slope_func=swizzle_param_camera,
                 always_lerp=always_lerp,
             )
     else:
@@ -622,7 +632,7 @@ def load_sekai_directional_light_animation(
         load_fcurves(
             action, 'rotation_euler', curve, 
             [swizzle_euler_light(keyframe.value) for keyframe in curve.Data], 
-            swizzle_func=swizzle_euler_light_slope,
+            swizzle_slope_func=swizzle_euler_light_slope,
             always_lerp=always_lerp
         )
     directional_light_action = action
@@ -722,7 +732,7 @@ def load_sekai_character_rim_light_animation(
         load_fcurves(
             action, 'rotation_euler', curve, 
             [swizzle_euler_light(keyframe.value, flipY=True) for keyframe in curve.Data],
-            swizzle_func=swizzle_euler_light_slope,
+            swizzle_slope_func=swizzle_euler_light_slope,
             always_lerp=always_lerp
         )
     
