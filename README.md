@@ -49,6 +49,9 @@ Remeber to *restart Blender* after updating the addon through the Bootstrapper t
 
 The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
 
+### Known Issues
+- Doesn't handle scenes with multiple objects of the same name.
+
 ### Roadmap
 #### Asset
 - ~~Handle Skinned Mesh with non-Identity Bind Pose~~

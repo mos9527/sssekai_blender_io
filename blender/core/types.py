@@ -83,9 +83,20 @@ class Hierarchy:
 
     # Graph relations
     root: HierarchyNode = None
+    # PathID:Node
     nodes: Dict[int, HierarchyNode] = field(default_factory=dict)
+    # PathID:PathID
     parents: Dict[int, int] = field(default_factory=dict)
 
     @property
     def path_id(self):
         return self.root.path_id
+
+    @staticmethod
+    def from_node(node: HierarchyNode):
+        """Create the hierarchy from a single node, with it as the new root"""
+        hierarchy = Hierarchy(node.name, node)
+        for parent, child, _ in node.children_recursive():
+            hierarchy.nodes[child.path_id] = child
+            hierarchy.parents[child.path_id] = parent.path_id
+        return hierarchy
