@@ -374,6 +374,14 @@ register_wm_props(
         description=T("Import the camera as a sub camera"),
         default=False,
     ),
+    sssekai_generic_material_import_slot=IntProperty(
+        name=T("Material Slot"),
+        description=T(
+            "Material index to use as the diffuse map. NOTE: All texture maps will be imported regardless which one is picked"
+        ),
+        default=0,
+        min=0,
+    ),
 )
 
 
@@ -669,6 +677,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                         row.label(text=T("Generic Options"), icon="ARMATURE_DATA")
                         row = layout.row()
                         row.prop(wm, "sssekai_hierarchy_import_bindpose")
+                        row = layout.row()
+                        row.prop(wm, "sssekai_generic_material_import_slot")
                         row = layout.row()
                         row.operator(
                             SSSekaiBlenderImportHierarchyOperator.bl_idname,

@@ -440,14 +440,17 @@ def make_material_texture_node(
     return texNode
 
 
-def import_fallback_material(name: str, data: Material, texture_cache=None, **kwargs):
+def import_fallback_material(
+    name: str, data: Material, texture_cache=None, nth_slot: int = 0, **kwargs
+):
     """Imports Material assets into blender.
-    This is a generic material importer that only imports the main texture,
-    as the input to a Principled BSDF shader's Base Color (Diffuse) and an Alpha input
+    This is a generic material importer that only imports all texture maps
+    with the nth_slot as the input to a Principled BSDF shader's Base Color (Diffuse) and an Alpha input
 
     Args:
         name (str): material name
         data (Material): UnityPy Material
+        nth_slot (int, optional): Texture slot to import. Defaults to 0.
 
     Returns:
         bpy.types.Material: Created material
@@ -456,18 +459,27 @@ def import_fallback_material(name: str, data: Material, texture_cache=None, **kw
     material = bpy.data.materials["SekaiDefaultFallbackMaterial"].copy()
     material.name = name
     sekaiShader = material.node_tree.nodes["SekaiDefaultFallbackShader"]
-    if "_MainTex" in textures:
-        mainTex = make_material_texture_node(
-            material, textures["_MainTex"], texture_cache
+    first_tex = None
+
+    def link_tex(tex: bpy.types.Node):
+        material.node_tree.links.new(
+            tex.outputs["Color"],
+            sekaiShader.inputs["Color"],
         )
-        if mainTex:
-            material.node_tree.links.new(
-                mainTex.outputs["Color"],
-                sekaiShader.inputs["Color"],
-            )
-            material.node_tree.links.new(
-                mainTex.outputs["Alpha"], sekaiShader.inputs["Alpha"]
-            )
+        material.node_tree.links.new(tex.outputs["Alpha"], sekaiShader.inputs["Alpha"])
+
+    for i, (env_name, env) in enumerate(textures.items()):
+        tex = make_material_texture_node(material, env, texture_cache)
+        first_tex = first_tex or tex
+        if tex and i == nth_slot:
+            link_tex(tex)
+            nth_slot = -1
+    if nth_slot >= 0 and first_tex:
+        logger.warning(
+            "Texture slot %d not found in material %s. Using first available texture."
+            % (nth_slot, name)
+        )
+        link_tex(first_tex)
     return material
 
 

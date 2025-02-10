@@ -330,7 +330,9 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
 
         def import_material_fallback(material: Material):
             name = material.m_Name
-            return import_fallback_material(name, material, texture_cache)
+            return import_fallback_material(
+                name, material, texture_cache, wm.sssekai_generic_material_import_slot
+            )
 
         for obj, materials, mesh in imported_objects:
             for ppmat in materials:
