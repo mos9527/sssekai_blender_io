@@ -22,7 +22,7 @@ import sys
 
 Col.init()
 logprint = lambda *a, **k: print(*a, **k, file=sys.stderr, sep="")
-pvid = "0133"
+pvid = "0001"
 f = open(
     f"/Volumes/mos9527弄丢的盘/Reverse/proseka_reverse/assets/live_pv/timeline/{pvid}/camera",
     "rb",
