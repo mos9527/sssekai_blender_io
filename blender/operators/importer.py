@@ -171,6 +171,20 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         var_scale.targets[0].transform_type = "SCALE_Z"
 
         driver.driver.expression = "sensor_height / (2 * tan(radians(fov * 100) / 2))"
+
+        # Driver for Focal Distance
+        camera.data.dof.use_dof = True
+        driver = camera.data.driver_add("dof.focus_distance")
+        driver.driver.type = "SCRIPTED"
+
+        var_distance = driver.driver.variables.new()
+        var_distance.name = "distance"
+        var_distance.type = "SINGLE_PROP"
+        var_distance.targets[0].id = rig
+        var_distance.targets[0].data_path = "delta_scale.x"
+
+        driver.driver.expression = "distance"
+
         bpy.context.view_layer.objects.active = rig
         return {"FINISHED"}
 

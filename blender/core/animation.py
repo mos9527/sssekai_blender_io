@@ -508,7 +508,7 @@ def load_sekai_camera_animation(
     action = create_action(name)
 
     def swizzle_param_camera(param: blVector):
-        return blVector((-param.x, param.y, param.z))
+        return blVector((abs(param.x), param.y, param.z))
 
     if is_sub_camera:
         mainCam = data.CurvesT.get(
@@ -525,7 +525,7 @@ def load_sekai_camera_animation(
         )  # Euler, Position in transform tracks
         camParam = data.CurvesT.get(
             crc32(SEKAI_CAMERA_PARAM_NAME), None
-        )  # Position, Scale(??) in transform tracks, FOV in the last float track
+        )  # Position, Scale in transform tracks
     if mainCam:
         if kBindTransformEuler in mainCam:
             curve = mainCam[kBindTransformEuler]
@@ -555,6 +555,16 @@ def load_sekai_camera_animation(
             load_fcurves(
                 action,
                 "scale",
+                curve,
+                [swizzle_param_camera(keyframe.value) for keyframe in curve.Data],
+                swizzle_slope_func=swizzle_param_camera,
+                always_lerp=always_lerp,
+            )
+        if kBindTransformScale in camParam:
+            curve = camParam[kBindTransformScale]
+            load_fcurves(
+                action,
+                "delta_scale",
                 curve,
                 [swizzle_param_camera(keyframe.value) for keyframe in curve.Data],
                 swizzle_slope_func=swizzle_param_camera,
