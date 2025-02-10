@@ -151,6 +151,10 @@ def import_hierarchy_as_armature(
                     for p, bp in root_bindposes[root_bone].items():
                         # Matrix eq. is done within epsilon
                         if not p in bindposes or bindposes[p] != bp:
+                            logger.warning(
+                                "Difference found at %s, M1=%s, M2=%s"
+                                % (p, bp, bindposes.get(p, None))
+                            )
                             dirty = True
                             break
                     if dirty:

@@ -241,7 +241,7 @@ def apply_pose_matrix(
             )
             M_local = M_parent.inverted() @ M_edit
             M_final_parent = (
-                pose_matrix.get(pbone.parent.name)
+                pose_matrix.get(pbone.parent.name, blMatrix.Identity(4))
                 if pbone.parent
                 else blMatrix.Identity(4)
             )
