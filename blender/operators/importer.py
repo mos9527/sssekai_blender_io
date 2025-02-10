@@ -225,34 +225,45 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
             game_object = node.game_object
             if game_object.m_SkinnedMeshRenderer:
                 # bool ModelImporter::ImportSkinnedMesh
-                renderer = game_object.m_SkinnedMeshRenderer.read()
-                renderer: SkinnedMeshRenderer
-                if not renderer.m_Mesh:
-                    continue
-                mesh = renderer.m_Mesh.read()
-                bone_names = [
-                    hierarchy.nodes[pptr.m_PathID].name for pptr in renderer.m_Bones
-                ]
-                mesh_data, mesh_obj = import_mesh_data(
-                    game_object.m_Name, mesh, bone_names
-                )
-                set_obj_bone_parent(mesh_obj, node.name, armature_obj)
-                # Add an armature modifier
-                mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
-                imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
+                try:
+                    renderer = game_object.m_SkinnedMeshRenderer.read()
+                    renderer: SkinnedMeshRenderer
+                    if not renderer.m_Mesh:
+                        continue
+                    mesh = renderer.m_Mesh.read()
+                    bone_names = [
+                        hierarchy.nodes[pptr.m_PathID].name for pptr in renderer.m_Bones
+                    ]
+                    mesh_data, mesh_obj = import_mesh_data(
+                        game_object.m_Name, mesh, bone_names
+                    )
+                    set_obj_bone_parent(mesh_obj, node.name, armature_obj)
+                    # Add an armature modifier
+                    mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
+                    imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
+                except Exception as e:
+                    logger.error(
+                        "Failed to import Skinned Mesh %s: %s. Skipping."
+                        % (node.name, str(e))
+                    )
 
             if game_object.m_MeshFilter:
-                renderer = game_object.m_MeshRenderer.read()
-                renderer: MeshRenderer
-                mesh_filter = game_object.m_MeshFilter.read()
-                mesh_filter: MeshFilter
-                if not mesh_filter.m_Mesh:
-                    continue
-                mesh = mesh_filter.m_Mesh.read()
-                mesh_data, mesh_obj = import_mesh_data(game_object.m_Name, mesh)
-                set_obj_bone_parent(mesh_obj, node.name, armature_obj)
-                imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
-
+                try:
+                    renderer = game_object.m_MeshRenderer.read()
+                    renderer: MeshRenderer
+                    mesh_filter = game_object.m_MeshFilter.read()
+                    mesh_filter: MeshFilter
+                    if not mesh_filter.m_Mesh:
+                        continue
+                    mesh = mesh_filter.m_Mesh.read()
+                    mesh_data, mesh_obj = import_mesh_data(game_object.m_Name, mesh)
+                    set_obj_bone_parent(mesh_obj, node.name, armature_obj)
+                    imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
+                except Exception as e:
+                    logger.error(
+                        "Failed to import Static Mesh %s: %s. Skipping."
+                        % (node.name, str(e))
+                    )
         # Import Materials
         # - This is done in a seperate procedure since there'd be some permuations depending on
         # the user's preference (i.e. sssekai_hierarchy_import_mode)
@@ -324,20 +335,26 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         for obj, materials, mesh in imported_objects:
             for ppmat in materials:
                 if ppmat:
-                    material: Material = ppmat.read()
-                    if material.object_reader.path_id in material_cache:
-                        imported = material_cache[material.object_reader.path_id]
+                    try:
+                        material: Material = ppmat.read()
+                        if material.object_reader.path_id in material_cache:
+                            imported = material_cache[material.object_reader.path_id]
+                            obj.data.materials.append(imported)
+                            continue
+                        match wm.sssekai_hierarchy_import_mode:
+                            case "SEKAI_CHARACTER":
+                                imported = import_material_sekai_character(material)
+                            case "SEKAI_STAGE":
+                                imported = import_material_sekai_stage(material)
+                            case "GENERIC":
+                                imported = import_material_fallback(material)
                         obj.data.materials.append(imported)
-                        continue
-                    match wm.sssekai_hierarchy_import_mode:
-                        case "SEKAI_CHARACTER":
-                            imported = import_material_sekai_character(material)
-                        case "SEKAI_STAGE":
-                            imported = import_material_sekai_stage(material)
-                        case "GENERIC":
-                            imported = import_material_fallback(material)
-                    obj.data.materials.append(imported)
-                    material_cache[material.object_reader.path_id] = imported
+                        material_cache[material.object_reader.path_id] = imported
+                    except Exception as e:
+                        logger.error(
+                            "Failed to import Material %s: %s. Skipping."
+                            % (material.m_Name, str(e))
+                        )
             # Set material indices afterwards
             bpy.context.view_layer.objects.active = obj
             bpy.ops.object.mode_set(mode="OBJECT")
