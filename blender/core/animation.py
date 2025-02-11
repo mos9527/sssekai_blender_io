@@ -157,37 +157,44 @@ def load_fcurves(
         # H'(0) = 3(P1 - P0) = m0 \therefore P1 = P0 + m0/3
         # H'(1) = 3(P3 - P2) = m1 \therefore P2 = P3 - m1/3
         # This is also where the rule of 1/3rd comes from
-        delta_t_3 = lambda i: (
-            (curve.Data[i + 1].time - curve.Data[i].time) / 3
-            if i + 1 < len(curve.Data)
-            else 0.1  # Arbitrary value
+        delta_t_3_prev = lambda key: (
+            abs(key.time - key.prev.time) / 3 if key.prev else 0.1
+        )
+        delta_t_3_next = lambda key: (
+            abs(key.time - key.next.time) / 3 if key.next else 0.1
         )
         # XXX: Somehow stepped keys with IPO set to Constant
         # can still affect neighboring keys.
+        # Right handles - next key
         p1[::2] = [
-            finite(time_to_frame(k.time + delta_t_3(i)))
+            finite(time_to_frame(k.time + delta_t_3_next(curve.Data[i])))
             for i, k in enumerate(curve.Data)
         ]
         p1[1::2] = [
             finite(
                 (bl_values[i][index] if num_curves > 1 else bl_values[i])
-                + finite((k[index] if num_curves > 1 else k) * delta_t_3(i))
+                + finite(
+                    (k[index] if num_curves > 1 else k) * delta_t_3_next(curve.Data[i])
+                )
             )
             for i, k in enumerate(bl_outSlopes)
         ]
+        # Left handles - previous key
         p2[::2] = [
-            finite(time_to_frame(k.time - delta_t_3(i)))
+            finite(time_to_frame(k.time - delta_t_3_prev(curve.Data[i])))
             for i, k in enumerate(curve.Data)
         ]
         p2[1::2] = [
             finite(
                 (bl_values[i][index] if num_curves > 1 else bl_values[i])
-                - finite((k[index] if num_curves > 1 else k) * delta_t_3(i))
+                - finite(
+                    (k[index] if num_curves > 1 else k) * delta_t_3_prev(curve.Data[i])
+                )
             )
             for i, k in enumerate(bl_inSlopes)
         ]
-        fcurve[index].keyframe_points.foreach_set("handle_left", p2)
         fcurve[index].keyframe_points.foreach_set("handle_right", p1)
+        fcurve[index].keyframe_points.foreach_set("handle_left", p2)
         fcurve[index].update()
 
 
