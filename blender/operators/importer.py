@@ -228,12 +228,12 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     assert not active_obj[
                         KEY_SEKAI_CHARACTER_FACE_OBJ
                     ], "Face already imported"
-                    active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ] = scene[0]
+                    active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ] = scene[0][0]
                 case "BODY":
                     assert not active_obj[
                         KEY_SEKAI_CHARACTER_BODY_OBJ
                     ], "Body already imported"
-                    active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ] = scene[0]
+                    active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ] = scene[0][0]
                     bpy.context.view_layer.objects.active = active_obj
                     bpy.ops.sssekai.update_character_controller_body_position_driver_op()
         # Import Skinned Meshes and Static Meshes
