@@ -88,13 +88,12 @@ def build_scene_hierarchy(env: Environment) -> List[Hierarchy]:
     return hierarchies
 
 
-def import_hierarchy_as_armature(
+def import_scene_hierarchy(
     hierarchy: Hierarchy,
-    name: str = None,
     use_bindpose: bool = False,
     seperate_armatures: bool = True,
-):
-    """Imports Hierarchy data into Blender as an Armature object
+) -> List[Tuple[bpy.types.Object, Dict[int, str]]]:
+    """Imports Scene Hierarchy data into Blender as an Armature object
 
     Args:
         arma (Armature): Armature as genereated by previous steps
@@ -117,26 +116,22 @@ def import_hierarchy_as_armature(
             or may not make this adjustment irrelavant.
 
     Returns:
-        Tuple[bpy.types.Armature, bpy.types.Object]: Created armature and its parent object
+        List[Tuple[bpy.types.Object (Armature Object), Dict[int, str] (Nodes belonging to the Armature's bones)]]
     """
-    results = (
-        list()
-    )  # List[Tuple[bpy.types.Object -> Armature Object, Dict[int, str] -> Nodes belonging to the Armature's bones]]
-    # No scaling is ever applied here since otherwise scaling becomes
-    # erroneouslly commutative which is *never* the case in any DCC software you'd use
-    hierarchy.root.update_global_transforms(scale=False)
+    results = list()
 
     def bindpose_of(sm: SkinnedMeshRenderer):
         mesh = sm.m_Mesh.read()
-        bindpose = {
-            p.m_PathID: swizzle_matrix(mesh.m_BindPose[i])
-            for i, p in enumerate(sm.m_Bones)
-        }
+        bindpose = {p.m_PathID: mesh.m_BindPose[i] for i, p in enumerate(sm.m_Bones)}
         return bindpose
 
     def build_armature(
         root_bone: HierarchyNode, bindpose: Dict[int, uMatrix4x4] = None, visited=set()
     ) -> bpy.types.Object:
+        # No scaling is ever applied here since otherwise scaling becomes
+        # erroneouslly commutative which is *never* the case in any DCC software you'd use
+        root_bone.update_global_transforms(scale=False)
+
         # Make an Armature with the hierarchy
         armature = bpy.data.armatures.new(root_bone.name)
         armature.display_type = "OCTAHEDRAL"
@@ -151,28 +146,28 @@ def import_hierarchy_as_armature(
         pose_scales = dict()
         bone_names = dict()
         for parent, child, _ in root_bone.children_recursive(visited=visited):
-            parent: HierarchyNode
-            child: HierarchyNode
-            if child.name != root_bone.name:
-                ebone = armature.edit_bones.new(child.name)
-                ebone[KEY_HIERARCHY_BONE_PATHID] = str(child.path_id)
-                ebone[KEY_HIERARCHY_BONE_NAME] = str(child.name)
-                ebone.use_local_location = True
-                ebone.use_relative_parent = False
-                ebone.use_connect = False
-                ebone.use_deform = True
+            ebone = armature.edit_bones.new(child.name)
+            ebone[KEY_HIERARCHY_BONE_PATHID] = str(child.path_id)
+            ebone[KEY_HIERARCHY_BONE_NAME] = str(child.name)
+            ebone.use_local_location = True
+            ebone.use_relative_parent = False
+            ebone.use_connect = False
+            ebone.use_deform = True
+            # Cache the pose matrix for later
+            # ebone name may not be unique in the hierarchy and importing it will
+            # automatically add .001, .002, etc. suffixes to the bone name
+            pose_scales[ebone.name] = child.scale
+            bone_names[child.path_id] = ebone.name
+            # Use bindposes for the subtree of the root bone
+            # and apply the actual pose in Pose Bones later
+            if bindpose:
+                # Needs correction
+                pose_matrix[ebone.name] = child.global_transform
                 M_edit = child.global_transform
-                # Cache the pose matrix for later
-                # ebone name may not be unique in the hierarchy and importing it will
-                # automatically add .001, .002, etc. suffixes to the bone name
-                pose_matrix[ebone.name] = M_edit
-                pose_scales[ebone.name] = child.scale
-                bone_names[child.path_id] = ebone.name
-                # Use bindposes for the subtree of the root bone
-                # and apply the actual pose in Pose Bones later
-                if bindpose:
-                    # Needs correction
-                    M_bind = bindpose[child.path_id]
+                M_bind = bindpose.get(child.path_id, None)
+                if not M_bind:
+                    logger.debug("No bindpose found for %s" % child.name)
+                else:
                     M_bind = swizzle_matrix(M_bind)
                     # In armature space it's basically the inverse of the bindpose
                     # Identity = M_bind * M_pose
@@ -181,21 +176,20 @@ def import_hierarchy_as_armature(
                     M_parent = root_bone.global_transform
                     # XXX: Assume no scaling in M_pose
                     M_edit = M_parent @ M_pose
-                # Treat the joints as extremely small bones
-                # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198
-                # TODO: Alternative shapes for bones
-                # TODO: Better bone size heuristic
-                ebone.head = M_edit @ blVector((0, 0, 0))
-                ebone.tail = M_edit @ blVector((0, 1, 0))
-                ebone.length = DEFAULT_BONE_SIZE
-                ebone.align_roll(M_edit @ blVector((0, 0, 1)) - ebone.head)
-                ebone.parent = (
-                    ebones[parent.name]
-                    if parent and parent.name != root_bone.name
-                    else None
-                )
-                ebones[child.name] = ebone
-
+            else:
+                M_edit = child.global_transform
+            # Treat the joints as extremely small bones
+            # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198
+            # TODO: Alternative shapes for bones
+            # TODO: Better bone size heuristic
+            ebone.head = M_edit @ blVector((0, 0, 0))
+            ebone.tail = M_edit @ blVector((0, 1, 0))
+            ebone.length = DEFAULT_BONE_SIZE
+            ebone.align_roll(M_edit @ blVector((0, 0, 1)) - ebone.head)
+            if parent:
+                ebone.parent = ebones[parent.name]
+            ebones[child.name] = ebone
+        bpy.ops.object.mode_set(mode="OBJECT")
         obj[KEY_HIERARCHY_BONE_PATHID] = str(root_bone.path_id)
         obj[KEY_HIERARCHY_BONE_NAME] = str(root_bone.name)
         # Pose space adjustment
@@ -203,8 +197,9 @@ def import_hierarchy_as_armature(
         if pose_matrix:
             # https://docs.blender.org/api/current/info_gotcha.html#stale-data
             bpy.context.view_layer.update()
-            apply_pose_matrix(obj, pose_matrix, edit_mode=False)
+            apply_pose_matrix(obj, pose_matrix, edit_mode=False, clear_pose=False)
         # Scale adjustment
+        bpy.context.view_layer.update()
         bpy.ops.object.mode_set(mode="POSE")
         for bone, scale in pose_scales.items():
             pbone = obj.pose.bones.get(bone, None)
@@ -215,7 +210,10 @@ def import_hierarchy_as_armature(
     for path_id, node in hierarchy.nodes.items():
         if node.game_object and node.game_object.m_SkinnedMeshRenderer:
             sm: SkinnedMeshRenderer = node.game_object.m_SkinnedMeshRenderer.read()
-            sm_roots.append((sm.m_RootBone.path_id, sm))
+            root = sm.m_RootBone.path_id
+            # 1 level up
+            root = hierarchy.parents[root] if root in hierarchy.parents else root
+            sm_roots.append((root, sm))
     sm_roots.sort(key=lambda x: x[0])
 
     if seperate_armatures:
@@ -258,6 +256,8 @@ def import_hierarchy_as_armature(
         else:
             obj, bone_names = build_armature(hierarchy.root)
         results.append((obj, bone_names))
+
+    return results
 
 
 def import_mesh_data(

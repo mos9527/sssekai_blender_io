@@ -233,6 +233,13 @@ register_wm_props(
         ),
         default=False,
     ),
+    sssekai_hierarchy_import_seperate_armatures=BoolProperty(
+        name=T("Seperate Armatures"),
+        description=T(
+            "Import Skinned Meshes into different armatures. MUST be used IF your armature comes with duped bones"
+        ),
+        default=False,
+    ),
     sssekai_hierarchy_import_mode=EnumProperty(
         name=T("Hierarchy Import Mode"),
         description=T("Method to import the selected hierarchy"),
@@ -676,7 +683,12 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     case "GENERIC":
                         row.label(text=T("Generic Options"), icon="ARMATURE_DATA")
                         row = layout.row()
-                        row.prop(wm, "sssekai_hierarchy_import_bindpose")
+                        row.prop(wm, "sssekai_hierarchy_import_bindpose", expand=True)
+                        row.prop(
+                            wm,
+                            "sssekai_hierarchy_import_seperate_armatures",
+                            expand=True,
+                        )
                         row = layout.row()
                         row.prop(wm, "sssekai_generic_material_import_slot")
                         row = layout.row()
