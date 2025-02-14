@@ -4,6 +4,7 @@ DEFAULT_BONE_SIZE = 0.01
 # Plugin custom attribute keys
 KEY_HIERARCHY_PATHID = "sssekai_hierarchy_pathid"
 KEY_HIERARCHY_BONE_PATHID = "sssekai_bone_hierarchy_pathid"
+KEY_HIERARCHY_BONE_NAME = "sssekai_bone_hierarchy_bonename"
 # Hashes of names prefixed `blendShape.`
 KEY_SHAPEKEY_HASH_TABEL = "sssekai_shapekey_name_hash_tbl"
 

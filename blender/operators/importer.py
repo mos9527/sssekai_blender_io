@@ -143,6 +143,7 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         camera.rotation_mode = "YXZ"
         camera.scale = blVector((1, 1, 1))
         camera.data.sensor_fit = "VERTICAL"
+        camera.data.dof.aperture_fstop = 6.5
 
         height = camera.data.driver_add("sensor_height")
         height.driver.type = "SCRIPTED"
