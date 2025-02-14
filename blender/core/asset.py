@@ -160,9 +160,9 @@ def import_scene_hierarchy(
             bone_names[child.path_id] = ebone.name
             # Use bindposes for the subtree of the root bone
             # and apply the actual pose in Pose Bones later
+            pose_matrix[ebone.name] = child.global_transform
             if bindpose:
                 # Needs correction
-                pose_matrix[ebone.name] = child.global_transform
                 M_edit = child.global_transform
                 M_bind = bindpose.get(child.path_id, None)
                 if not M_bind:
@@ -187,8 +187,8 @@ def import_scene_hierarchy(
             ebone.length = DEFAULT_BONE_SIZE
             ebone.align_roll(M_edit @ blVector((0, 0, 1)) - ebone.head)
             if parent:
-                ebone.parent = ebones[parent.name]
-            ebones[child.name] = ebone
+                ebone.parent = ebones[parent.path_id]
+            ebones[child.path_id] = ebone
         bpy.ops.object.mode_set(mode="OBJECT")
         obj[KEY_HIERARCHY_BONE_PATHID] = str(root_bone.path_id)
         obj[KEY_HIERARCHY_BONE_NAME] = str(root_bone.name)

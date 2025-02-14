@@ -263,7 +263,8 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     root_bone = sm.m_RootBone.path_id
                     armature_obj, _mapping = scene_path_map[root_bone]
                     # Already in parent space
-                    mesh_obj.parent = armature_obj
+                    armature_bone = armature_obj.data.bones[0].name
+                    set_obj_bone_parent(mesh_obj, armature_bone, armature_obj)
                     # Add an armature modifier
                     mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
                     imported_objects.append((mesh_obj, sm.m_Materials, mesh))
