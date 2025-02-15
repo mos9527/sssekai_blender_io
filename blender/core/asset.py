@@ -147,6 +147,8 @@ def import_scene_hierarchy(
         bone_names = dict()
         for parent, child, _ in root_bone.children_recursive(visited=visited):
             ebone = armature.edit_bones.new(child.name)
+            if not parent:
+                ebone[KEY_HIERARCHY_BONE_ROOT] = True
             ebone[KEY_HIERARCHY_BONE_PATHID] = str(child.path_id)
             ebone[KEY_HIERARCHY_BONE_NAME] = str(child.name)
             ebone.use_local_location = True
@@ -187,7 +189,11 @@ def import_scene_hierarchy(
             ebone.length = DEFAULT_BONE_SIZE
             ebone.align_roll(M_edit @ blVector((0, 0, 1)) - ebone.head)
             if parent:
-                ebone.parent = ebones[parent.path_id]
+                ebone.parent = ebones.get(parent.path_id, None)
+                if not ebone.parent:
+                    logger.warning(
+                        "Parent bone %s not found for %s" % (parent.name, child.name)
+                    )
             ebones[child.path_id] = ebone
         bpy.ops.object.mode_set(mode="OBJECT")
         obj[KEY_HIERARCHY_BONE_PATHID] = str(root_bone.path_id)
@@ -211,8 +217,6 @@ def import_scene_hierarchy(
         if node.game_object and node.game_object.m_SkinnedMeshRenderer:
             sm: SkinnedMeshRenderer = node.game_object.m_SkinnedMeshRenderer.read()
             root = sm.m_RootBone.path_id
-            # 1 level up
-            root = hierarchy.parents[root] if root in hierarchy.parents else root
             sm_roots.append((root, sm))
     sm_roots.sort(key=lambda x: x[0])
 
@@ -251,7 +255,8 @@ def import_scene_hierarchy(
                     assert (
                         lhs == rhs
                     ), "Bindposes are not the same. Seperation of armatures required!"
-                    bindpose |= lhs
+                bindpose |= bindpose_of(cur[1])
+                bindpose |= bindpose_of(next[1])
             obj, bone_names = build_armature(hierarchy.root, bindpose=bindpose)
         else:
             obj, bone_names = build_armature(hierarchy.root)

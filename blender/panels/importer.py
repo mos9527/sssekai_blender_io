@@ -572,7 +572,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                                     )
                                 row = layout.row()
                     case "GENERIC":
-                        if active_obj and KEY_HIERARCHY_PATHID in active_obj:
+                        if active_obj and KEY_HIERARCHY_BONE_PATHID in active_obj:
                             row.prop(
                                 wm,
                                 "sssekai_animation_use_animator",
@@ -604,7 +604,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             text=T("Project SEKAI Character Options"),
                             icon="OUTLINER_OB_ARMATURE",
                         )
-                        if active_obj and KEY_HIERARCHY_PATHID in active_obj:
+                        if active_obj and KEY_HIERARCHY_BONE_PATHID in active_obj:
                             row = layout.row()
                             row.operator(
                                 SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator.bl_idname,
@@ -663,6 +663,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             row.prop(wm, "sssekai_character_type", expand=True)
                             row = layout.row()
                             wm.sssekai_hierarchy_import_bindpose = False
+                            wm.sssekai_hierarchy_import_seperate_armatures = False
                             row.operator(
                                 SSSekaiBlenderImportHierarchyOperator.bl_idname,
                                 icon="APPEND_BLEND",
@@ -676,6 +677,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                         row.label(text=T("Not implemented yet"))
                         row = layout.row()
                         wm.sssekai_hierarchy_import_bindpose = False
+                        wm.sssekai_hierarchy_import_seperate_armatures = False
                         row.operator(
                             SSSekaiBlenderImportHierarchyOperator.bl_idname,
                             icon="APPEND_BLEND",
@@ -683,11 +685,15 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     case "GENERIC":
                         row.label(text=T("Generic Options"), icon="ARMATURE_DATA")
                         row = layout.row()
-                        row.prop(wm, "sssekai_hierarchy_import_bindpose", expand=True)
+                        row.prop(
+                            wm,
+                            "sssekai_hierarchy_import_bindpose",
+                            icon="OUTLINER_DATA_ARMATURE",
+                        )
                         row.prop(
                             wm,
                             "sssekai_hierarchy_import_seperate_armatures",
-                            expand=True,
+                            icon="BONE_DATA",
                         )
                         row = layout.row()
                         row.prop(wm, "sssekai_generic_material_import_slot")

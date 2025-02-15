@@ -124,7 +124,9 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
     def execute(self, context):
         wm = context.window_manager
         active_obj = context.active_object
-        assert KEY_HIERARCHY_PATHID in active_obj, "Active object is not a Hierachy"
+        assert (
+            KEY_HIERARCHY_BONE_PATHID in active_obj
+        ), "Active object is not a Hierachy"
         container = wm.sssekai_selected_hierarchy_container
         # fmt: off
         selected = wm.sssekai_selected_hierarchy

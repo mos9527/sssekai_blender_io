@@ -2,9 +2,9 @@ from .utils import crc32
 
 DEFAULT_BONE_SIZE = 0.01
 # Plugin custom attribute keys
-KEY_HIERARCHY_PATHID = "sssekai_hierarchy_pathid"
 KEY_HIERARCHY_BONE_PATHID = "sssekai_bone_hierarchy_pathid"
 KEY_HIERARCHY_BONE_NAME = "sssekai_bone_hierarchy_bonename"
+KEY_HIERARCHY_BONE_ROOT = "sssekai_bone_hierarchy_root"
 # Hashes of names prefixed `blendShape.`
 KEY_SHAPEKEY_HASH_TABEL = "sssekai_shapekey_name_hash_tbl"
 

@@ -263,8 +263,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     root_bone = sm.m_RootBone.path_id
                     armature_obj, _mapping = scene_path_map[root_bone]
                     # Already in parent space
-                    armature_bone = armature_obj.data.bones[0].name
-                    set_obj_bone_parent(mesh_obj, armature_bone, armature_obj)
+                    mesh_obj.parent = armature_obj
                     # Add an armature modifier
                     mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
                     imported_objects.append((mesh_obj, sm.m_Materials, mesh))
@@ -415,7 +414,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
     bl_idname = "sssekai.import_hierarchy_animation_op"
     bl_label = T("Import Hierarchy Animation")
     bl_description = T(
-        "Import the selected Animation into the selected Armature (Hierarchy)"
+        "Import the selected Animation into the selected Armature (Hierarchy). ATTENTION: Split armatures won't work yet!"
     )
 
     def execute(self, context):
@@ -425,7 +424,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         active_obj = context.active_object
         assert active_obj.type == "ARMATURE", "Active object must be an Armature"
         assert (
-            KEY_HIERARCHY_PATHID in active_obj
+            KEY_HIERARCHY_BONE_PATHID in active_obj
         ), "Active object must be a Hierarchy imported by the addon itself"
         # Build TOS
         # XXX: Does TOS mean To String? Unity uses this nomenclature internally
@@ -454,10 +453,17 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             else:
                 dfngen = armature_editbone_children_recursive(active_obj.data)
             for parent, child, depth in dfngen:
-                if not parent:
-                    tos_leaf[child.name] = child.name
-                else:
-                    tos_leaf[child.name] = tos_leaf[parent.name] + "/" + child.name
+                if (
+                    not wm.sssekai_animation_root_bone
+                    and KEY_HIERARCHY_BONE_ROOT in child
+                ):
+                    # Stub. Ignore this when a root bone is selected
+                    continue
+                pa_path = tos_leaf.get(parent.name, "") if parent else ""
+                if pa_path:
+                    pa_path += "/"
+                leaf = child[KEY_HIERARCHY_BONE_NAME]
+                tos_leaf[leaf] = pa_path + leaf
             tos_leaf = {crc32(v): k for k, v in tos_leaf.items()}
             bpy.ops.object.mode_set(mode="OBJECT")
         # Load Animation
