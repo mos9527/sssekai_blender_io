@@ -447,6 +447,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             animator = sssekai_global.cotainers[
                 wm.sssekai_selected_animator_container
             ].animators[int(wm.sssekai_selected_animator)]
+            animator = animator.read()
             avatar = animator.m_Avatar.read()
             # Only take the leaf bone names for the same reason as stated in `import_hierarchy_as_armature`
             tos_leaf = {k: v.split("/")[-1] for k, v in avatar.m_TOS}
@@ -485,6 +486,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)
+        anim = anim.read()
         anim = read_animation(anim)
         bpy.context.scene.render.fps = int(anim.SampleRate)
         logger.info("Sample Rate: %d FPS" % anim.SampleRate)
@@ -578,6 +580,7 @@ class SSSekaiBlenderImportSekaiCharacterFaceMotionOperator(bpy.types.Operator):
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)
+        anim = anim.read()
         anim = read_animation(anim)
         action = load_sekai_keyshape_animation(
             anim.Name, anim, crc_table, wm.sssekai_animation_always_lerp
@@ -611,6 +614,7 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)
+        anim = anim.read()
         anim = read_animation(anim)
         bpy.context.scene.render.fps = int(anim.SampleRate)
         logger.info("Sample Rate: %d FPS" % anim.SampleRate)
@@ -651,6 +655,7 @@ class SSSekaiBlenderImportGlobalLightAnimationOperator(bpy.types.Operator):
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)
+        anim = anim.read()
         anim = read_animation(anim)
         bpy.context.scene.render.fps = int(anim.SampleRate)
         logger.info("Sample Rate: %d FPS" % anim.SampleRate)
@@ -709,6 +714,7 @@ class SSSekaiBlenderImportCharacterLightAnimationOperator(bpy.types.Operator):
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)
+        anim = anim.read()
         anim = read_animation(anim)
         bpy.context.scene.render.fps = int(anim.SampleRate)
         logger.info("Sample Rate: %d FPS" % anim.SampleRate)

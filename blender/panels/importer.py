@@ -60,7 +60,7 @@ def update_environment(path: str):
         UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()
         sssekai_global.env = UnityPy.load(path)
         sssekai_global.cotainers.clear()
-
+        logger.debug("Building scene hierarchy")
         hierarchies = build_scene_hierarchy(sssekai_global.env)
         for hierarchy in hierarchies:
             root = hierarchy.root.game_object
@@ -68,28 +68,19 @@ def update_environment(path: str):
             sssekai_global.cotainers[container].hierarchies[
                 hierarchy.path_id
             ] = hierarchy
-
-        predicate = lambda obj: obj.type == ClassIDType.AnimationClip
-        for animation in (
-            obj.read() for obj in filter(predicate, sssekai_global.env.objects)
+        logger.debug("Updating enums")
+        for reader in filter(
+            lambda obj: obj.type == ClassIDType.AnimationClip,
+            sssekai_global.env.objects,
         ):
-            animation: AnimationClip
-            container = animation.object_reader.container or EMPTY_CONTAINER
-            sssekai_global.cotainers[container].animations[
-                animation.object_reader.path_id
-            ] = animation
+            container = reader.container or EMPTY_CONTAINER
+            sssekai_global.cotainers[container].animations[reader.path_id] = reader
 
-        predicate = lambda obj: obj.type == ClassIDType.Animator
-        for animator in (
-            obj.read() for obj in filter(predicate, sssekai_global.env.objects)
+        for reader in filter(
+            lambda obj: obj.type == ClassIDType.Animator, sssekai_global.env.objects
         ):
-            animator: Animator
-            container = (
-                animator.m_GameObject.read().object_reader.container or EMPTY_CONTAINER
-            )
-            sssekai_global.cotainers[container].animators[
-                animator.object_reader.path_id
-            ] = animator
+            container = reader.container or EMPTY_CONTAINER
+            sssekai_global.cotainers[container].animators[reader.path_id] = reader
 
         for container in sssekai_global.cotainers.values():
             container.update_enums()
@@ -109,8 +100,11 @@ def enumerate_containers(obj: bpy.types.Object, context: bpy.types.Context):
     global sssekai_global
 
     wm = context.window_manager
-    path = wm.sssekai_selected_assetbundle_file
-    update_environment(path)
+    try:
+        update_environment(wm.sssekai_selected_assetbundle_file)
+    except Exception as e:
+        wm.sssekai_selected_assetbundle_file = ""
+        raise e
     return sssekai_global.container_enum or [EMPTY_OPT]
 
 

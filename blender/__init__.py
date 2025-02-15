@@ -73,6 +73,7 @@ def lookup_wm_prop(key: str, default=None):
 # Evil(!!) global variables
 # Copilot autocompleted this after 'evil' lmao
 from UnityPy import Environment
+from UnityPy.files import ObjectReader
 from UnityPy.classes import AnimationClip, Animator
 from .core.types import Hierarchy
 
@@ -91,8 +92,8 @@ class SSSekaiEnvironmentContainerCachedEnums:
 class SSSekaiEnvironmentContainer:
     # PathID to types
     hierarchies: Dict[int, Hierarchy] = field(default_factory=dict)
-    animators: Dict[int, Animator] = field(default_factory=dict)
-    animations: Dict[int, AnimationClip] = field(default_factory=dict)
+    animators: Dict[int, ObjectReader[Animator]] = field(default_factory=dict)
+    animations: Dict[int, ObjectReader[AnimationClip]] = field(default_factory=dict)
     enums: SSSekaiEnvironmentContainerCachedEnums = field(
         default_factory=SSSekaiEnvironmentContainerCachedEnums
     )
@@ -107,7 +108,7 @@ class SSSekaiEnvironmentContainer:
         self.enums.animators = [
             (
                 str(path_id),
-                animator.m_GameObject.read().m_Name,
+                animator.read().m_GameObject.read().m_Name,
                 "",
                 "DECORATE_ANIMATE",
                 index,
@@ -116,7 +117,7 @@ class SSSekaiEnvironmentContainer:
         ]
         self.enums.animators = sorted(self.enums.animators, key=lambda x: x[1])
         self.enums.animations = [
-            (str(path_id), animation.m_Name, "", "ANIM_DATA", index)
+            (str(path_id), animation.peek_name(), "", "ANIM_DATA", index)
             for index, (path_id, animation) in enumerate(self.animations.items())
         ]
         self.enums.animations = sorted(self.enums.animations, key=lambda x: x[1])
