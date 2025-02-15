@@ -22,6 +22,7 @@ from .helpers import (
     auto_connect_shader_nodes_by_name,
     auto_setup_shader_node_driver,
     apply_pose_matrix,
+    set_obj_bone_parent,
 )
 from .math import (
     swizzle_matrix,
@@ -87,15 +88,18 @@ def build_scene_hierarchy(env: Environment) -> List[Hierarchy]:
     return hierarchies
 
 
-def import_hierarchy_as_armature(
-    hierarchy: Hierarchy, name: str = None, use_bindpose: bool = False
-):
-    """Imports Hierarchy data into Blender as an Armature object
+def import_scene_hierarchy(
+    hierarchy: Hierarchy,
+    use_bindpose: bool = False,
+    seperate_armatures: bool = True,
+) -> List[Tuple[bpy.types.Object, Dict[int, str]]]:
+    """Imports Scene Hierarchy data into Blender as an Armature object
 
     Args:
         arma (Armature): Armature as genereated by previous steps
         name (str): Armature Object name
         use_bindpose (bool): Whether to use the bindpose for the bones
+        seperate_armatures (bool): Whether to create a new armature for each Skinned Mesh Renderer
 
     Note:
         In Unity Bindpose is generated in the asset import process (e.g. FBX)
@@ -112,94 +116,70 @@ def import_hierarchy_as_armature(
             or may not make this adjustment irrelavant.
 
     Returns:
-        Tuple[bpy.types.Armature, bpy.types.Object]: Created armature and its parent object
+        List[Tuple[bpy.types.Object (Armature Object), Dict[int, str] (Nodes belonging to the Armature's bones)]]
     """
-    name = name or hierarchy.name
-    armature = bpy.data.armatures.new(name)
-    armature.display_type = "OCTAHEDRAL"
-    armature.relation_line_position = "HEAD"
-    obj = bpy.data.objects.new(name, armature)
-    bpy.context.collection.objects.link(obj)
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.mode_set(mode="EDIT")
-    root_meshes: Dict[int, int] = dict()
-    for path_id, node in hierarchy.nodes.items():
-        if node.game_object and node.game_object.m_SkinnedMeshRenderer:
-            root_meshes[path_id] = node
-    # Adjust SkinnedMesh Root bones by the meshes' bindpose
-    root_bindposes: Dict[int, Dict[int, blMatrix]] = dict()
-    bindposes_pa: Dict[int, int] = dict()
-    if use_bindpose:
-        for path_id, node in hierarchy.nodes.items():
-            if node.game_object and node.game_object.m_SkinnedMeshRenderer:
-                renderer = node.game_object.m_SkinnedMeshRenderer.read()
-                renderer: SkinnedMeshRenderer
-                root_bone = renderer.m_RootBone.m_PathID
-                if not renderer.m_Mesh:
-                    continue
-                mesh = renderer.m_Mesh.read()
-                mesh: Mesh
-                bindposes = {
-                    p.m_PathID: swizzle_matrix(mesh.m_BindPose[i])
-                    for i, p in enumerate(renderer.m_Bones)
-                }
-                for p in renderer.m_Bones:
-                    bindposes_pa[p.m_PathID] = root_bone
-                if root_bone in root_bindposes:
-                    # Sanity check - only allow this when the bindposes are the same
-                    dirty = False
-                    for p, bp in root_bindposes[root_bone].items():
-                        # Matrix eq. is done within epsilon
-                        if not p in bindposes or bindposes[p] != bp:
-                            logger.warning(
-                                "Difference found at %s, M1=%s, M2=%s"
-                                % (p, bp, bindposes.get(p, None))
-                            )
-                            dirty = True
-                            break
-                    if dirty:
-                        logger.warning(
-                            "Impossible! Root bone %s has different bindposes!"
-                            % hierarchy.nodes[root_bone].name
-                        )
-                        continue
-                root_bindposes[root_bone] = bindposes
-            pass
-    # Build bone hierarchy in blender
-    # Obivously won't work when leaf bones aren't named uniquely
-    # However the assumption should hold true since...well, Blender doesn't allow it -_-||
-    # XXX: Figure out if we'd ever need to support multiple bones with the same name
-    ebones = dict()
-    root_bone = hierarchy.root
-    # Build EditBones.
-    # No scaling is ever applied here since otherwise scaling becomes
-    # erroneouslly commutative which is *never* the case in any DCC software you'd use
-    hierarchy.root.update_global_transforms(scale=False)
-    for parent, child, _ in root_bone.children_recursive():
-        parent: HierarchyNode
-        child: HierarchyNode
-        if child.name != root_bone.name:
+    results = list()
+
+    def bindpose_of(sm: SkinnedMeshRenderer):
+        mesh = sm.m_Mesh.read()
+        bindpose = {p.m_PathID: mesh.m_BindPose[i] for i, p in enumerate(sm.m_Bones)}
+        return bindpose
+
+    def build_armature(
+        root_bone: HierarchyNode, bindpose: Dict[int, uMatrix4x4] = None, visited=set()
+    ) -> bpy.types.Object:
+        # No scaling is ever applied here since otherwise scaling becomes
+        # erroneouslly commutative which is *never* the case in any DCC software you'd use
+        root_bone.update_global_transforms(scale=False)
+
+        # Make an Armature with the hierarchy
+        armature = bpy.data.armatures.new(root_bone.name)
+        armature.display_type = "OCTAHEDRAL"
+        armature.relation_line_position = "HEAD"
+        obj = bpy.data.objects.new(armature.name, armature)
+        bpy.context.collection.objects.link(obj)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode="EDIT")
+
+        ebones = dict()
+        pose_matrix = dict()
+        pose_scales = dict()
+        bone_names = dict()
+        for parent, child, _ in root_bone.children_recursive(visited=visited):
             ebone = armature.edit_bones.new(child.name)
+            if not parent:
+                ebone[KEY_HIERARCHY_BONE_ROOT] = True
+            ebone[KEY_HIERARCHY_BONE_PATHID] = str(child.path_id)
+            ebone[KEY_HIERARCHY_BONE_NAME] = str(child.name)
             ebone.use_local_location = True
             ebone.use_relative_parent = False
             ebone.use_connect = False
             ebone.use_deform = True
-            M_edit = child.global_transform
+            # Cache the pose matrix for later
+            # ebone name may not be unique in the hierarchy and importing it will
+            # automatically add .001, .002, etc. suffixes to the bone name
+            pose_scales[ebone.name] = child.scale
+            bone_names[child.path_id] = ebone.name
             # Use bindposes for the subtree of the root bone
             # and apply the actual pose in Pose Bones later
-            if use_bindpose and child.path_id in bindposes_pa:
+            pose_matrix[ebone.name] = child.global_transform
+            if bindpose:
                 # Needs correction
-                bparent = bindposes_pa[child.path_id]
-                bbind = root_bindposes[bparent][child.path_id]
-                # In armature space it's basically the inverse of the bindpose
-                # Identity = M_bind * M_pose
-                M_pose = bbind.inverted()
-                M_pose = unity_to_blender(M_pose)
-                # Bindposes are in the _Root's Parent's_ space (2 levels up)
-                brparent = hierarchy.parents[bparent]
-                M_parent = hierarchy.nodes[brparent].global_transform
-                # XXX: Assume no scaling in M_pose
-                M_edit = M_parent @ M_pose
+                M_edit = child.global_transform
+                M_bind = bindpose.get(child.path_id, None)
+                if not M_bind:
+                    logger.debug("No bindpose found for %s" % child.name)
+                else:
+                    M_bind = swizzle_matrix(M_bind)
+                    # In armature space it's basically the inverse of the bindpose
+                    # Identity = M_bind * M_pose
+                    M_pose = M_bind.inverted()
+                    M_pose = unity_to_blender(M_pose)
+                    M_parent = root_bone.global_transform
+                    # XXX: Assume no scaling in M_pose
+                    M_edit = M_parent @ M_pose
+            else:
+                M_edit = child.global_transform
             # Treat the joints as extremely small bones
             # The same as https://github.com/KhronosGroup/glTF-Blender-IO/blob/2debd75ace303f3a3b00a43e9d7a9507af32f194/addons/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L198
             # TODO: Alternative shapes for bones
@@ -208,33 +188,81 @@ def import_hierarchy_as_armature(
             ebone.tail = M_edit @ blVector((0, 1, 0))
             ebone.length = DEFAULT_BONE_SIZE
             ebone.align_roll(M_edit @ blVector((0, 0, 1)) - ebone.head)
-            ebone.parent = (
-                ebones[parent.name]
-                if parent and parent.name != root_bone.name
-                else None
-            )
-            ebone[KEY_HIERARCHY_BONE_PATHID] = str(child.path_id)
-            ebones[child.name] = ebone
-    # Pose space adjustment
-    # Make Scene Hierachy transform the Pose Bones so the final pose is correct
-    if use_bindpose:
-        # i hate this
-        # https://docs.blender.org/api/current/info_gotcha.html#stale-data
+            if parent:
+                ebone.parent = ebones.get(parent.path_id, None)
+                if not ebone.parent:
+                    logger.warning(
+                        "Parent bone %s not found for %s" % (parent.name, child.name)
+                    )
+            ebones[child.path_id] = ebone
+        bpy.ops.object.mode_set(mode="OBJECT")
+        obj[KEY_HIERARCHY_BONE_PATHID] = str(root_bone.path_id)
+        obj[KEY_HIERARCHY_BONE_NAME] = str(root_bone.name)
+        # Pose space adjustment
+        # Make Scene Hierachy transform the Pose Bones so the final pose is correct
+        if pose_matrix:
+            # https://docs.blender.org/api/current/info_gotcha.html#stale-data
+            bpy.context.view_layer.update()
+            apply_pose_matrix(obj, pose_matrix, edit_mode=False, clear_pose=False)
+        # Scale adjustment
         bpy.context.view_layer.update()
-        pose_matrix = {
-            node.name: node.global_transform for node in hierarchy.nodes.values()
-        }
-        apply_pose_matrix(obj, pose_matrix, edit_mode=False)
-    # Scale adjustment
-    bpy.ops.object.mode_set(mode="POSE")
-    for node in hierarchy.nodes.values():
-        if node.path_id in root_meshes:
-            continue
-        pbone = obj.pose.bones.get(node.name, None)
-        if pbone:
-            pbone.scale = swizzle_vector_scale(node.scale)
-    obj[KEY_HIERARCHY_PATHID] = str(hierarchy.path_id)
-    return armature, obj
+        bpy.ops.object.mode_set(mode="POSE")
+        for bone, scale in pose_scales.items():
+            pbone = obj.pose.bones.get(bone, None)
+            pbone.scale = swizzle_vector_scale(scale)
+        return obj, bone_names
+
+    sm_roots = list()
+    for path_id, node in hierarchy.nodes.items():
+        if node.game_object and node.game_object.m_SkinnedMeshRenderer:
+            sm: SkinnedMeshRenderer = node.game_object.m_SkinnedMeshRenderer.read()
+            root = sm.m_RootBone.path_id
+            sm_roots.append((root, sm))
+    sm_roots.sort(key=lambda x: x[0])
+
+    if seperate_armatures:
+        # Collect Skinned Meshes in the hierarchy
+        # Their root bone's subtree is guaranteed to have AT LEAST one-to-one name to vertex group
+        # mappings.
+        # We'll cull these from the graph and import them separately
+        sm_culled = {path_id for path_id, sm in sm_roots}
+        root, bone_names = build_armature(hierarchy.root, visited=sm_culled)
+        results.append((root, bone_names))
+        for sm_root, sm in sm_roots:
+            child = hierarchy.nodes[sm_root]
+            if use_bindpose:
+                bindpose = bindpose_of(sm)
+                obj, child_bone_names = build_armature(child, bindpose=bindpose)
+            else:
+                obj, child_bone_names = build_armature(child)
+            bone_parent = hierarchy.parents[child.path_id]
+            set_obj_bone_parent(obj, bone_names[bone_parent], root)
+            results.append((obj, child_bone_names))
+    else:
+        # Import the entire hierarchy as a single armature
+        # Fails when:
+        # - The root bones are reused for *different* bindposes
+        # - The root bones are reused for *different* meshes with different weights
+        # Otherwise for a single skinned mesh with a single bindpose this is fine
+        if use_bindpose:
+            # Sanity check - only allow this when the bindposes are the same
+            bindpose = dict()
+            for i in range(0, len(sm_roots) - 1):
+                cur, next = sm_roots[i], sm_roots[i + 1]
+                if cur[0] == next[0]:
+                    # Check matrices
+                    lhs, rhs = bindpose_of(cur[1]), bindpose_of(next[1])
+                    assert (
+                        lhs == rhs
+                    ), "Bindposes are not the same. Seperation of armatures required!"
+                bindpose |= bindpose_of(cur[1])
+                bindpose |= bindpose_of(next[1])
+            obj, bone_names = build_armature(hierarchy.root, bindpose=bindpose)
+        else:
+            obj, bone_names = build_armature(hierarchy.root)
+        results.append((obj, bone_names))
+
+    return results
 
 
 def import_mesh_data(

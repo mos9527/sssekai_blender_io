@@ -33,7 +33,7 @@ from ..core.asset import (
     import_sekai_character_face_sdf_material,
     import_sekai_stage_lightmap_material,
     import_sekai_stage_color_add_material,
-    import_hierarchy_as_armature,
+    import_scene_hierarchy,
     import_mesh_data,
 )
 from ..core.animation import (
@@ -143,6 +143,7 @@ class SSSekaiBlenderCreateCameraRigControllerOperator(bpy.types.Operator):
         camera.rotation_mode = "YXZ"
         camera.scale = blVector((1, 1, 1))
         camera.data.sensor_fit = "VERTICAL"
+        camera.data.dof.aperture_fstop = 6.5
 
         height = camera.data.driver_add("sensor_height")
         height.driver.type = "SCRIPTED"
@@ -208,9 +209,16 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         hierarchy = sssekai_global.cotainers[container].hierarchies[int(selected)]
         logger.debug("Loading selected hierarchy: %s" % hierarchy.name)
         # Import the scene as an Armature
-        armature, armature_obj = import_hierarchy_as_armature(
-            hierarchy, hierarchy.name, wm.sssekai_hierarchy_import_bindpose
+        scene = import_scene_hierarchy(
+            hierarchy,
+            wm.sssekai_hierarchy_import_bindpose,
+            wm.sssekai_hierarchy_import_seperate_armatures,
         )
+        scene_path_map = {
+            path_id: (obj, mapping)
+            for obj, mapping in scene
+            for path_id, name in mapping.items()
+        }
         if wm.sssekai_hierarchy_import_mode == "SEKAI_CHARACTER":
             assert (
                 KEY_SEKAI_CHARACTER_ROOT in active_obj
@@ -220,12 +228,12 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     assert not active_obj[
                         KEY_SEKAI_CHARACTER_FACE_OBJ
                     ], "Face already imported"
-                    active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ] = armature_obj
+                    active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ] = scene[0][0]
                 case "BODY":
                     assert not active_obj[
                         KEY_SEKAI_CHARACTER_BODY_OBJ
                     ], "Body already imported"
-                    active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ] = armature_obj
+                    active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ] = scene[0][0]
                     bpy.context.view_layer.objects.active = active_obj
                     bpy.ops.sssekai.update_character_controller_body_position_driver_op()
         # Import Skinned Meshes and Static Meshes
@@ -235,49 +243,59 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         # - Skinning works in Blender by matching bone names with vertex groups
         #   In that sense we only need to import the mesh and assign the modifier since parenting is already done
         imported_objects: List[Tuple[bpy.types.Object, List[PPtr[Material]], Mesh]] = []
-        for path_id, node in hierarchy.nodes.items():
+        # Skinned Meshes
+        for node in hierarchy.nodes.values():
             game_object = node.game_object
             if game_object.m_SkinnedMeshRenderer:
                 # bool ModelImporter::ImportSkinnedMesh
                 try:
-                    renderer = game_object.m_SkinnedMeshRenderer.read()
-                    renderer: SkinnedMeshRenderer
-                    if not renderer.m_Mesh:
+                    sm = game_object.m_SkinnedMeshRenderer.read()
+                    sm: SkinnedMeshRenderer
+                    if not sm.m_Mesh:
                         continue
-                    mesh = renderer.m_Mesh.read()
+                    mesh = sm.m_Mesh.read()
                     bone_names = [
-                        hierarchy.nodes[pptr.m_PathID].name for pptr in renderer.m_Bones
+                        hierarchy.nodes[pptr.m_PathID].name for pptr in sm.m_Bones
                     ]
                     mesh_data, mesh_obj = import_mesh_data(
                         game_object.m_Name, mesh, bone_names
                     )
-                    set_obj_bone_parent(mesh_obj, node.name, armature_obj)
+                    root_bone = sm.m_RootBone.path_id
+                    armature_obj, _mapping = scene_path_map[root_bone]
+                    # Already in parent space
+                    mesh_obj.parent = armature_obj
                     # Add an armature modifier
                     mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
-                    imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
+                    imported_objects.append((mesh_obj, sm.m_Materials, mesh))
                 except Exception as e:
                     logger.error(
-                        "Failed to import Skinned Mesh %s: %s. Skipping."
-                        % (node.name, str(e))
+                        "Failed to import Skinned Mesh at %s: %s. Skipping."
+                        % (game_object.m_Name, str(e))
                     )
-
-            if game_object.m_MeshFilter:
-                try:
-                    renderer = game_object.m_MeshRenderer.read()
-                    renderer: MeshRenderer
-                    mesh_filter = game_object.m_MeshFilter.read()
-                    mesh_filter: MeshFilter
-                    if not mesh_filter.m_Mesh:
-                        continue
-                    mesh = mesh_filter.m_Mesh.read()
-                    mesh_data, mesh_obj = import_mesh_data(game_object.m_Name, mesh)
-                    set_obj_bone_parent(mesh_obj, node.name, armature_obj)
-                    imported_objects.append((mesh_obj, renderer.m_Materials, mesh))
-                except Exception as e:
-                    logger.error(
-                        "Failed to import Static Mesh %s: %s. Skipping."
-                        % (node.name, str(e))
-                    )
+        # Static Meshes
+        for armature_obj, nodes in scene:
+            if wm.sssekai_hierarchy_import_mode == "SEKAI_CHARACTER":
+                armature_obj.parent = active_obj
+            for path_id, bone_name in nodes.items():
+                node = hierarchy.nodes[path_id]
+                game_object = node.game_object
+                if game_object.m_MeshFilter:
+                    try:
+                        m = game_object.m_MeshRenderer.read()
+                        m: MeshRenderer
+                        mf = game_object.m_MeshFilter.read()
+                        mf: MeshFilter
+                        if not mf.m_Mesh:
+                            continue
+                        mesh = mf.m_Mesh.read()
+                        mesh_data, mesh_obj = import_mesh_data(game_object.m_Name, mesh)
+                        set_obj_bone_parent(mesh_obj, bone_name, armature_obj)
+                        imported_objects.append((mesh_obj, m.m_Materials, mesh))
+                    except Exception as e:
+                        logger.error(
+                            "Failed to import Static Mesh at %s: %s. Skipping."
+                            % (bone_name, str(e))
+                        )
         # Import Materials
         # - This is done in a seperate procedure since there'd be some permuations depending on
         # the user's preference (i.e. sssekai_hierarchy_import_mode)
@@ -384,7 +402,6 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 bpy.ops.mesh.select_all(action="DESELECT")
                 bpy.ops.object.mode_set(mode="OBJECT")  # Deselects all vertices
 
-        armature_obj.parent = active_obj
         # Restore
         if active_obj:
             bpy.context.view_layer.objects.active = active_obj
@@ -397,7 +414,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
     bl_idname = "sssekai.import_hierarchy_animation_op"
     bl_label = T("Import Hierarchy Animation")
     bl_description = T(
-        "Import the selected Animation into the selected Armature (Hierarchy)"
+        "Import the selected Animation into the selected Armature (Hierarchy). ATTENTION: Split armatures won't work yet!"
     )
 
     def execute(self, context):
@@ -407,7 +424,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         active_obj = context.active_object
         assert active_obj.type == "ARMATURE", "Active object must be an Armature"
         assert (
-            KEY_HIERARCHY_PATHID in active_obj
+            KEY_HIERARCHY_BONE_PATHID in active_obj
         ), "Active object must be a Hierarchy imported by the addon itself"
         # Build TOS
         # XXX: Does TOS mean To String? Unity uses this nomenclature internally
@@ -436,10 +453,17 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             else:
                 dfngen = armature_editbone_children_recursive(active_obj.data)
             for parent, child, depth in dfngen:
-                if not parent:
-                    tos_leaf[child.name] = child.name
-                else:
-                    tos_leaf[child.name] = tos_leaf[parent.name] + "/" + child.name
+                if (
+                    not wm.sssekai_animation_root_bone
+                    and KEY_HIERARCHY_BONE_ROOT in child
+                ):
+                    # Stub. Ignore this when a root bone is selected
+                    continue
+                pa_path = tos_leaf.get(parent.name, "") if parent else ""
+                if pa_path:
+                    pa_path += "/"
+                leaf = child[KEY_HIERARCHY_BONE_NAME]
+                tos_leaf[leaf] = pa_path + leaf
             tos_leaf = {crc32(v): k for k, v in tos_leaf.items()}
             bpy.ops.object.mode_set(mode="OBJECT")
         # Load Animation

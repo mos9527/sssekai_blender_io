@@ -206,6 +206,7 @@ def apply_pose_matrix(
     dest: bpy.types.Object,
     pose_matrix: Dict[str, blMatrix],
     edit_mode: bool = False,
+    clear_pose: bool = True,
 ):
     """Applies a pose matrix to an armature object
 
@@ -217,23 +218,27 @@ def apply_pose_matrix(
     bpy.context.view_layer.objects.active = dest
     bpy.ops.object.mode_set(mode="EDIT")
     edit_space = {bone.name: bone.matrix for bone in dest.data.edit_bones}
-    if not edit_mode:
+    if clear_pose:
         bpy.ops.object.mode_set(mode="POSE")
         bpy.ops.pose.select_all(action="SELECT")
         bpy.ops.pose.transforms_clear()
         bpy.ops.pose.select_all(action="DESELECT")
     for bone_name, M_final in pose_matrix.items():
         if edit_mode:
+            bpy.ops.object.mode_set(mode="EDIT")
             ebone = dest.data.edit_bones.get(bone_name)
             if not ebone:
+                logger.warning(f"Bone {bone_name} not found in edit mode.")
                 continue
             ebone.head = M_final @ blVector((0, 0, 0))
             ebone.tail = M_final @ blVector((0, 1, 0))
             ebone.length = DEFAULT_BONE_SIZE
             ebone.align_roll(M_final @ blVector((0, 0, 1)) - ebone.head)
         else:
+            bpy.ops.object.mode_set(mode="POSE")
             pbone = dest.pose.bones.get(bone_name)
             if not pbone:
+                logger.warning(f"Bone {bone_name} not found in pose mode.")
                 continue
             M_edit = edit_space[pbone.name]
             M_parent = (
@@ -251,4 +256,3 @@ def apply_pose_matrix(
             # Also applies to local space
             M_pose = M_local.inverted() @ M_final_local
             pbone.matrix_basis = M_pose
-    bpy.ops.object.mode_set(mode="POSE")

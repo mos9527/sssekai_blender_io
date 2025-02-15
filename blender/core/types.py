@@ -25,8 +25,8 @@ class HierarchyNode:
     scale: uVector3
 
     # Graph relations
-    parent: object = None  # HierarchyNode
-    children: List[object] = field(default_factory=list)  # HierarchyNode
+    parent: "HierarchyNode" = None
+    children: List["HierarchyNode"] = field(default_factory=list)
 
     # Cached global attributes
     """Global transform in Blender coordinates. NOTE: You will need to update this manually with `update_global_transforms`"""
@@ -53,17 +53,23 @@ class HierarchyNode:
         )
 
     def children_recursive(
-        self, root=None
+        self, root=None, visited: set = set()
     ) -> Generator[Tuple["HierarchyNode", "HierarchyNode", int], None, None]:
         """Yields a tuple of (parent, child, depth) for each bone in the hierarchy.
 
         The tree is traversed in depth-first order and from top to bottom.
+
+        Arguments:
+            root: root node. leave None to use self
+            visited: read-only set of visited parent nodes to skip
         """
 
         def dfs(bone: HierarchyNode, parent: HierarchyNode = None, depth=0):
-            yield parent, bone, depth
+            if not bone.path_id in visited:
+                yield parent, bone, depth
             for child in bone.children:
-                yield from dfs(child, bone, depth + 1)
+                if not child.path_id in visited:
+                    yield from dfs(child, bone, depth + 1)
 
         yield from dfs(root or self)
 

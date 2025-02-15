@@ -40,7 +40,7 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
         active_object = bpy.context.active_object
         assert (
             active_object and KEY_SEKAI_CHARACTER_ROOT in active_object
-        ), "Please select an armature to import the animation to!"
+        ), "Please select an Character Root to import the animation to!"
         (
             wm.sssekai_animation_import_use_nla,
             wm.sssekai_animation_import_nla_always_new_track,

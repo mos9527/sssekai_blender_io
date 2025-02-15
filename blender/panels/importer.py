@@ -233,6 +233,13 @@ register_wm_props(
         ),
         default=False,
     ),
+    sssekai_hierarchy_import_seperate_armatures=BoolProperty(
+        name=T("Seperate Armatures"),
+        description=T(
+            "Import Skinned Meshes into different armatures. MUST be used IF your armature comes with duped bones"
+        ),
+        default=False,
+    ),
     sssekai_hierarchy_import_mode=EnumProperty(
         name=T("Hierarchy Import Mode"),
         description=T("Method to import the selected hierarchy"),
@@ -565,7 +572,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                                     )
                                 row = layout.row()
                     case "GENERIC":
-                        if active_obj and KEY_HIERARCHY_PATHID in active_obj:
+                        if active_obj and KEY_HIERARCHY_BONE_PATHID in active_obj:
                             row.prop(
                                 wm,
                                 "sssekai_animation_use_animator",
@@ -590,6 +597,25 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 row = layout.row()
                 row.prop(wm, "sssekai_hierarchy_import_mode", expand=True)
                 row = layout.row()
+                row.label(text=T("Import Options"), icon="OPTIONS")
+                row = layout.row()
+                row.label(
+                    text=T(
+                        "NOTE: Some settings are enforced with different import modes"
+                    )
+                )
+                row = layout.row()
+                row.prop(
+                    wm,
+                    "sssekai_hierarchy_import_bindpose",
+                    icon="OUTLINER_DATA_ARMATURE",
+                )
+                row.prop(
+                    wm,
+                    "sssekai_hierarchy_import_seperate_armatures",
+                    icon="BONE_DATA",
+                )
+                row = layout.row()
                 import_mode = wm.sssekai_hierarchy_import_mode
                 match import_mode:
                     case "SEKAI_CHARACTER":
@@ -597,7 +623,9 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             text=T("Project SEKAI Character Options"),
                             icon="OUTLINER_OB_ARMATURE",
                         )
-                        if active_obj and KEY_HIERARCHY_PATHID in active_obj:
+                        wm.sssekai_hierarchy_import_bindpose = False
+                        wm.sssekai_hierarchy_import_seperate_armatures = False
+                        if active_obj and KEY_HIERARCHY_BONE_PATHID in active_obj:
                             row = layout.row()
                             row.operator(
                                 SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator.bl_idname,
@@ -655,7 +683,6 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             row = layout.row()
                             row.prop(wm, "sssekai_character_type", expand=True)
                             row = layout.row()
-                            wm.sssekai_hierarchy_import_bindpose = False
                             row.operator(
                                 SSSekaiBlenderImportHierarchyOperator.bl_idname,
                                 icon="APPEND_BLEND",
@@ -666,17 +693,14 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             icon="OUTLINER_OB_EMPTY",
                         )
                         row = layout.row()
-                        row.label(text=T("Not implemented yet"))
-                        row = layout.row()
-                        wm.sssekai_hierarchy_import_bindpose = False
+                        wm.sssekai_hierarchy_import_bindpose = True
+                        wm.sssekai_hierarchy_import_seperate_armatures = False
                         row.operator(
                             SSSekaiBlenderImportHierarchyOperator.bl_idname,
                             icon="APPEND_BLEND",
                         )
                     case "GENERIC":
                         row.label(text=T("Generic Options"), icon="ARMATURE_DATA")
-                        row = layout.row()
-                        row.prop(wm, "sssekai_hierarchy_import_bindpose")
                         row = layout.row()
                         row.prop(wm, "sssekai_generic_material_import_slot")
                         row = layout.row()
