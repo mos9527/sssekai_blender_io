@@ -12,12 +12,13 @@ def set_obj_bone_parent(
     parent: bpy.types.Object,
 ):
     obj.parent = parent
-    obj.parent_type = "BONE"
-    obj.parent_bone = bone_name
-    # Bone parenting by default snaps to tail
-    # Offset this manually
-    obj.parent.track_axis = "POS_Y"
-    obj.location.y = -DEFAULT_BONE_SIZE
+    if bone_name:
+        obj.parent_type = "BONE"
+        obj.parent_bone = bone_name
+        # Bone parenting by default snaps to tail
+        # Offset this manually
+        obj.parent.track_axis = "POS_Y"
+        obj.location.y = -DEFAULT_BONE_SIZE
 
 
 def ensure_sssekai_shader_blend():

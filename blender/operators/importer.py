@@ -264,6 +264,17 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     armature_obj, _mapping = scene_path_map[root_bone]
                     # Already in parent space
                     mesh_obj.parent = armature_obj
+                    if wm.sssekai_hierarchy_import_seperate_armatures:
+                        # Otherwise armature only has an identity transform on its object
+                        # Will introduce issues with the mesh's parent space so we set it manually
+                        armature_bone = armature_obj.data.bones[0].name
+                        set_obj_bone_parent(mesh_obj, armature_bone, armature_obj)
+                        bpy.context.view_layer.update()
+                        # Keep the transform but parent to the armature w/o the bone
+                        M_world = mesh_obj.matrix_world.copy()
+                        mesh_obj.parent = armature_obj
+                        mesh_obj.parent_type = "OBJECT"
+                        mesh_obj.matrix_world = M_world
                     # Add an armature modifier
                     mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
                     imported_objects.append((mesh_obj, sm.m_Materials, mesh))

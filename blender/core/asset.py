@@ -235,8 +235,11 @@ def import_scene_hierarchy(
                 obj, child_bone_names = build_armature(child, bindpose=bindpose)
             else:
                 obj, child_bone_names = build_armature(child)
-            bone_parent = hierarchy.parents[child.path_id]
-            set_obj_bone_parent(obj, bone_names[bone_parent], root)
+            bone_parent = hierarchy.parents.get(child.path_id, None)
+            pa_name = bone_names.get(bone_parent, "")
+            if not bone_parent:
+                logger.warning("Parent not found for %s" % child.name)
+            set_obj_bone_parent(obj, pa_name, root)
             results.append((obj, child_bone_names))
     else:
         # Import the entire hierarchy as a single armature
