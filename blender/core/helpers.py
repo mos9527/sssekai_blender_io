@@ -3,7 +3,34 @@ from typing import Dict
 from .math import blMatrix, blVector
 from .utils import get_addon_relative_path
 from .consts import DEFAULT_BONE_SIZE
-from .. import logger
+from .. import logger, register_wm_props, register_class
+
+
+def get_enum_search_op_name(wm_name: str):
+    return f"search.{wm_name}"
+
+
+def register_serachable_enum(wm_name: str = "", **kwargs):
+    @register_class
+    class FakeEnumSearchOperator(bpy.types.Operator):
+        bl_idname = get_enum_search_op_name(wm_name)
+        bl_label = wm_name
+        bl_property = "selected"
+
+        selected: bpy.props.EnumProperty(**kwargs)  # type: ignore
+
+        def execute(self, context):
+            wm = context.window_manager
+            setattr(wm, wm_name, self.selected)
+            return {"FINISHED"}
+
+        def invoke(self, context, event):
+            wm = context.window_manager
+            wm.invoke_search_popup(self)
+            return {"FINISHED"}
+
+    register_wm_props(**{wm_name: bpy.props.EnumProperty(**kwargs)})
+    return FakeEnumSearchOperator
 
 
 def set_obj_bone_parent(

@@ -70,8 +70,6 @@ def lookup_wm_prop(key: str, default=None):
     return registry.lookup_wm(key, default)
 
 
-# Evil(!!) global variables
-# Copilot autocompleted this after 'evil' lmao
 from UnityPy import Environment
 from UnityPy.files import ObjectReader
 from UnityPy.classes import AnimationClip, Animator

@@ -17,6 +17,7 @@ import UnityPy
 from UnityPy.enums import ClassIDType
 from UnityPy.classes import AnimationClip, Animator
 
+from ..core.helpers import register_serachable_enum, get_enum_search_op_name
 from ..core.consts import *
 from .. import register_class, register_wm_props, logger
 
@@ -119,6 +120,12 @@ def enumerate_prop(container_selection_key: str, prop: str):
     return inner
 
 
+register_serachable_enum(
+    "sssekai_selected_hierarchy_container",
+    name=T("Container"),
+    description=T("Selected Container"),
+    items=enumerate_containers,
+)
 register_wm_props(
     sssekai_selected_assetbundle_file=StringProperty(
         name=T("Directory"),
@@ -126,11 +133,6 @@ register_wm_props(
             "Where the asset bundle(s) are located. Every AssetBundle in this directory will be loaded (if possible)"
         ),
         subtype="DIR_PATH",
-    ),
-    sssekai_selected_hierarchy_container=EnumProperty(
-        name=T("Container"),
-        description=T("Selected Container"),
-        items=enumerate_containers,
     ),
     sssekai_selected_hierarchy=EnumProperty(
         name=T("Hierarchy"),
@@ -445,6 +447,9 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     "sssekai_selected_hierarchy_container",
                     text=T("Container"),
                     icon="OUTLINER_OB_ARMATURE",
+                )
+                row.operator(
+                    get_enum_search_op_name("sssekai_selected_hierarchy_container")
                 )
                 row = layout.row()
                 row.prop(wm, "sssekai_selected_hierarchy")
