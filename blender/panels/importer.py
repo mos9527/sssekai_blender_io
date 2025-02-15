@@ -381,13 +381,12 @@ register_wm_props(
         description=T("Import the camera as a sub camera"),
         default=False,
     ),
-    sssekai_generic_material_import_slot=IntProperty(
+    sssekai_generic_material_import_slot=StringProperty(
         name=T("Material Slot"),
         description=T(
-            "Material index to use as the diffuse map. NOTE: All texture maps will be imported regardless which one is picked"
+            "Material Slot to use as the diffuse map. Check the System Console during import for slot info. NOTE: All texture maps will be imported regardless which one is picked"
         ),
-        default=0,
-        min=0,
+        default="_MainTex",
     ),
     sssekai_generic_material_import_skip=BoolProperty(
         name=T("Skip Materials"),

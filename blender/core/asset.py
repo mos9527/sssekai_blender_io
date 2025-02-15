@@ -470,6 +470,18 @@ def make_material_texture_node(
     uv_remap_override_node: bpy.types.Node = None,
     uv_remap_postprocess_node: bpy.types.Node = None,
 ):
+    image = None
+    try:
+        texture: Texture2D = ppTexture.m_Texture.read()
+        if texture_cache:
+            if not texture.m_Name in texture_cache:
+                texture_cache[texture.m_Name] = import_texture(texture.m_Name, texture)
+            image = texture_cache[texture.m_Name]
+        else:
+            image = import_texture(texture.m_Name, texture)
+    except Exception as e:
+        logger.error("Failed to load texture - %s. Discarding." % e)
+        return None
     uvMap = material.node_tree.nodes.new("ShaderNodeUVMap")
     uvMap.uv_map = uv_layer
     if uv_remap_override_node:
@@ -481,17 +493,7 @@ def make_material_texture_node(
         uvRemap.inputs[3].default_value[0] = ppTexture.m_Scale.x
         uvRemap.inputs[3].default_value[1] = ppTexture.m_Scale.y
     texNode = material.node_tree.nodes.new("ShaderNodeTexImage")
-    try:
-        texture: Texture2D = ppTexture.m_Texture.read()
-        if texture_cache:
-            if not texture.m_Name in texture_cache:
-                texture_cache[texture.m_Name] = import_texture(texture.m_Name, texture)
-            texNode.image = texture_cache[texture.m_Name]
-        else:
-            texNode.image = import_texture(texture.m_Name, texture)
-    except Exception as e:
-        logger.error("Failed to load texture - %s. Discarding." % e)
-        return None
+    texNode.image = image
     material.node_tree.links.new(uvMap.outputs["UV"], uvRemap.inputs[0])
     if uv_remap_postprocess_node:
         material.node_tree.links.new(
@@ -506,7 +508,7 @@ def make_material_texture_node(
 
 
 def import_fallback_material(
-    name: str, data: Material, texture_cache=None, nth_slot: int = 0, **kwargs
+    name: str, data: Material, texture_cache=None, slot_name: str = "_MainTex", **kwargs
 ):
     """Imports Material assets into blender.
     This is a generic material importer that only imports all texture maps
@@ -515,7 +517,7 @@ def import_fallback_material(
     Args:
         name (str): material name
         data (Material): UnityPy Material
-        nth_slot (int, optional): Texture slot to import. Defaults to 0.
+        slot_name (str, optional): Texture slot to import.
 
     Returns:
         bpy.types.Material: Created material
@@ -524,7 +526,6 @@ def import_fallback_material(
     material = bpy.data.materials["SekaiDefaultFallbackMaterial"].copy()
     material.name = name
     sekaiShader = material.node_tree.nodes["SekaiDefaultFallbackShader"]
-    first_tex = None
 
     def link_tex(tex: bpy.types.Node):
         material.node_tree.links.new(
@@ -533,18 +534,18 @@ def import_fallback_material(
         )
         material.node_tree.links.new(tex.outputs["Alpha"], sekaiShader.inputs["Alpha"])
 
+    logger.debug("Material %s" % name)
+    imported = dict()
     for i, (env_name, env) in enumerate(textures.items()):
+        logger.debug("- Tex#%2d: %s" % (i, env_name))
         tex = make_material_texture_node(material, env, texture_cache)
-        first_tex = first_tex or tex
-        if tex and i == nth_slot:
-            link_tex(tex)
-            nth_slot = -1
-    if nth_slot >= 0 and first_tex:
-        logger.warning(
-            "Texture slot %d not found in material %s. Using first available texture."
-            % (nth_slot, name)
-        )
-        link_tex(first_tex)
+        if tex:
+            tex.name = env_name
+            imported[env_name] = tex
+    if slot_name in imported:
+        link_tex(imported[slot_name])
+    else:
+        logger.warning("Slot %s not found" % slot_name)
     return material
 
 
