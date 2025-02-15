@@ -540,7 +540,7 @@ def import_fallback_material(
         logger.debug("- Tex#%2d: %s" % (i, env_name))
         tex = make_material_texture_node(material, env, texture_cache)
         if tex:
-            tex.name = env_name
+            tex.label = env_name
             imported[env_name] = tex
     if slot_name in imported:
         link_tex(imported[slot_name])
