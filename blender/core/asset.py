@@ -280,16 +280,18 @@ def import_scene_hierarchy(
         for sm_root, sm in sm_roots:
             bone_ids |= {p.path_id for p in sm.m_Bones}
         if use_bindpose:
+            # XXX: CHECK NOT ENFORCED
             # Sanity check - only allow this when the bindposes are the same
             bindpose = dict()
             for i in range(0, len(sm_roots) - 1):
-                cur, next = sm_roots[i], sm_roots[i + 1]
+                cur, next = sm_roots[i], sm_roots[i + 1]                
                 if cur[0] == next[0]:
                     # Check matrices
                     lhs, rhs = bindpose_of(cur[1]), bindpose_of(next[1])
-                    assert (
-                        lhs == rhs
-                    ), "Bindposes are not the same. Seperation of armatures required!"
+                    if lhs != rhs:
+                        logger.warning(
+                            "Bindposes are not the same. Seperation of armatures may be required!"
+                        )
                 bindpose |= bindpose_of(cur[1])
                 bindpose |= bindpose_of(next[1])
             obj, bone_names = build_armature(
