@@ -126,6 +126,36 @@ register_serachable_enum(
     description=T("Selected Container"),
     items=enumerate_containers,
 )
+register_serachable_enum(
+    "sssekai_selected_hierarchy",
+    name=T("Hierarchy"),
+    description=T("Selected Hierarchy"),
+    items=enumerate_prop("sssekai_selected_hierarchy_container", "hierarchies"),
+)
+register_serachable_enum(
+    "sssekai_selected_animation_container",
+    name=T("Container"),
+    description=T("Selected Container"),
+    items=enumerate_containers,
+)
+register_serachable_enum(
+    "sssekai_selected_animation",
+    name=T("Animation"),
+    description=T("Selected Animation"),
+    items=enumerate_prop("sssekai_selected_animation_container", "animations"),
+)
+register_serachable_enum(
+    "sssekai_selected_animator_container",
+    name=T("Container"),
+    description=T("Selected Container"),
+    items=enumerate_containers,
+)
+register_serachable_enum(
+    "sssekai_selected_animator",
+    name=T("Animator"),
+    description=T("Selected Animator"),
+    items=enumerate_prop("sssekai_selected_animator_container", "animators"),
+)
 register_wm_props(
     sssekai_selected_assetbundle_file=StringProperty(
         name=T("Directory"),
@@ -133,31 +163,6 @@ register_wm_props(
             "Where the asset bundle(s) are located. Every AssetBundle in this directory will be loaded (if possible)"
         ),
         subtype="DIR_PATH",
-    ),
-    sssekai_selected_hierarchy=EnumProperty(
-        name=T("Hierarchy"),
-        description=T("Selected Hierarchy"),
-        items=enumerate_prop("sssekai_selected_hierarchy_container", "hierarchies"),
-    ),
-    sssekai_selected_animation_container=EnumProperty(
-        name=T("Container"),
-        description=T("Selected Container"),
-        items=enumerate_containers,
-    ),
-    sssekai_selected_animation=EnumProperty(
-        name=T("Animation"),
-        description=T("Selected Animation"),
-        items=enumerate_prop("sssekai_selected_animation_container", "animations"),
-    ),
-    sssekai_selected_animator_container=EnumProperty(
-        name=T("Container"),
-        description=T("Selected Container"),
-        items=enumerate_containers,
-    ),
-    sssekai_selected_animator=EnumProperty(
-        name=T("Animator"),
-        description=T("Selected Animator"),
-        items=enumerate_prop("sssekai_selected_animator_container", "animators"),
     ),
     sssekai_animation_append_exisiting=BoolProperty(
         name=T("Append"),
@@ -225,14 +230,14 @@ register_wm_props(
     sssekai_hierarchy_import_bindpose=BoolProperty(
         name=T("Bind Pose"),
         description=T(
-            "Correct the hierarchy to match the bind pose of the Skinned Meshes that might be imported. Only use this if the pose is incorrect"
+            "Correct the hierarchy to match the bind pose of the Skinned Meshes that might be imported. ONLY use this if the pose is incorrect"
         ),
         default=False,
     ),
     sssekai_hierarchy_import_seperate_armatures=BoolProperty(
         name=T("Seperate Armatures"),
         description=T(
-            "Import Skinned Meshes into different armatures. MUST be used IF your armature comes with duped bones"
+            "Import Skinned Meshes into different armatures. MUST be used IF your hierarchy has multiple Skinned Meshes and has different bind poses. ONLY use this if the pose is incorrect"
         ),
         default=False,
     ),
@@ -429,8 +434,16 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     text=T("Container"),
                     icon="ANIM_DATA",
                 )
+                row.operator(
+                    get_enum_search_op_name("sssekai_selected_animation_container"),
+                    icon="VIEWZOOM",
+                )
                 row = layout.row()
                 row.prop(wm, "sssekai_selected_animation")
+                row.operator(
+                    get_enum_search_op_name("sssekai_selected_animation"),
+                    icon="VIEWZOOM",
+                )
                 row = layout.row()
                 row.prop(
                     wm,
@@ -438,8 +451,16 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     text=T("Container"),
                     icon="DECORATE_ANIMATE",
                 )
+                row.operator(
+                    get_enum_search_op_name("sssekai_selected_animator_container"),
+                    icon="VIEWZOOM",
+                )
                 row = layout.row()
                 row.prop(wm, "sssekai_selected_animator")
+                row.operator(
+                    get_enum_search_op_name("sssekai_selected_animator"),
+                    icon="VIEWZOOM",
+                )
                 row = layout.row()
             case "IMPORT_HIERARCHY":
                 row.prop(
@@ -449,10 +470,15 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                     icon="OUTLINER_OB_ARMATURE",
                 )
                 row.operator(
-                    get_enum_search_op_name("sssekai_selected_hierarchy_container")
+                    get_enum_search_op_name("sssekai_selected_hierarchy_container"),
+                    icon="VIEWZOOM",
                 )
                 row = layout.row()
                 row.prop(wm, "sssekai_selected_hierarchy")
+                row.operator(
+                    get_enum_search_op_name("sssekai_selected_hierarchy"),
+                    icon="VIEWZOOM",
+                )
                 row = layout.row()
         row.label(text=T("Import Options"), icon="OPTIONS")
         row = layout.row()

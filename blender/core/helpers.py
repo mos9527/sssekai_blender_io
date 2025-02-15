@@ -4,6 +4,7 @@ from .math import blMatrix, blVector
 from .utils import get_addon_relative_path
 from .consts import DEFAULT_BONE_SIZE
 from .. import logger, register_wm_props, register_class
+from bpy.app.translations import pgettext as T
 
 
 def get_enum_search_op_name(wm_name: str):
@@ -14,9 +15,9 @@ def register_serachable_enum(wm_name: str = "", **kwargs):
     @register_class
     class FakeEnumSearchOperator(bpy.types.Operator):
         bl_idname = get_enum_search_op_name(wm_name)
-        bl_label = wm_name
+        bl_label = ""  # Icon only
+        bl_description = T("Search in %s") % kwargs["name"]
         bl_property = "selected"
-
         selected: bpy.props.EnumProperty(**kwargs)  # type: ignore
 
         def execute(self, context):

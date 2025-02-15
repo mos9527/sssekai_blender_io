@@ -183,7 +183,8 @@ def import_scene_hierarchy(
                 M_edit = child.global_transform
                 M_bind = bindpose.get(child.path_id, None)
                 if not M_bind:
-                    logger.debug("No bindpose found for %s" % child.name)
+                    # logger.debug("No bindpose found for %s" % child.name)
+                    pass
                 else:
                     M_bind = swizzle_matrix(M_bind)
                     # In armature space it's basically the inverse of the bindpose
@@ -284,13 +285,15 @@ def import_scene_hierarchy(
             # Sanity check - only allow this when the bindposes are the same
             bindpose = dict()
             for i in range(0, len(sm_roots) - 1):
-                cur, next = sm_roots[i], sm_roots[i + 1]                
+                cur, next = sm_roots[i], sm_roots[i + 1]
                 if cur[0] == next[0]:
                     # Check matrices
                     lhs, rhs = bindpose_of(cur[1]), bindpose_of(next[1])
                     if lhs != rhs:
+                        root_name = hierarchy.nodes[cur[0]].name
                         logger.warning(
-                            "Bindposes are not the same. Seperation of armatures may be required!"
+                            "Bindposes are not the same at %s. Seperation of armatures may be required!"
+                            % root_name
                         )
                 bindpose |= bindpose_of(cur[1])
                 bindpose |= bindpose_of(next[1])
