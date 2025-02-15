@@ -1,7 +1,7 @@
 import bpy, bmesh
 import json, math
 import tempfile, copy
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 from UnityPy.enums import ClassIDType
 from UnityPy.helpers.MeshHelper import MeshHandler
 from UnityPy.classes import (
@@ -126,8 +126,17 @@ def import_scene_hierarchy(
         return bindpose
 
     def build_armature(
-        root_bone: HierarchyNode, bindpose: Dict[int, uMatrix4x4] = None, visited=set()
+        root_bone: HierarchyNode,
+        bindpose: Dict[int, uMatrix4x4] = None,
+        bone_ids: Set[int] = None,
+        visited=set(),
     ) -> bpy.types.Object:
+        # Reserve bone_id nodes's names since they'd be used for vertex groups
+        reserve_bonenames = dict()
+        if bone_ids:
+            for path_id in bone_ids:
+                bone = hierarchy.nodes[path_id]
+                reserve_bonenames[bone.name] = path_id
         # No scaling is ever applied here since otherwise scaling becomes
         # erroneouslly commutative which is *never* the case in any DCC software you'd use
         root_bone.update_global_transforms(scale=False)
@@ -146,7 +155,13 @@ def import_scene_hierarchy(
         pose_scales = dict()
         bone_names = dict()
         for parent, child, _ in root_bone.children_recursive(visited=visited):
-            ebone = armature.edit_bones.new(child.name)
+            if child.name in reserve_bonenames:
+                if child.path_id in bone_ids:
+                    ebone = armature.edit_bones.new(child.name)
+                else:
+                    ebone = armature.edit_bones.new(child.name + "_Duped")
+            else:
+                ebone = armature.edit_bones.new(child.name)
             if not parent:
                 ebone[KEY_HIERARCHY_BONE_ROOT] = True
             ebone[KEY_HIERARCHY_BONE_PATHID] = str(child.path_id)
@@ -230,11 +245,14 @@ def import_scene_hierarchy(
         results.append((root, bone_names))
         for sm_root, sm in sm_roots:
             child = hierarchy.nodes[sm_root]
+            bones = {p.path_id for p in sm.m_Bones}
             if use_bindpose:
                 bindpose = bindpose_of(sm)
-                obj, child_bone_names = build_armature(child, bindpose=bindpose)
+                obj, child_bone_names = build_armature(
+                    child, bindpose=bindpose, bone_ids=bones
+                )
             else:
-                obj, child_bone_names = build_armature(child)
+                obj, child_bone_names = build_armature(child, bone_ids=bones)
             bone_parent = hierarchy.parents.get(child.path_id, None)
             pa_name = bone_names.get(bone_parent, "")
             if not bone_parent:
@@ -247,6 +265,9 @@ def import_scene_hierarchy(
         # - The root bones are reused for *different* bindposes
         # - The root bones are reused for *different* meshes with different weights
         # Otherwise for a single skinned mesh with a single bindpose this is fine
+        bone_ids = set()
+        for sm_root, sm in sm_roots:
+            bone_ids |= {p.path_id for p in sm.m_Bones}
         if use_bindpose:
             # Sanity check - only allow this when the bindposes are the same
             bindpose = dict()
@@ -260,9 +281,11 @@ def import_scene_hierarchy(
                     ), "Bindposes are not the same. Seperation of armatures required!"
                 bindpose |= bindpose_of(cur[1])
                 bindpose |= bindpose_of(next[1])
-            obj, bone_names = build_armature(hierarchy.root, bindpose=bindpose)
+            obj, bone_names = build_armature(
+                hierarchy.root, bindpose=bindpose, bone_ids=bone_ids
+            )
         else:
-            obj, bone_names = build_armature(hierarchy.root)
+            obj, bone_names = build_armature(hierarchy.root, bone_ids=bone_ids)
         results.append((obj, bone_names))
 
     return results
