@@ -130,7 +130,7 @@ def import_scene_hierarchy(
         bindpose: Dict[int, uMatrix4x4] = None,
         bone_ids: Set[int] = None,
         visited=set(),
-    ) -> bpy.types.Object:
+    ) -> Tuple[bpy.types.Object, Dict[int, str]]:
         # Reserve bone_id nodes's names since they'd be used for vertex groups
         reserve_bonenames = dict()
         if bone_ids:
@@ -241,7 +241,9 @@ def import_scene_hierarchy(
         # mappings.
         # We'll cull these from the graph and import them separately
         sm_culled = {path_id for path_id, sm in sm_roots}
+        bone_names_all = dict()
         root, bone_names = build_armature(hierarchy.root, visited=sm_culled)
+        bone_names_all |= {k: (root, v) for k, v in bone_names.items()}
         results.append((root, bone_names))
         for sm_root, sm in sm_roots:
             child = hierarchy.nodes[sm_root]
@@ -249,16 +251,25 @@ def import_scene_hierarchy(
             if use_bindpose:
                 bindpose = bindpose_of(sm)
                 obj, child_bone_names = build_armature(
-                    child, bindpose=bindpose, bone_ids=bones
+                    child,
+                    bindpose=bindpose,
+                    bone_ids=bones,
+                    visited=sm_culled - {sm_root},
                 )
             else:
-                obj, child_bone_names = build_armature(child, bone_ids=bones)
-            bone_parent = hierarchy.parents.get(child.path_id, None)
-            pa_name = bone_names.get(bone_parent, "")
-            if not bone_parent:
-                logger.warning("Parent not found for %s" % child.name)
-            set_obj_bone_parent(obj, pa_name, root)
+                obj, child_bone_names = build_armature(
+                    child, bone_ids=bones, visited=sm_culled - {sm_root}
+                )
             results.append((obj, child_bone_names))
+            bone_names_all |= {k: (obj, v) for k, v in child_bone_names.items()}
+        for i, (obj, _) in enumerate(results[1:]):
+            sm_root, sm = sm_roots[i]
+            child = hierarchy.nodes[sm_root]
+            bone_parent = hierarchy.parents.get(sm_root, None)
+            pa_root, pa_name = bone_names_all.get(bone_parent, (None, None))
+            if not pa_name:
+                logger.warning("Parent not found for %s" % child.name)
+            set_obj_bone_parent(obj, pa_name, pa_root)
     else:
         # Import the entire hierarchy as a single armature
         # Fails when:

@@ -382,6 +382,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 if ppmat:
                     try:
                         material: Material = ppmat.read()
+                        imported = None
                         if material.object_reader.path_id in material_cache:
                             imported = material_cache[material.object_reader.path_id]
                             obj.data.materials.append(imported)
@@ -392,9 +393,11 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                             case "SEKAI_STAGE":
                                 imported = import_material_sekai_stage(material)
                             case "GENERIC":
-                                imported = import_material_fallback(material)
-                        obj.data.materials.append(imported)
-                        material_cache[material.object_reader.path_id] = imported
+                                if not wm.sssekai_generic_material_import_skip:
+                                    imported = import_material_fallback(material)
+                        if imported:
+                            obj.data.materials.append(imported)
+                            material_cache[material.object_reader.path_id] = imported
                     except Exception as e:
                         logger.error(
                             "Failed to import Material %s: %s. Skipping."

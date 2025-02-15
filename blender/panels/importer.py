@@ -389,6 +389,11 @@ register_wm_props(
         default=0,
         min=0,
     ),
+    sssekai_generic_material_import_skip=BoolProperty(
+        name=T("Skip Materials"),
+        description=T("Skip importing materials"),
+        default=False,
+    ),
 )
 
 
@@ -703,6 +708,9 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                         row.label(text=T("Generic Options"), icon="ARMATURE_DATA")
                         row = layout.row()
                         row.prop(wm, "sssekai_generic_material_import_slot")
+                        row.prop(
+                            wm, "sssekai_generic_material_import_skip", icon="CANCEL"
+                        )
                         row = layout.row()
                         row.operator(
                             SSSekaiBlenderImportHierarchyOperator.bl_idname,
