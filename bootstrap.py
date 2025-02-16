@@ -77,8 +77,9 @@ class SSSekaiAddonEnviornmentStatus:
             self.addon_installed = None
 
         try:
-            import sssekai
+            import importlib, sssekai
 
+            importlib.reload(sssekai)
             self.sssekai_installed = sssekai.__version__
         except ImportError:
             self.sssekai_installed = None
@@ -303,11 +304,6 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
                 text=env.addon_installed or "(not installed or invalid source path)"
             )
             row = layout.row()
-            row.label(
-                text="After an update, you should restart Blender for changes to take effect.",
-                icon="INFO",
-            )
-            row = layout.row()
             if env.is_currently_installed:
                 row.label(
                     text="You can UPDATE the addon by clicking the button below.",
@@ -354,6 +350,11 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
                         text="After this operation, the source path will be symlinked to the addons folder."
                     )
             row = layout.row()
+            row.label(
+                text="After an update of the addon or sssekai, you should restart Blender for changes to take effect.",
+                icon="INFO",
+            )
+            row = layout.row()
             row.operator(SSSekaiUpdateAddonOperator.bl_idname)
         else:
             row.label(
@@ -367,9 +368,13 @@ class SSSekaiAddonBootstrapperPreferences(bpy.types.AddonPreferences):
             row = layout.row()
             row.label(text="Please fix the issues above and try again.")
         row = layout.row()
-
-        if env.lib_writable:
-            row.operator(SSSekaiUpdateSSSekaiOperator.bl_idname)
+        if not env.lib_writable:
+            row.label(
+                text="Blender library path is not writable. You may need to run Blender as an administrator.",
+                icon="ERROR",
+            )
+            row = layout.row()
+        row.operator(SSSekaiUpdateSSSekaiOperator.bl_idname)
         row.operator(SSSekaiRefreshEnvironmentOperator.bl_idname)
 
 

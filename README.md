@@ -4,6 +4,8 @@
 Blender asset importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク) asset bundles.
 
 ## Documentation
+**ATTENTION:** The Wiki is undergoing revisions and is not up-to-date. Please wait for further notice.
+
 Read the [wiki page](https://github.com/mos9527/sssekai_blender_io/wiki) for more!
 
 ## Supported Languages
@@ -50,7 +52,7 @@ Remeber to *restart Blender* after updating the addon through the Bootstrapper t
 The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
 
 ### Known Issues
-- Doesn't handle scenes with multiple objects of the same name.
+- ~~Doesn't handle scenes with multiple objects of the same name.~~
 
 ### Roadmap
 #### Asset
