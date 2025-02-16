@@ -345,12 +345,12 @@ def import_mesh_data(
         deform_layer = bm.verts.layers.deform.new()
     # Vertex position & vertex normal (pre-assign)
     for vtx in range(0, handler.m_VertexCount):
-        vert = bm.verts.new(swizzle_vector3(*handler.m_Vertices[vtx]))
+        vert = bm.verts.new(swizzle_vector3(*handler.m_Vertices[vtx][:3]))
         # Blender always generates normals automatically
         # Custom normals needs a bit more work
         # See below for normals_split... calls
         if handler.m_Normals:
-            vert.normal = swizzle_vector3(*handler.m_Normals[vtx])
+            vert.normal = swizzle_vector3(*handler.m_Normals[vtx][:3])
         if deform_layer:
             boneIndex = handler.m_BoneIndices[vtx]
             if handler.m_BoneWeights:
