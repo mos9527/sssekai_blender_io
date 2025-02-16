@@ -1,7 +1,7 @@
 # sssekai_blender_io
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-Blender asset importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク) asset bundles.
+Blender importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク), and generic Unity AssetBundle files.
 
 ## Documentation
 **ATTENTION:** The Wiki is undergoing revisions and is not up-to-date. Please wait for further notice.
