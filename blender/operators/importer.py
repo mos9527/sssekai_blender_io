@@ -1,6 +1,6 @@
 from bpy.app.translations import pgettext as T
 import bpy, bpy.utils.previews, bpy_extras
-import math, json
+import math, json, traceback
 
 from typing import List, Tuple
 from UnityPy.classes import PPtr
@@ -279,6 +279,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
                     imported_objects.append((mesh_obj, sm.m_Materials, mesh))
                 except Exception as e:
+                    traceback.print_exc()
                     logger.error(
                         "Failed to import Skinned Mesh at %s: %s. Skipping."
                         % (game_object.m_Name, str(e))
@@ -303,6 +304,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                         set_obj_bone_parent(mesh_obj, bone_name, armature_obj)
                         imported_objects.append((mesh_obj, m.m_Materials, mesh))
                     except Exception as e:
+                        traceback.print_exc()
                         logger.error(
                             "Failed to import Static Mesh at %s: %s. Skipping."
                             % (bone_name, str(e))
@@ -399,6 +401,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                             obj.data.materials.append(imported)
                             material_cache[material.object_reader.path_id] = imported
                     except Exception as e:
+                        traceback.print_exc()
                         logger.error(
                             "Failed to import Material %s: %s. Skipping."
                             % (material.m_Name, str(e))

@@ -1,6 +1,6 @@
 import bpy, bmesh
 import json, math
-import tempfile, copy
+import tempfile, copy, traceback
 from typing import Dict, Tuple, List, Set
 from UnityPy.enums import ClassIDType
 from UnityPy.helpers.MeshHelper import MeshHandler
@@ -485,6 +485,7 @@ def make_material_texture_node(
         else:
             image = import_texture(texture.m_Name, texture)
     except Exception as e:
+        traceback.print_exc()
         logger.error("Failed to load texture - %s. Discarding." % e)
         return None
     uvMap = material.node_tree.nodes.new("ShaderNodeUVMap")
