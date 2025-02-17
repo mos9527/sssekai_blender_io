@@ -232,8 +232,9 @@ def import_scene_hierarchy(
     for path_id, node in hierarchy.nodes.items():
         if node.game_object and node.game_object.m_SkinnedMeshRenderer:
             sm: SkinnedMeshRenderer = node.game_object.m_SkinnedMeshRenderer.read()
-            root = sm.m_RootBone.path_id
-            sm_roots.append((root, sm))
+            if sm.m_Mesh:
+                root = sm.m_RootBone.path_id
+                sm_roots.append((root, sm))
     sm_roots.sort(key=lambda x: x[0])
 
     if seperate_armatures:
