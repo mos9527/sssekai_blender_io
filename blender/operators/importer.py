@@ -26,7 +26,7 @@ from ..core.helpers import (
 )
 
 from ..core.asset import (
-    import_fallback_material,
+    import_all_material_inputs,
     import_sekai_eye_material,
     import_sekai_eyelight_material,
     import_sekai_character_material,
@@ -375,9 +375,24 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
 
         def import_material_fallback(material: Material):
             name = material.m_Name
-            return import_fallback_material(
-                name, material, texture_cache, wm.sssekai_generic_material_import_slot
-            )
+            return import_all_material_inputs(name, material, texture_cache)
+
+        def import_material(material: Material):
+            imported = None
+            match wm.sssekai_hierarchy_import_mode:
+                case "SEKAI_CHARACTER":
+                    if wm.sssekai_sekai_material_mode == "GENERIC":
+                        imported = import_material_fallback(material)
+                    else:
+                        imported = import_material_sekai_character(material)
+                case "SEKAI_STAGE":
+                    if wm.sssekai_sekai_material_mode == "GENERIC":
+                        imported = import_material_fallback(material)
+                    else:
+                        imported = import_material_sekai_stage(material)
+                case "GENERIC":
+                    imported = import_material_fallback(material)
+            return imported
 
         for obj, materials, mesh in imported_objects:
             for ppmat in materials:
@@ -389,14 +404,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                             imported = material_cache[material.object_reader.path_id]
                             obj.data.materials.append(imported)
                             continue
-                        match wm.sssekai_hierarchy_import_mode:
-                            case "SEKAI_CHARACTER":
-                                imported = import_material_sekai_character(material)
-                            case "SEKAI_STAGE":
-                                imported = import_material_sekai_stage(material)
-                            case "GENERIC":
-                                if not wm.sssekai_generic_material_import_skip:
-                                    imported = import_material_fallback(material)
+                        imported = import_material(material)
                         if imported:
                             obj.data.materials.append(imported)
                             material_cache[material.object_reader.path_id] = imported
