@@ -10,6 +10,7 @@ from UnityPy.classes import (
     Material,
     Mesh,
     Transform,
+    RectTransform,
     UnityTexEnv,
     SkinnedMeshRenderer,
 )
@@ -50,7 +51,10 @@ def build_scene_hierarchy(env: Environment) -> List[Hierarchy]:
     representation of the scene in Blender's View Layer.
     """
     transform_roots = []
-    for obj in filter(lambda obj: obj.type == ClassIDType.Transform, env.objects):
+    for obj in filter(
+        lambda obj: obj.type in {ClassIDType.Transform, ClassIDType.RectTransform},
+        env.objects,
+    ):
         data = obj.read()
         if hasattr(data, "m_Children") and not data.m_Father.path_id:
             transform_roots.append(data)
@@ -58,7 +62,7 @@ def build_scene_hierarchy(env: Environment) -> List[Hierarchy]:
     for transform in transform_roots:
         hierarchy = Hierarchy(transform.m_GameObject.read().m_Name)
 
-        def dfs(root: Transform, parent: HierarchyNode = None):
+        def dfs(root: Transform | RectTransform, parent: HierarchyNode = None):
             game_object = root.m_GameObject.read()
             name = game_object.m_Name
             node = HierarchyNode(
