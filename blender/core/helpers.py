@@ -3,7 +3,7 @@ from typing import Dict
 from .math import blMatrix, blVector
 from .utils import get_addon_relative_path
 from .consts import DEFAULT_BONE_SIZE
-from .. import logger, register_wm_props, register_class
+from .. import logger, register_wm_props, register_class, sssekai_global
 from bpy.app.translations import pgettext as T
 
 
@@ -53,7 +53,11 @@ def ensure_sssekai_shader_blend():
     SHADER_BLEND_FILE = get_addon_relative_path("assets", "SekaiShaderStandalone.blend")
     if not "SSSekaiWasHere" in bpy.data.materials:
         logger.warning("SekaiShader not loaded. Importing from %s" % SHADER_BLEND_FILE)
-        with bpy.data.libraries.load(SHADER_BLEND_FILE, link=False) as (
+        if sssekai_global.debug_link_shaders:
+            logger.warning("Debug Link Shaders is enabled!")
+        with bpy.data.libraries.load(
+            SHADER_BLEND_FILE, link=sssekai_global.debug_link_shaders
+        ) as (
             data_from,
             data_to,
         ):

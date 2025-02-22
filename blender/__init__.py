@@ -146,5 +146,8 @@ class SSSekaiGlobalEnvironment:
             else (0, 0)
         )
 
+    # --- Debug
+    debug_link_shaders: bool = False
+
 
 sssekai_global = SSSekaiGlobalEnvironment()

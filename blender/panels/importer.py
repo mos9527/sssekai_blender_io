@@ -740,3 +740,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             SSSekaiBlenderImportHierarchyOperator.bl_idname,
                             icon="APPEND_BLEND",
                         )
+        row = layout.row()
+        row.label(text=T("Debug Options"), icon="SCRIPT")
+        row = layout.row()
+        row.prop(wm, "sssekai_debug_link_shaders", icon="SCRIPT", expand=True)
