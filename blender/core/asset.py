@@ -298,6 +298,8 @@ def import_scene_hierarchy(
                         )
                 bindpose |= bindpose_of(cur[1])
                 bindpose |= bindpose_of(next[1])
+            if len(sm_roots) == 1:
+                bindpose |= bindpose_of(sm_roots[0][1])
             obj, bone_names = build_armature(
                 hierarchy.root, bindpose=bindpose, bone_ids=bone_ids
             )
