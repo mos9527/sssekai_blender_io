@@ -68,6 +68,8 @@ def ensure_sssekai_shader_blend():
         bpy.context.scene.collection.children.link(
             bpy.data.collections["SekaiShaderBase"]
         )
+        # https://projects.blender.org/blender/blender/issues/102881
+        bpy.data.objects.remove(bpy.data.objects["SekaiShaderStub"])
 
 
 rgba_to_rgb_tuple = lambda col: (col.r, col.g, col.b, col.a)
