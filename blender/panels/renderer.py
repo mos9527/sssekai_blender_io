@@ -24,6 +24,11 @@ class SSSekaiRendererPanel(bpy.types.Panel):
                 icon="INFO",
             )
             row = layout.row()
+            row.label(
+                text="For optimal viewport performance, however, using Eevee is recommended.",
+                icon="INFO",
+            )
+            row = layout.row()
         else:
             row.prop(context.scene.eevee, "use_raytracing")
             row = layout.row()

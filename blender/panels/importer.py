@@ -779,7 +779,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             )
                             row.operator(
                                 SSSekaiBlenderUtilCharaNeckMergeOperator.bl_idname,
-                                icon="AREA_JOIN",
+                                icon="CONSTRAINT",
                             )
                             row = layout.row()
                             row.label(text=T("Mesh Type"))
