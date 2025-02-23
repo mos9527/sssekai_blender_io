@@ -484,13 +484,18 @@ def make_material_texture_node(
 ):
     image = None
     try:
-        texture: Texture2D = ppTexture.m_Texture.read()
-        if texture_cache:
-            if not texture.m_Name in texture_cache:
-                texture_cache[texture.m_Name] = import_texture(texture.m_Name, texture)
-            image = texture_cache[texture.m_Name]
+        if ppTexture.m_Texture:
+            texture: Texture2D = ppTexture.m_Texture.read()
+            if texture_cache:
+                if not texture.m_Name in texture_cache:
+                    texture_cache[texture.m_Name] = import_texture(
+                        texture.m_Name, texture
+                    )
+                image = texture_cache[texture.m_Name]
+            else:
+                image = import_texture(texture.m_Name, texture)
         else:
-            image = import_texture(texture.m_Name, texture)
+            return None
     except Exception as e:
         traceback.print_exc()
         logger.error("Failed to load texture - %s. Discarding." % e)
@@ -520,45 +525,53 @@ def make_material_texture_node(
     return texNode
 
 
-def import_fallback_material(
-    name: str, data: Material, texture_cache=None, slot_name: str = "_MainTex", **kwargs
+def make_material_value_node(
+    name: str, material: bpy.types.Material, value: float | int | ColorRGBA
 ):
+    node = None
+    if type(value) == ColorRGBA:
+        node = material.node_tree.nodes.new("ShaderNodeCombineRGB")
+        node.inputs[0].default_value = value.r
+        node.inputs[1].default_value = value.g
+        node.inputs[2].default_value = value.b
+        alpha = make_material_value_node(name + " Alpha", material, value.a)
+    else:
+        node = material.node_tree.nodes.new("ShaderNodeValue")
+        node.outputs[0].default_value = value
+    if node:
+        node.name = node.label = name
+    return node
+
+
+def import_all_material_inputs(name: str, data: Material, texture_cache=None, **kwargs):
     """Imports Material assets into blender.
-    This is a generic material importer that only imports all texture maps
-    with the nth_slot as the input to a Principled BSDF shader's Base Color (Diffuse) and an Alpha input
+    This imports all texture slots into the material w/o actually linking them.
 
     Args:
         name (str): material name
         data (Material): UnityPy Material
-        slot_name (str, optional): Texture slot to import.
 
     Returns:
         bpy.types.Material: Created material
     """
-    textures = dict(data.m_SavedProperties.m_TexEnvs)
-    material = bpy.data.materials["SekaiDefaultFallbackMaterial"].copy()
-    material.name = name
-    sekaiShader = material.node_tree.nodes["SekaiDefaultFallbackShader"]
-
-    def link_tex(tex: bpy.types.Node):
-        material.node_tree.links.new(
-            tex.outputs["Color"],
-            sekaiShader.inputs["Color"],
-        )
-        material.node_tree.links.new(tex.outputs["Alpha"], sekaiShader.inputs["Alpha"])
-
-    logger.debug("Material %s" % name)
-    imported = dict()
-    for i, (env_name, env) in enumerate(textures.items()):
-        logger.debug("- Tex#%2d: %s" % (i, env_name))
+    material = bpy.data.materials.new(name)
+    material.use_nodes = True
+    for node in material.node_tree.nodes:
+        material.node_tree.nodes.remove(node)
+    output = material.node_tree.nodes.new("ShaderNodeOutputMaterial")
+    for env_name, env in data.m_SavedProperties.m_TexEnvs:
         tex = make_material_texture_node(material, env, texture_cache)
         if tex:
-            tex.label = env_name
-            imported[env_name] = tex
-    if slot_name in imported:
-        link_tex(imported[slot_name])
-    else:
-        logger.warning("Slot %s not found" % slot_name)
+            tex.name = tex.label = env_name
+        else:
+            logger.warning("Texture map not found on %s" % env_name)
+    for env_name, env in (
+        data.m_SavedProperties.m_Floats
+        + data.m_SavedProperties.m_Colors
+        + data.m_SavedProperties.m_Ints
+    ):
+        node = make_material_value_node(env_name, material, env)
+
     return material
 
 

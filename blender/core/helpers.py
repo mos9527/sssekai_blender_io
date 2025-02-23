@@ -84,6 +84,29 @@ def create_empty(name: str, parent=None, size=0.1):
     return joint
 
 
+def auto_connect_tex_vaule_nodes_by_name(node_tree, dst):
+    """Automatically connects nodes by their group name
+
+    Connections are made between the intersection of the output and input names.
+    No checks are made for type compatibility.
+    """
+    outputs = {k.name: i for i, k in enumerate(node_tree.nodes)}
+    inputs = {k.name: i for i, k in enumerate(dst.inputs)}
+    for input in inputs:
+        if input in outputs:
+            node_tree.links.new(
+                node_tree.nodes[outputs[input]].outputs[0], dst.inputs[inputs[input]]
+            )
+        else:
+            if " " in input:
+                name, socket = input.split(" ")[:2]
+                if name in outputs:
+                    node_tree.links.new(
+                        node_tree.nodes[outputs[name]].outputs[socket],
+                        dst.inputs[inputs[input]],
+                    )
+
+
 def auto_connect_shader_nodes_by_name(node_tree, lhs, rhs):
     """Automatically connects nodes by name
 
