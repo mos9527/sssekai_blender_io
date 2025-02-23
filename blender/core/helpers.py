@@ -92,11 +92,19 @@ def auto_connect_tex_vaule_nodes_by_name(node_tree, dst):
     """
     outputs = {k.name: i for i, k in enumerate(node_tree.nodes)}
     inputs = {k.name: i for i, k in enumerate(dst.inputs)}
-    for output in outputs:
-        if output in inputs:
+    for input in inputs:
+        if input in outputs:
             node_tree.links.new(
-                node_tree.nodes[outputs[output]].outputs[0], dst.inputs[inputs[output]]
+                node_tree.nodes[outputs[input]].outputs[0], dst.inputs[inputs[input]]
             )
+        else:
+            if " " in input:
+                name, socket = input.split(" ")[:2]
+                if name in outputs:
+                    node_tree.links.new(
+                        node_tree.nodes[outputs[name]].outputs[socket],
+                        dst.inputs[inputs[input]],
+                    )
 
 
 def auto_connect_shader_nodes_by_name(node_tree, lhs, rhs):

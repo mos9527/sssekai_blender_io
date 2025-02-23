@@ -526,7 +526,7 @@ def make_material_texture_node(
 
 
 def make_material_value_node(
-    material: bpy.types.Material, value: float | int | ColorRGBA
+    name: str, material: bpy.types.Material, value: float | int | ColorRGBA
 ):
     node = None
     if type(value) == ColorRGBA:
@@ -534,9 +534,12 @@ def make_material_value_node(
         node.inputs[0].default_value = value.r
         node.inputs[1].default_value = value.g
         node.inputs[2].default_value = value.b
+        alpha = make_material_value_node(name + " Alpha", material, value.a)
     else:
         node = material.node_tree.nodes.new("ShaderNodeValue")
         node.outputs[0].default_value = value
+    if node:
+        node.name = node.label = name
     return node
 
 
@@ -567,9 +570,7 @@ def import_all_material_inputs(name: str, data: Material, texture_cache=None, **
         + data.m_SavedProperties.m_Colors
         + data.m_SavedProperties.m_Ints
     ):
-        node = make_material_value_node(material, env)
-        if node:
-            node.name = node.label = env_name
+        node = make_material_value_node(env_name, material, env)
 
     return material
 

@@ -45,6 +45,8 @@ from ..operators.sekai_rigidbody import (
     SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator,
 )
 
+from ..operators.material import SSSekaiGenericMaterialSetModeOperator
+
 EMPTY_OPT = ("<no assest selected!>", "Not Available", "", "ERROR", 0)
 EMPTY_CONTAINER = "<default>"
 ALL_CONTAINER = "<all>"
@@ -387,26 +389,28 @@ register_wm_props(
         description=T("Method to import the selected material"),
         items=[
             (
-                "UNITY_PBR_STANDARD",
-                T("Unity PBR Standard"),
-                T("Import the materials as a Unity PBR Standard Material"),
+                "BASIC_TOON",
+                T("Toon"),
+                T(
+                    "Import the base material as a basic toon material w/ simple NPR techniques"
+                ),
                 "MATERIAL",
                 1,
+            ),
+            (
+                "UNITY_PBR_STANDARD",
+                T("PBR Std."),
+                T(
+                    "(Currently, Same as Basic) Import the materials as a Unity PBR Standard Material"
+                ),
+                "MATERIAL",
+                2,
             ),
             (
                 "BASIC",
                 T("Basic"),
                 T(
                     "Import the base material as a basic material with *ONLY* the diffuse map"
-                ),
-                "MATERIAL",
-                2,
-            ),
-            (
-                "BASIC_TOON",
-                T("Basic Toon"),
-                T(
-                    "Import the base material as a basic toon material w/ simple NPR techniques"
                 ),
                 "MATERIAL",
                 3,
@@ -418,7 +422,14 @@ register_wm_props(
                 "MATERIAL",
                 4,
             ),
-            ("SKIP", T("Skip"), T("Skip importing the material"), 5),
+            (
+                "COLORADD",
+                T("Color Add"),
+                T("Import the base material as a color add material"),
+                "MATERIAL",
+                5,
+            ),
+            ("SKIP", T("Skip"), T("Skip importing the material"), 6),
         ],
     ),
     sssekai_sekai_material_mode=EnumProperty(
@@ -699,6 +710,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 def __draw_generic_material_options(row):
                     row.prop(wm, "sssekai_generic_material_import_mode", expand=True)
                     row = layout.row()
+                    row.operator(SSSekaiGenericMaterialSetModeOperator.bl_idname)
+                    row = layout.row()
 
                 match import_mode:
                     case "SEKAI_CHARACTER":
@@ -808,6 +821,7 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                             SSSekaiBlenderImportHierarchyOperator.bl_idname,
                             icon="APPEND_BLEND",
                         )
+
         row = layout.row()
         row.label(text=T("Debug Options"), icon="SCRIPT")
         row = layout.row()
