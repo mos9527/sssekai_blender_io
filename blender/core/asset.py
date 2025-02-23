@@ -559,16 +559,16 @@ def import_all_material_inputs(name: str, data: Material, texture_cache=None, **
     for node in material.node_tree.nodes:
         material.node_tree.nodes.remove(node)
     output = material.node_tree.nodes.new("ShaderNodeOutputMaterial")
-    for env_name, env in data.m_SavedProperties.m_TexEnvs:
+    for env_name, env in data.m_SavedProperties.m_TexEnvs or []:
         tex = make_material_texture_node(material, env, texture_cache)
         if tex:
             tex.name = tex.label = env_name
         else:
             logger.warning("Texture map not found on %s" % env_name)
     for env_name, env in (
-        data.m_SavedProperties.m_Floats
-        + data.m_SavedProperties.m_Colors
-        + data.m_SavedProperties.m_Ints
+        (data.m_SavedProperties.m_Floats or [])
+        + (data.m_SavedProperties.m_Colors or [])
+        + (data.m_SavedProperties.m_Ints or [])
     ):
         node = make_material_value_node(env_name, material, env)
 
