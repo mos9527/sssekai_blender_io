@@ -12,7 +12,6 @@ bl_info = {
 
 
 import bpy, os, subprocess, sys, shutil
-import addon_utils
 from dataclasses import dataclass
 
 ADDON_INSTALLATION_LINK_FOLDER = "sssekai_blender_io_bootstrapped"
@@ -39,7 +38,7 @@ class SSSekaiAddonEnviornmentStatus:
         return os.path.join(self.addon_path, ADDON_INSTALLATION_LINK_FOLDER)
 
     def refresh(self):
-        self.addon_path = addon_utils.paths()[-1]
+        self.addon_path = os.path.dirname(__file__)
         self.lib_path = os.path.dirname(os.__file__)
 
         self.addon_writable = os.access(self.addon_path, os.W_OK)

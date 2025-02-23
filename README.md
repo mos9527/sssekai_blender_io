@@ -3,6 +3,8 @@
 
 Blender importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク), and generic Unity AssetBundle files.
 
+Supports Blender 4.0 and up.
+
 ## Documentation
 **ATTENTION:** The Wiki is undergoing revisions and is not up-to-date. Please wait for further notice.
 
