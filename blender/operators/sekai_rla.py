@@ -85,6 +85,8 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                 tick_min = min(tick_min, frame)
                 tick_max = max(tick_max, frame)
                 for i, bone_euler in enumerate(pose["boneDatas"]):
+                    if i >= len(SEKAI_RLA_VALID_BONES): continue
+                    # XXX: Uh oh
                     if SEKAI_RLA_VALID_BONES[i] == SEKAI_RLA_ROOT_BONE: continue
                     # Eulers
                     bone_path_crc = inv_tos_crc_table.get(SEKAI_RLA_VALID_BONES[i])
@@ -105,7 +107,10 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                 ))
             # Always use NLAs
             action = load_armature_animation(anim.Name, anim, body_obj, tos_crc_table, True)
-            apply_action(body_obj, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
+            try:
+                apply_action(body_obj, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
+            except Exception as e:
+                logger.error("Failed to Armature action: %s" % e)
             # fmt: on
         else:
             logger.warning("No body object found, skipping body animation")
@@ -131,12 +136,17 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                 tick_min = min(tick_min, frame)
                 tick_max = max(tick_max, frame)
                 for i, shapeValue in enumerate(pose["shapeDatas"]):
+                    if i >= len(SEKAI_RLA_VALID_BLENDSHAPES): continue
+                    # XXX: Again?
                     shape_name = SEKAI_RLA_VALID_BLENDSHAPES[i]
                     curve = anim.get_curve(binding_of(SEKAI_BLENDSHAPE_CRC, inv_mod_crc_table[shape_name]))
                     curve.Data.append(KeyFrame(frame,0,shapeValue,isDense=True,inSlope=0,outSlope=0))
             # Always use NLAs
             action = load_sekai_keyshape_animation(anim.Name, anim, morph_crc_table, True)
-            apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
+            try:
+                apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
+            except Exception as e:
+                logger.error("Failed to ShapeKey action: %s" % e)
             # fmt: on
         else:
             logger.warning("No face object found, skipping face animation")
