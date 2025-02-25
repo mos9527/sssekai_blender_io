@@ -3,7 +3,7 @@ import argparse, os, logging, coloredlogs, io
 from sssekai.fmt.rla import decode_buffer_base64, read_rla_frames
 
 MAGNITUDE = 1e7
-SEGMENTS_PER_CLIP = 30
+SEGMENTS_PER_CLIP = 100
 
 logger = logging.getLogger("sssekai")
 if __name__ == "__main__":
@@ -33,15 +33,16 @@ if __name__ == "__main__":
             raw_data.append((f, data))
         else:
             try:
-                decode_buffer_base64(data)
-                raw_data.append((f, data))
+                split, sig, _ = decode_buffer_base64(data)
+                if sig == 1:  # MotionCaptureData
+                    raw_data.append((f, data))
             except Exception as e:
                 logger.error("Failed to decode %s: %s", f, e)
                 dropped += 1
             finally:
                 if raw_data:
                     print(
-                        "read: %8d drop: %8d, health: %.2f%%, total: %8d"
+                        "motion read: %8d, drop: %8d, health: %.2f%%, total: %8d (motion + rest)"
                         % (
                             len(raw_data),
                             dropped,
@@ -60,7 +61,7 @@ if __name__ == "__main__":
     assert mot, "No MotionCaptureData found in SSE packets"
     base_tick = int(mot[0].split("-")[0])
     base_frame_tick = min((data["timestamp"] for data in mot[1]["data"]))
-    logger.info("Base tick: %d", base_tick)
+    logger.info("Base tick: %d, %d" % (base_tick, base_frame_tick))
     logger.info("Packing into ZIP")
 
     rla_stream = io.BytesIO()
@@ -69,36 +70,39 @@ if __name__ == "__main__":
     write_int = lambda value, nbytes: rla_stream.write(value.to_bytes(nbytes, "little"))
     write_buffer = lambda value: rla_stream.write(value)
 
-    segments = []
+    clips = []
     for fname, data in raw_data:
         tick = int(fname.split("-")[0])
-        split, _, _ = decode_buffer_base64(data)
+        split, sig, _ = decode_buffer_base64(data)
+        if split:
+            print("skip split", fname, split)
+            continue
         frame_tick = base_frame_tick + (tick - base_tick) / 1000 * MAGNITUDE
         write_int(int(frame_tick), 8)
         write_int(len(data), 4)
         write_buffer(data)
         num_segments += 1
-        if num_segments >= SEGMENTS_PER_CLIP and split is None:
+        if num_segments >= SEGMENTS_PER_CLIP:
             num_segments = 0
-            segments.append(bytes(rla_stream.getbuffer()))
+            clips.append(bytes(rla_stream.getbuffer()))
             rla_stream = io.BytesIO()
     if num_segments > 0:
-        segments.append(bytes(rla_stream.getbuffer()))
-    logger.info("Writing %d segments to %s", len(segments), args.outfile)
+        clips.append(bytes(rla_stream.getbuffer()))
+    logger.info("Writing %d segments to %s", len(clips), args.outfile)
     rlh_header = {
         "baseTicks": base_frame_tick,
         "version": args.version,
         "splitSeconds": 0,
-        "splitFileIds": list(range(len(segments))),
+        "splitFileIds": list(range(len(clips))),
     }
 
     import zipfile, json
 
     with zipfile.ZipFile(args.outfile, "w") as z:
         z.writestr("sekai.rlh", json.dumps(rlh_header))
-        for idx, segment in enumerate(segments):
+        for idx, segment in enumerate(clips):
             print(
-                "* packing %s %08d/%08d" % ("/|-"[idx % 3], idx, len(segments)),
+                "* packing %s %08d/%08d" % ("/|-"[idx % 3], idx, len(clips)),
                 end="\r",
             )
             z.writestr("sekai_%02d_%08d.rla" % (0, idx), segment)

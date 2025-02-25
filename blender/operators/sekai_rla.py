@@ -58,6 +58,11 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                     if chunk["id"] == active_chara:
                         chara_segments.append((chunk["timestamp"], chunk["pose"]))
         chara_segments = sorted(chara_segments, key=lambda x: x[0])
+        if not chara_segments:
+            logger.warning(
+                "Skipping empty segment %s" % sssekai_global.rla_selected_raw_clip
+            )
+            return {"FINISHED"}
         base_tick = sssekai_global.rla_header["baseTicks"]
         tick_min, tick_max = 1e10, 0
         if body_obj:
@@ -82,6 +87,11 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                 frame = (tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
                 tick_min = min(tick_min, frame)
                 tick_max = max(tick_max, frame)
+                if len(pose["boneDatas"]) != len(SEKAI_RLA_VALID_BONES):
+                    logger.warning("Invalid bone count: %d" % len(pose["boneDatas"]))
+                    # XXX: Introduced after ENSTAR collab
+                    # Core/StreamingLive/Define/TransportDefineCollaboE
+                    continue
                 for i, bone_euler in enumerate(pose["boneDatas"]):
                     if SEKAI_RLA_VALID_BONES[i] == SEKAI_RLA_ROOT_BONE: continue
                     # Eulers
@@ -104,6 +114,7 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
             # Always use NLAs
             action = load_armature_animation(anim.Name, anim, body_obj, tos_crc_table, True)
             try:
+                logger.info("Armature Frame range: %d - %d" % (tick_min, tick_max))
                 apply_action(body_obj, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
             except Exception as e:
                 logger.error("Failed to Armature action: %s" % e)
@@ -131,6 +142,9 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                 frame = (tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
                 tick_min = min(tick_min, frame)
                 tick_max = max(tick_max, frame)
+                if len(pose["shapeDatas"]) != len(SEKAI_RLA_VALID_BLENDSHAPES):
+                    logger.warning("Invalid shape count: %d" % len(pose["shapeDatas"]))
+                    continue
                 for i, shapeValue in enumerate(pose["shapeDatas"]):
                     shape_name = SEKAI_RLA_VALID_BLENDSHAPES[i]
                     curve = anim.get_curve(binding_of(SEKAI_BLENDSHAPE_CRC, inv_mod_crc_table[shape_name]))
@@ -138,6 +152,7 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
             # Always use NLAs
             action = load_sekai_keyshape_animation(anim.Name, anim, morph_crc_table, True)
             try:
+                logger.info("Face Frame range: %d - %d" % (tick_min, tick_max))
                 apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
             except Exception as e:
                 logger.error("Failed to ShapeKey action: %s" % e)
@@ -184,13 +199,17 @@ NOTE: NLA tracks will be used regardless of the option specified!"""
 
         logger.debug("Loading RLA index %s" % entry)
         version = sssekai_global.rla_get_version()
-        sssekai_global.rla_clip_data = list(
-            read_archive_rla_frames(
-                BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=False
+        try:
+            sssekai_global.rla_clip_data = list(
+                read_archive_rla_frames(
+                    BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=True
+                )
             )
-        )
+        except Exception as e:
+            logger.error("Failed to load RLA bundle: %s" % e)
+            return {"CANCELLED"}
         sssekai_global.rla_selected_raw_clip = entry
-        min_tick, max_tick = 1e18, 0
+        min_tick, max_tick = 1e10, 0
         sssekai_global.rla_clip_charas.clear()
         for tick, data in sssekai_global.rla_clip_data:
             if data["type"] == "MotionCaptureData":

@@ -132,6 +132,7 @@ KEY_SEKAI_CHARACTER_LIGHT_OBJ = "sssekai_sekai_character_light_obj"
 KEY_SEKAI_CHARACTER_BODY_OBJ = "sssekai_sekai_character_body_obj"
 KEY_SEKAI_CHARACTER_FACE_OBJ = "sssekai_sekai_character_face_obj"
 # Hardcoded orders for RLA import
+# Core/StreamingLive/Define/TransportDefine
 SEKAI_RLA_VALID_BONES = [
     "Hip",
     "Waist",

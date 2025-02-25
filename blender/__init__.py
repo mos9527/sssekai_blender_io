@@ -132,7 +132,7 @@ class SSSekaiGlobalEnvironment:
     # --- RLA
     rla_sekai_streaming_live_bundle_path: str = None
     rla_header: dict = field(default_factory=dict)
-    rla_clip_data: dict = field(default_factory=dict)
+    rla_clip_data: list = field(default_factory=list)
     rla_raw_clips: dict = field(default_factory=dict)
     rla_selected_raw_clip: str = None
     rla_clip_tick_range: tuple = (0, 0)

@@ -76,6 +76,7 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
                     (sname, sname, "", "ANIM_DATA", index)
                     for index, sname in enumerate(sssekai_global.rla_raw_clips.keys())
                 ]
+                logger.debug("RLA version: %s" % header["version"])
         except Exception as e:
             logger.error("Failed to load RLA bundle: %s" % e)
         return sssekai_global.rla_enum_entries
