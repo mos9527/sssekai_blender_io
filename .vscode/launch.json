@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false            
+        },        
+        {
             "name": "Python Debugger: Test Private A (Offline)",
             "type": "debugpy",
             "request": "launch",
@@ -37,15 +45,20 @@
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
-            "args": ["-v","-s"],   
-            "justMyCode": false         
+            "args": [
+                "-v",
+                "-s"
+            ],
+            "justMyCode": false
         },
         {
             "name": "Python Debugger: inv_crc32.py",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/inv_crc32.py",
-            "args": ["nocsv"]
+            "args": [
+                "nocsv"
+            ]
         },
         {
             "name": "Python Debugger: LUT tests",
@@ -74,6 +87,19 @@
             "request": "launch",
             "justMyCode": false,
             "module": "tests.test_dof",
+        },
+        {
+            "name": "Python Debugger: Pack RLA Zip",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/scripts/rla_pack_zip.py",
+            "args": [
+                "/Volumes/mos9527弄丢的盘/Reverse/proseka_reverse/sse_packet_importer/packets/356_5043",
+                "/Volumes/mos9527弄丢的盘/Reverse/proseka_reverse/sse_packet_importer/packets/356_5043.zip",
+                "--version",
+                "1.6"
+            ]
         },
     ]
 }

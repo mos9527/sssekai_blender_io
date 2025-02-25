@@ -3,8 +3,8 @@ import bpy, bpy.utils.previews
 import json
 
 from sssekai.unity.AnimationClip import (
-    Animation,
-    KeyFrame,
+    AnimationHelper,
+    KeyframeHelper,
     kBindTransformRotation,
     kBindTransformPosition,
 )
@@ -52,16 +52,23 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
         active_chara_height = active_object[KEY_SEKAI_CHARACTER_HEIGHT]
 
         chara_segments = list()
-        for tick, data in sssekai_global.rla_clip_data.items():
-            m_data = data.get("MotionCaptureData", None)
-            if m_data:
-                for data in m_data:
-                    for pose in data["data"]:
-                        if pose["id"] == active_chara:
-                            chara_segments.append((pose["timestamp"], pose["pose"]))
+        for tick, data in sssekai_global.rla_clip_data:
+            if data["type"] == "MotionCaptureData":
+                for chunk in data["data"]:
+                    if chunk["id"] == active_chara:
+                        chara_segments.append((chunk["timestamp"], chunk["pose"]))
         chara_segments = sorted(chara_segments, key=lambda x: x[0])
+        if not chara_segments:
+            logger.warning(
+                "Skipping empty segment %s" % sssekai_global.rla_selected_raw_clip
+            )
+            return {"FINISHED"}
         base_tick = sssekai_global.rla_header["baseTicks"]
-        tick_min, tick_max = 1e18, 0
+        tick_min, tick_max = 1e10, 0
+        logger.debug("Transport type: %s" % wm.sssekai_rla_transport_type)
+        rla_transport_bones, rla_transport_shapes = SEKAI_RLA_TRANSPORT[
+            wm.sssekai_rla_transport_type
+        ]
         if body_obj:
             bpy.context.view_layer.objects.active = body_obj
             bpy.ops.object.mode_set(mode="EDIT")
@@ -78,36 +85,38 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
             tos_crc_table = {crc32(v): k for k, v in tos_crc_table.items()}
             inv_tos_crc_table = {v: k for k, v in tos_crc_table.items()}
             bpy.ops.object.mode_set(mode="OBJECT")
-            anim = Animation("RLA", 0, 0)
+            anim = AnimationHelper(sssekai_global.rla_selected_raw_clip + "_MOT", 0, 0)
             # fmt: off
             for tick, pose in chara_segments:                
                 frame = (tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
                 tick_min = min(tick_min, frame)
                 tick_max = max(tick_max, frame)
+                if len(pose["boneDatas"]) != len(rla_transport_bones):
+                    logger.warning("Invalid bone count: %d. Wrong transport type?" % len(pose["boneDatas"]))
+                    continue
                 for i, bone_euler in enumerate(pose["boneDatas"]):
-                    if i >= len(SEKAI_RLA_VALID_BONES): continue
-                    # XXX: Uh oh
-                    if SEKAI_RLA_VALID_BONES[i] == SEKAI_RLA_ROOT_BONE: continue
+                    if i == 0: continue
                     # Eulers
-                    bone_path_crc = inv_tos_crc_table.get(SEKAI_RLA_VALID_BONES[i])
+                    bone_path_crc = inv_tos_crc_table.get(rla_transport_bones[i])
                     curve = anim.get_curve(binding_of(bone_path_crc,kBindTransformRotation))
-                    curve.Data.append(KeyFrame(
+                    curve.Data.append(KeyframeHelper(
                         frame, 0, euler3_to_quat_swizzled(*bone_euler), isDense=True, 
                         inSlope=uQuaternion(0,0,0,1), outSlope=uQuaternion(0,0,0,1)
                     ))
                 # Root loc/rot
-                curve = anim.get_curve(binding_of(inv_tos_crc_table[SEKAI_RLA_ROOT_BONE],kBindTransformPosition))
-                curve.Data.append(KeyFrame(frame, 0, uVector3(*(
+                curve = anim.get_curve(binding_of(inv_tos_crc_table[rla_transport_bones[0]],kBindTransformPosition))
+                curve.Data.append(KeyframeHelper(frame, 0, uVector3(*(
                     v / active_chara_height for v in pose["bodyPosition"]
                 )), isDense=True, inSlope=uVector3(0,0,0), outSlope=uVector3(0,0,0)))
-                curve = anim.get_curve(binding_of(inv_tos_crc_table[SEKAI_RLA_ROOT_BONE],kBindTransformRotation))
-                curve.Data.append(KeyFrame(
+                curve = anim.get_curve(binding_of(inv_tos_crc_table[rla_transport_bones[0]],kBindTransformRotation))
+                curve.Data.append(KeyframeHelper(
                     frame, 0, euler3_to_quat_swizzled(*pose["bodyRotation"]), isDense=True,
                     inSlope=uQuaternion(0,0,0,1), outSlope=uQuaternion(0,0,0,1)
                 ))
             # Always use NLAs
             action = load_armature_animation(anim.Name, anim, body_obj, tos_crc_table, True)
             try:
+                logger.info("Armature Frame range: %d - %d" % (tick_min, tick_max))
                 apply_action(body_obj, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
             except Exception as e:
                 logger.error("Failed to Armature action: %s" % e)
@@ -130,20 +139,22 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
             morph_crc_table = json.loads(morph.data[KEY_SHAPEKEY_HASH_TABEL])
             inv_mod_crc_table = {v: k for k, v in morph_crc_table.items()}
             # fmt: off
-            anim = Animation("RLA", 0, 0)
+            anim = AnimationHelper(sssekai_global.rla_selected_raw_clip + "_FACE", 0, 0)
             for tick, pose in chara_segments:                
                 frame = (tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
                 tick_min = min(tick_min, frame)
                 tick_max = max(tick_max, frame)
+                if len(pose["shapeDatas"]) != len(rla_transport_shapes):
+                    logger.warning("Invalid shape count: %d. Wrong transport type?" % len(pose["shapeDatas"]))
+                    continue
                 for i, shapeValue in enumerate(pose["shapeDatas"]):
-                    if i >= len(SEKAI_RLA_VALID_BLENDSHAPES): continue
-                    # XXX: Again?
-                    shape_name = SEKAI_RLA_VALID_BLENDSHAPES[i]
+                    shape_name = rla_transport_shapes[i]
                     curve = anim.get_curve(binding_of(SEKAI_BLENDSHAPE_CRC, inv_mod_crc_table[shape_name]))
-                    curve.Data.append(KeyFrame(frame,0,shapeValue,isDense=True,inSlope=0,outSlope=0))
+                    curve.Data.append(KeyframeHelper(frame,0,shapeValue,isDense=True,inSlope=0,outSlope=0))
             # Always use NLAs
             action = load_sekai_keyshape_animation(anim.Name, anim, morph_crc_table, True)
             try:
+                logger.info("Face Frame range: %d - %d" % (tick_min, tick_max))
                 apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
             except Exception as e:
                 logger.error("Failed to ShapeKey action: %s" % e)
@@ -185,25 +196,29 @@ NOTE: NLA tracks will be used regardless of the option specified!"""
     @staticmethod
     def update_selected_rla_asset(entry):
         global sssekai_global
-        from sssekai.fmt.rla import read_rla
+        from sssekai.fmt.rla import read_archive_rla_frames
         from io import BytesIO
 
         logger.debug("Loading RLA index %s" % entry)
         version = sssekai_global.rla_get_version()
-        sssekai_global.rla_clip_data = read_rla(
-            BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=False
-        )
+        try:
+            sssekai_global.rla_clip_data = list(
+                read_archive_rla_frames(
+                    BytesIO(sssekai_global.rla_raw_clips[entry]), version, strict=True
+                )
+            )
+        except Exception as e:
+            logger.error("Failed to load RLA bundle: %s" % e)
+            return {"CANCELLED"}
         sssekai_global.rla_selected_raw_clip = entry
-        min_tick, max_tick = 1e18, 0
+        min_tick, max_tick = 1e10, 0
         sssekai_global.rla_clip_charas.clear()
-        for tick, data in sssekai_global.rla_clip_data.items():
-            m_data = data.get("MotionCaptureData", None)
-            if m_data:
-                min_tick = min(min_tick, tick)
-                max_tick = max(max_tick, tick)
-                for data in m_data:
-                    for pose in data["data"]:
-                        sssekai_global.rla_clip_charas.add(pose["id"])
+        for tick, data in sssekai_global.rla_clip_data:
+            if data["type"] == "MotionCaptureData":
+                for chunk in data["data"]:
+                    min_tick = min(min_tick, chunk["timestamp"])
+                    max_tick = max(max_tick, chunk["timestamp"])
+                    sssekai_global.rla_clip_charas.add(chunk["id"])
         base_tick = sssekai_global.rla_header["baseTicks"]
         sssekai_global.rla_clip_tick_range = (
             (min_tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE,
