@@ -117,6 +117,8 @@ class SSSekaiRLAImportPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(wm, "sssekai_rla_active_character", icon="ARMATURE_DATA")
         row = layout.row()
+        row.prop(wm, "sssekai_rla_transport_type", icon="FILE_FOLDER")
+        row = layout.row()
         row.prop(bpy.context.scene.render, "fps", icon="TIME")
         row = layout.row()
         row.label(
@@ -188,5 +190,15 @@ register_wm_props(
     ),
     sssekai_util_neck_attach_obj_body=bpy.props.PointerProperty(
         name=T("Body"), type=bpy.types.Armature
+    ),
+    sssekai_rla_transport_type=EnumProperty(
+        name=T("Transport Type"),
+        description=T("Transport Type"),
+        items=[
+            # [(identifier, name, description, icon, number),...]
+            (name, name, name, "NONE", i)
+            for i, name in enumerate(SEKAI_RLA_TRANSPORT)
+        ],
+        default=list(SEKAI_RLA_TRANSPORT.keys())[0],
     ),
 )

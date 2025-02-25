@@ -65,6 +65,10 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
             return {"FINISHED"}
         base_tick = sssekai_global.rla_header["baseTicks"]
         tick_min, tick_max = 1e10, 0
+        logger.debug("Transport type: %s" % wm.sssekai_rla_transport_type)
+        rla_transport_bones, rla_transport_shapes = SEKAI_RLA_TRANSPORT[
+            wm.sssekai_rla_transport_type
+        ]
         if body_obj:
             bpy.context.view_layer.objects.active = body_obj
             bpy.ops.object.mode_set(mode="EDIT")
@@ -87,26 +91,24 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                 frame = (tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
                 tick_min = min(tick_min, frame)
                 tick_max = max(tick_max, frame)
-                if len(pose["boneDatas"]) != len(SEKAI_RLA_VALID_BONES):
-                    logger.warning("Invalid bone count: %d" % len(pose["boneDatas"]))
-                    # XXX: Introduced after ENSTAR collab
-                    # Core/StreamingLive/Define/TransportDefineCollaboE
+                if len(pose["boneDatas"]) != len(rla_transport_bones):
+                    logger.warning("Invalid bone count: %d. Wrong transport type?" % len(pose["boneDatas"]))
                     continue
                 for i, bone_euler in enumerate(pose["boneDatas"]):
-                    if SEKAI_RLA_VALID_BONES[i] == SEKAI_RLA_ROOT_BONE: continue
+                    if i == 0: continue
                     # Eulers
-                    bone_path_crc = inv_tos_crc_table.get(SEKAI_RLA_VALID_BONES[i])
+                    bone_path_crc = inv_tos_crc_table.get(rla_transport_bones[i])
                     curve = anim.get_curve(binding_of(bone_path_crc,kBindTransformRotation))
                     curve.Data.append(KeyframeHelper(
                         frame, 0, euler3_to_quat_swizzled(*bone_euler), isDense=True, 
                         inSlope=uQuaternion(0,0,0,1), outSlope=uQuaternion(0,0,0,1)
                     ))
                 # Root loc/rot
-                curve = anim.get_curve(binding_of(inv_tos_crc_table[SEKAI_RLA_ROOT_BONE],kBindTransformPosition))
+                curve = anim.get_curve(binding_of(inv_tos_crc_table[rla_transport_bones[0]],kBindTransformPosition))
                 curve.Data.append(KeyframeHelper(frame, 0, uVector3(*(
                     v / active_chara_height for v in pose["bodyPosition"]
                 )), isDense=True, inSlope=uVector3(0,0,0), outSlope=uVector3(0,0,0)))
-                curve = anim.get_curve(binding_of(inv_tos_crc_table[SEKAI_RLA_ROOT_BONE],kBindTransformRotation))
+                curve = anim.get_curve(binding_of(inv_tos_crc_table[rla_transport_bones[0]],kBindTransformRotation))
                 curve.Data.append(KeyframeHelper(
                     frame, 0, euler3_to_quat_swizzled(*pose["bodyRotation"]), isDense=True,
                     inSlope=uQuaternion(0,0,0,1), outSlope=uQuaternion(0,0,0,1)
@@ -142,11 +144,11 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                 frame = (tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
                 tick_min = min(tick_min, frame)
                 tick_max = max(tick_max, frame)
-                if len(pose["shapeDatas"]) != len(SEKAI_RLA_VALID_BLENDSHAPES):
-                    logger.warning("Invalid shape count: %d" % len(pose["shapeDatas"]))
+                if len(pose["shapeDatas"]) != len(rla_transport_shapes):
+                    logger.warning("Invalid shape count: %d. Wrong transport type?" % len(pose["shapeDatas"]))
                     continue
                 for i, shapeValue in enumerate(pose["shapeDatas"]):
-                    shape_name = SEKAI_RLA_VALID_BLENDSHAPES[i]
+                    shape_name = rla_transport_shapes[i]
                     curve = anim.get_curve(binding_of(SEKAI_BLENDSHAPE_CRC, inv_mod_crc_table[shape_name]))
                     curve.Data.append(KeyframeHelper(frame,0,shapeValue,isDense=True,inSlope=0,outSlope=0))
             # Always use NLAs

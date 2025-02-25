@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false            
+        },        
+        {
             "name": "Python Debugger: Test Private A (Offline)",
             "type": "debugpy",
             "request": "launch",
@@ -37,15 +45,20 @@
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
-            "args": ["-v","-s"],   
-            "justMyCode": false         
+            "args": [
+                "-v",
+                "-s"
+            ],
+            "justMyCode": false
         },
         {
             "name": "Python Debugger: inv_crc32.py",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/inv_crc32.py",
-            "args": ["nocsv"]
+            "args": [
+                "nocsv"
+            ]
         },
         {
             "name": "Python Debugger: LUT tests",
@@ -87,6 +100,6 @@
                 "--version",
                 "1.6"
             ]
-        },        
+        },
     ]
 }
