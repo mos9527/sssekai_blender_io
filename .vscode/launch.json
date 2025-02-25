@@ -75,5 +75,18 @@
             "justMyCode": false,
             "module": "tests.test_dof",
         },
+        {
+            "name": "Python Debugger: Pack RLA Zip",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}/scripts/rla_pack_zip.py",
+            "args": [
+                "/Volumes/mos9527弄丢的盘/Reverse/proseka_reverse/sse_packet_importer/packets/356_5043",
+                "/Volumes/mos9527弄丢的盘/Reverse/proseka_reverse/sse_packet_importer/packets/356_5043.zip",
+                "--version",
+                "1.6"
+            ]
+        },        
     ]
 }
