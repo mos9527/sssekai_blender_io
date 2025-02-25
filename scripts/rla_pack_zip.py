@@ -27,7 +27,7 @@ if __name__ == "__main__":
         logger.info("Validating SSE packets")
     dropped = 0
     ls = os.listdir(args.indir)
-    for f in ls:
+    for idx, f in enumerate(ls):
         data = open(os.path.join(args.indir, f), "rb").read()
         if args.skip_validation:
             raw_data.append((f, data))
@@ -37,20 +37,23 @@ if __name__ == "__main__":
                 if sig == 1:  # MotionCaptureData
                     raw_data.append((f, data))
             except Exception as e:
-                logger.error("Failed to decode %s: %s", f, e)
+                # logger.error("Failed to decode %s: %s", f, e)
                 dropped += 1
             finally:
                 if raw_data:
                     print(
-                        "motion read: %8d, drop: %8d, health: %.2f%%, total: %8d (motion + rest)"
+                        "motion take: %8d, all drop: %8d, all health: %.2f%%, read/total: %8d/%8d %.2f%%"
                         % (
                             len(raw_data),
                             dropped,
-                            100 * (1 - dropped / len(raw_data)),
+                            100 * (1 - dropped / (idx + 1)),
+                            idx + 1,
                             len(ls),
+                            100 * (idx + 1) / len(ls),
                         ),
                         end="\r",
                     )
+    print()
     version = tuple(map(int, args.version.split(".")))
     frame_gen = read_rla_frames(
         raw_data,

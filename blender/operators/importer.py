@@ -78,15 +78,16 @@ class SSSekaiBlenderUpdateCharacterControllerBodyPositionDriverOperator(
         bpy.context.view_layer.objects.active = body
         bpy.ops.object.mode_set(mode="POSE")
         bone = body.pose.bones.get("Position", None)
-        bone.driver_remove("scale")
-        for ch in bone.driver_add("scale"):
-            ch.driver.type = "SCRIPTED"
-            var = ch.driver.variables.new()
-            var.name = "height"
-            var.type = "SINGLE_PROP"
-            var.targets[0].id = active_obj
-            var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
-            ch.driver.expression = "height"
+        if bone:
+            bone.driver_remove("scale")
+            for ch in bone.driver_add("scale"):
+                ch.driver.type = "SCRIPTED"
+                var = ch.driver.variables.new()
+                var.name = "height"
+                var.type = "SINGLE_PROP"
+                var.targets[0].id = active_obj
+                var.targets[0].data_path = f'["{KEY_SEKAI_CHARACTER_HEIGHT}"]'
+                ch.driver.expression = "height"
         bpy.context.view_layer.objects.active = active_obj
         bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}
@@ -611,6 +612,7 @@ class SSSekaiBlenderImportSekaiCharacterFaceMotionOperator(bpy.types.Operator):
         assert (
             len(morphs) == 1
         ), "Multiple meshes with shapekeys found. Please keep only one"
+        # XXX: Generalize this for generic Unity stuff
         morph = morphs[0]
         crc_table = json.loads(morph.data[KEY_SHAPEKEY_HASH_TABEL])
         # Set active object to the face

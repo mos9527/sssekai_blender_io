@@ -131,33 +131,36 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                     face_obj.children_recursive,
                 )
             )
-            assert morphs, "No meshes with shapekey found"
-            assert (
-                len(morphs) == 1
-            ), "Multiple meshes with shapekeys found. Please keep only one"
-            morph = morphs[0]
-            morph_crc_table = json.loads(morph.data[KEY_SHAPEKEY_HASH_TABEL])
-            inv_mod_crc_table = {v: k for k, v in morph_crc_table.items()}
-            # fmt: off
-            anim = AnimationHelper(sssekai_global.rla_selected_raw_clip + "_FACE", 0, 0)
-            for tick, pose in chara_segments:                
-                frame = (tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
-                tick_min = min(tick_min, frame)
-                tick_max = max(tick_max, frame)
-                if len(pose["shapeDatas"]) != len(rla_transport_shapes):
-                    logger.warning("Invalid shape count: %d. Wrong transport type?" % len(pose["shapeDatas"]))
-                    continue
-                for i, shapeValue in enumerate(pose["shapeDatas"]):
-                    shape_name = rla_transport_shapes[i]
-                    curve = anim.get_curve(binding_of(SEKAI_BLENDSHAPE_CRC, inv_mod_crc_table[shape_name]))
-                    curve.Data.append(KeyframeHelper(frame,0,shapeValue,isDense=True,inSlope=0,outSlope=0))
-            # Always use NLAs
-            action = load_sekai_keyshape_animation(anim.Name, anim, morph_crc_table, True)
             try:
-                logger.info("Face Frame range: %d - %d" % (tick_min, tick_max))
-                apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
+                assert morphs, "No meshes with shapekey found"
+                assert (
+                    len(morphs) == 1
+                ), "Multiple meshes with shapekeys found. Please keep only one"
+                morph = morphs[0]
+                morph_crc_table = json.loads(morph.data[KEY_SHAPEKEY_HASH_TABEL])
+                inv_mod_crc_table = {v: k for k, v in morph_crc_table.items()}
+                # fmt: off
+                anim = AnimationHelper(sssekai_global.rla_selected_raw_clip + "_FACE", 0, 0)
+                for tick, pose in chara_segments:                
+                    frame = (tick - base_tick) / SEKAI_RLA_TIME_MAGNITUDE
+                    tick_min = min(tick_min, frame)
+                    tick_max = max(tick_max, frame)
+                    if len(pose["shapeDatas"]) != len(rla_transport_shapes):
+                        logger.warning("Invalid shape count: %d. Wrong transport type?" % len(pose["shapeDatas"]))
+                        continue
+                    for i, shapeValue in enumerate(pose["shapeDatas"]):
+                        shape_name = rla_transport_shapes[i]
+                        curve = anim.get_curve(binding_of(SEKAI_BLENDSHAPE_CRC, inv_mod_crc_table[shape_name]))
+                        curve.Data.append(KeyframeHelper(frame,0,shapeValue,isDense=True,inSlope=0,outSlope=0))
+                # Always use NLAs
+                action = load_sekai_keyshape_animation(anim.Name, anim, morph_crc_table, True)
+                try:
+                    logger.info("Face Frame range: %d - %d" % (tick_min, tick_max))
+                    apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
+                except Exception as e:
+                    logger.error("Failed to ShapeKey action: %s" % e)
             except Exception as e:
-                logger.error("Failed to ShapeKey action: %s" % e)
+                logger.error("Failed to bind face mesh: %s" % e)
             # fmt: on
         else:
             logger.warning("No face object found, skipping face animation")

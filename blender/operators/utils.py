@@ -198,8 +198,14 @@ class SSSekaiBlenderUtilCharaNeckMergeOperator(bpy.types.Operator):
         body = active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ]
         face: bpy.types.Object
         body: bpy.types.Object
-        assert face and body, "Face and Body must be set"
-        assert face != body, "Face and Body must be different."
+        if face and not body:
+            active_obj[KEY_SEKAI_CHARACTER_BODY_OBJ] = face
+            return {"FINISHED"}
+        elif body and not face:
+            active_obj[KEY_SEKAI_CHARACTER_FACE_OBJ] = body
+            return {"FINISHED"}
+        elif not face and not body:
+            raise ValueError("Face and Body must be set")
         # Always try to attach first
         bpy.ops.sssekai.util_chara_root_armature_attach_op()
         # For the child armature, we:
