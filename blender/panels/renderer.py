@@ -16,30 +16,39 @@ class SSSekaiRendererPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         row = layout.row()
+        row.label(
+            text=T(
+                "Generally EEVEE is recommended for previewing assets (available before 4.2) for better performance."
+            ),
+            icon="INFO",
+        )
+        row = layout.row()
+        row.label(
+            text=T(
+                "If you're seeing severe performance issues, try switching to an older version of Blender (e.g. 3.6)."
+            ),
+            icon="INFO",
+        )
+        row = layout.row()
         row.prop(context.scene.render, "engine")
         row = layout.row()
-        if context.scene.render.engine != "BLENDER_EEVEE_NEXT":
+        if context.scene.render.engine == "BLENDER_EEVEE":
             row.label(
-                text="Eevee Next (available since 4.2+) is the recommended renderer for PJSK assets.",
-                icon="INFO",
+                text=T(
+                    "Screen Space Reflections (SSR) is required for reflective surfaces to work."
+                ),
             )
             row = layout.row()
-            row.label(
-                text="For optimal viewport performance, however, using Eevee is recommended.",
-                icon="INFO",
-            )
+            row.prop(context.scene.eevee, "use_ssr")
             row = layout.row()
-        else:
+        elif context.scene.render.engine == "BLENDER_EEVEE_NEXT":
             row.prop(context.scene.eevee, "use_raytracing")
             row = layout.row()
             if not context.scene.eevee.use_raytracing:
                 row.label(
-                    text="Raytracing enables SSR (Screen Space Reflections) which is required for reflective surfaces to work.",
-                    icon="INFO",
-                )
-                row = layout.row()
-                row.label(
-                    text="This is optional if your assets do not have reflective surfaces.",
+                    text=T(
+                        "Raytracing enables SSR (Screen Space Reflections) which is required for reflective surfaces to work."
+                    ),
                     icon="INFO",
                 )
                 row = layout.row()
@@ -47,7 +56,9 @@ class SSSekaiRendererPanel(bpy.types.Panel):
         row = layout.row()
         if not context.scene.view_settings.view_transform == "Standard":
             row.label(
-                text="View Transform should be set to Standard since the assets are authored in SRGB space.",
+                text=T(
+                    "View Transform should be set to Standard since the assets are authored in SRGB space."
+                ),
                 icon="INFO",
             )
         row = layout.row()

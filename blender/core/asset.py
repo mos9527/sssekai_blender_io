@@ -559,6 +559,7 @@ def import_all_material_inputs(name: str, data: Material, texture_cache=None, **
     for node in material.node_tree.nodes:
         material.node_tree.nodes.remove(node)
     output = material.node_tree.nodes.new("ShaderNodeOutputMaterial")
+    output.name = "Material Output"
     for env_name, env in data.m_SavedProperties.m_TexEnvs or []:
         tex = make_material_texture_node(material, env, texture_cache)
         if tex:
