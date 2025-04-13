@@ -15,4 +15,5 @@ for reader in filter(lambda x: x.type == ClassIDType.MonoBehaviour, env.objects)
     name = reader.peek_name()
     if name.startswith("TransportDefine"):
         instance = UTTCGen_AsInstance(reader, "Sekai.Streaming.TransportDefine")
-        print(instance)
+        instance : TransportDefine
+        print(f'"{name}":({instance.validBones}, {instance.validBlendShapes}),')
