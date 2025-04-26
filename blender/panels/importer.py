@@ -39,6 +39,7 @@ from ..operators.importer import (
 from ..operators.utils import (
     SSSekaiBlenderUtilCharaNeckAttachOperator,
     SSSekaiBlenderUtilCharaNeckMergeOperator,
+    SSSekaiBlenderUtilArmatureBakeIdentityPoseOperator,
 )
 
 from ..operators.sekai_rigidbody import (
@@ -820,6 +821,13 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                         row.operator(
                             SSSekaiBlenderImportHierarchyOperator.bl_idname,
                             icon="APPEND_BLEND",
+                        )
+                        row = layout.row()
+                        row.label(text=T("Common Fixes"))
+                        row = layout.row()
+                        row.operator(
+                            SSSekaiBlenderUtilArmatureBakeIdentityPoseOperator.bl_idname,
+                            icon="CONSTRAINT_BONE",
                         )
 
         row = layout.row()

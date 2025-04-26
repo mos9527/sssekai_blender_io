@@ -284,3 +284,34 @@ class SSSekaiBlenderUtilCharaNeckAttachOperator(bpy.types.Operator):
         add_constraint("Head")
         add_constraint("Position")
         return {"FINISHED"}
+
+
+@register_class
+class SSSekaiBlenderUtilArmatureBakeIdentityPoseOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_armature_set_identity_pose_op"
+    bl_label = T("Bake Identity Pose")
+    bl_description = T(
+        "Bakes the current visual transform (i.e. Modifiers) into the armature's Mesh data and sets current pose as the new rest pose. This in effect would result in all new bone transforms to be identity transforms."
+    )
+
+    def execute(self, context):
+        active_obj = context.active_object
+        assert active_obj and active_obj.type == "ARMATURE", "Please select an armature"
+        # All mesh children - bake their visual transforms into the mesh data
+        children = []
+        for child in active_obj.children:
+            if child.type == "MESH":
+                bpy.context.view_layer.objects.active = child
+                children.append(child)
+                bpy.ops.object.mode_set(mode="OBJECT")
+                bpy.ops.sssekai.util_apply_modifiers_op()
+                bpy.context.view_layer.objects.active = active_obj
+                bpy.ops.object.mode_set(mode="POSE")
+        # Re-add armature modifier to all children
+        for child in children:
+            child.modifiers.new("Armature", "ARMATURE").object = active_obj
+        # Set the armature to pose mode and apply all constraints
+        bpy.ops.object.mode_set(mode="POSE")
+        bpy.ops.pose.armature_apply(selected=False)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        return {"FINISHED"}
