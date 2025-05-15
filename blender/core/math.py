@@ -17,22 +17,15 @@ from typing import List
 # Coordinate System | Forward |  Up  |  Left
 # Unity:   LH, Y Up |   Z     |   Y  |  -X
 # Blender: RH, Z Up |  -Y     |   Z  |   X
-UNITY_TO_BLENDER_AXIS = blMatrix(
+UNITY_TO_BLENDER_BASIS = blMatrix(
     (
         (-1.0, 0.0, 0.0, 0.0),
-        (0.0, 0.0, 1.0, 0.0),
-        (0.0, -1.0, 0.0, 0.0),
-        (0.0, 0.0, 0.0, 1.0),
-    )
-)
-UNITY_TO_BLENDER_HAND = blMatrix(
-    (
-        (1.0, 0.0, 0.0, 0.0),
-        (0.0, -1.0, 0.0, 0.0),
         (0.0, 0.0, -1.0, 0.0),
+        (0.0, 1.0, 0.0, 0.0),
         (0.0, 0.0, 0.0, 1.0),
     )
 )
+BLENDER_TO_UNITY_BASIS = UNITY_TO_BLENDER_BASIS.inverted()
 
 
 def swizzle_matrix(mat: uMatrix4x4):
@@ -45,10 +38,6 @@ def swizzle_matrix(mat: uMatrix4x4):
         )
     )
     return blmat
-
-
-def unity_to_blender(mat: blMatrix):
-    return UNITY_TO_BLENDER_HAND @ UNITY_TO_BLENDER_AXIS @ mat @ UNITY_TO_BLENDER_AXIS
 
 
 def swizzle_vector_scale(vec: uVector3):

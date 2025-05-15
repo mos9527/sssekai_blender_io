@@ -34,7 +34,8 @@ from .math import (
     blVector,
     blMatrix,
     uMatrix4x4,
-    unity_to_blender,
+    UNITY_TO_BLENDER_BASIS,
+    BLENDER_TO_UNITY_BASIS,
 )
 from .consts import *
 from .. import logger
@@ -194,7 +195,7 @@ def import_scene_hierarchy(
                     # In armature space it's basically the inverse of the bindpose
                     # Identity = M_bind * M_pose
                     M_pose = M_bind.inverted()
-                    M_pose = unity_to_blender(M_pose)
+                    M_pose = UNITY_TO_BLENDER_BASIS @ M_pose @ BLENDER_TO_UNITY_BASIS
                     M_parent = root_bone.global_transform
                     # XXX: Assume no scaling in M_pose
                     M_edit = M_parent @ M_pose
