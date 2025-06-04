@@ -11,7 +11,7 @@ bl_info = {
 }
 
 
-import bpy, os, subprocess, sys, shutil
+import bpy, os, subprocess, sys, shutil, traceback
 from dataclasses import dataclass
 
 ADDON_INSTALLATION_LINK_FOLDER = "sssekai_blender_io_bootstrapped"
@@ -49,7 +49,11 @@ class SSSekaiAddonEnviornmentStatus:
                 ["git", "--version"], capture_output=True, text=True, check=True
             )
             self.git_installed = result.stdout.strip()
-        except Exception:
+            assert self.git_installed, "empty git version output"
+        except Exception as e:
+            print("** ERROR: Git is not installed or not available in the PATH.")
+            print(e)
+            traceback.print_stack()
             self.git_installed = None
 
         if self.git_installed:
@@ -70,7 +74,10 @@ class SSSekaiAddonEnviornmentStatus:
                     check=True,
                 )
                 self.addon_installed += f" ({result.stdout.strip()})"
-            except Exception:
+            except Exception as e:
+                print("** ERROR: Failed to get the current git repository status.")
+                print(e)
+                traceback.print_stack()
                 self.addon_installed = None
         else:
             self.addon_installed = None
@@ -81,7 +88,11 @@ class SSSekaiAddonEnviornmentStatus:
             importlib.reload(sssekai)
             self.sssekai_installed = sssekai.__version__
         except ImportError:
+            print(
+                "** ERROR: SSSekai is not installed or not available in the Python environment."
+            )
             self.sssekai_installed = None
+        print("** Status refreshed")
 
     @property
     def is_ok(self):
