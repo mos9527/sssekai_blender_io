@@ -5,6 +5,9 @@ NOTE: Run this script with the *same* version of Python that Blender uses.
 Or use the interpreter bundled with Blender. As mismatching Python/glibc ABIs may cause crashes in Blender.
 
 Example usage:
+    # You need to Clone this repo beforehand. A downloaded `ZIP` file will NOT work
+    # as Git functions are used to determine the files to bundle.
+
     python bundle.py
     # Creates `sssekai_blender_io.bundled.zip` on master branch
 
