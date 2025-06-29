@@ -1,8 +1,22 @@
-# Build the addon zip locally
-# With `--no-ext` the file hierarchy is the same with what Github will generate when you download the source code
-# Otherwise, the external dependencies will be included in the zip file which would allow the addon to be installed directly
-# * Used to reproduce https://github.com/mos9527/sssekai_blender_io/issues/9
-import zipfile, os, argparse, shutil
+"""Bundle the Addon into a ZIP file, complete with external dependencies.
+
+NOTE: Python and Git are required to run this script.
+NOTE: Run this script with the *same* version of Python that Blender uses.
+Or use the interpreter bundled with Blender. As mismatching Python/glibc ABIs may cause crashes in Blender.
+
+Example usage:
+    python bundle.py
+    # Creates `sssekai_blender_io.bundled.zip` on master branch
+
+    python bundle.py --branch master --no-ext --outfile release
+    # Creates `release.bundled.zip` on master branch without external dependencies
+
+The produced ZIP file can be installed as-is like any other addon in Blender.
+
+* See also https://github.com/mos9527/sssekai_blender_io/issues/9
+"""
+
+import zipfile, os, argparse, shutil, sys
 
 PIPTEMP_DIR = ".temp"
 
@@ -36,23 +50,45 @@ if __name__ == "__main__":
         "--no-ext", action="store_true", help="Do not include external dependencies"
     )
     parser.add_argument(
-        "--outfile", type=str, help="Output file name", default="release"
+        "--outfile",
+        type=str,
+        help="Output file name WITHOUT extension. Addon will always be bundled in ZIP format.",
+        default="sssekai_blender_io",
     )
     args = parser.parse_args()
-    assert not "." in args.outfile, "Output file name should not contain '.'"
+
     files = get_tracked_files(args.branch)
     assert "__init__.py" in [
         f[0] for f in files
-    ], "No __init__.py found in tracked files. Please run this script from the root of the repository."
+    ], "No __init__.py found in tracked files. Please run this script in the addon root directory."
+    print("** Bundle information")
+    print("** Branch: %s" % args.branch)
+    print("** Bundler Python Runtime: %s" % sys.version)
+    print("-- Checking extension dependencies")
     if not args.no_ext:
         if os.path.exists(PIPTEMP_DIR):
             shutil.rmtree(PIPTEMP_DIR)
         os.mkdir(PIPTEMP_DIR)
         fetch_external_dependencies()
         files += get_dependencies()
-    with open(args.outfile + ".zip", "wb") as f:
+        # Push import dir
+        sys.path.insert(0, PIPTEMP_DIR)
+    try:
+        import UnityPy
+        import sssekai
+    except ImportError as e:
+        print("** Error: %s" % e)
+        print(
+            "** Do NOT use `--no-ext`, or install `sssekai` in your Python environment first."
+        )
+        sys.exit(1)
+    print("** SSSekai: %s" % sssekai.__version__)
+    print("** UnityPy: %s" % UnityPy.__version__)
+    print("-- Bundling files")
+    with open(args.outfile + ".bundled.zip", "wb") as f:
         z = zipfile.ZipFile(f, "w")
-        for src, filename in files:
-            print("* writing %s" % filename)
+        for i, (src, filename) in enumerate(files):
+            print("[%3d/%3d] %s" % (i + 1, len(files), filename), " " * 50, end="\r")
             z.write(src, ("%s/%s" % (args.outfile, filename)))
         z.close()
+    print("\n-- Bundle complete: %s.zip" % args.outfile)

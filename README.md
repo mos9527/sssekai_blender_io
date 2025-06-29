@@ -22,14 +22,22 @@ Currently supported languages and maintainers:
 - 简体中文 (zh_HANS, mos9527)
 
 ## Installing & Updating
+### With Addon Bundle
+Prebuilt bundles are not provided for binary ABI compatibility reasons. 
+
+[The Bundle Script](https://github.com/mos9527/sssekai_blender_io/blob/master/bundle.py) is provided to build a self-contained addon bundle for your Blender version. Please follow the instructions in the script to build the bundle.
+
+### With the Bootstrapper
 **PLEASE NOTE:**
-The updater is still a W.I.P and has bugs! Please report them in the [issues](https://github.com/mos9527/sssekai_blender_io/issues) tab if you encounter one.
+The Bootstrapper is still a W.I.P and has bugs! Please report them in the [issues](https://github.com/mos9527/sssekai_blender_io/issues) tab if you encounter one.
 
-Use the **portable** version of Blender to avoid any issues with the updater. You can download it [here](https://www.blender.org/download/).
+Use the **portable** version of Blender to avoid any issues with the Bootstrapper. You can download it [here](https://www.blender.org/download/).
 
-Remeber to *restart Blender* after updating the addon through the Bootstrapper to see the changes.
+Remember to *restart Blender* after updating the addon through the Bootstrapper to see the changes.
 
-### Attention
+You can automatically update the addon using the [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py).
+
+#### Attention
 **To Windows 11 Users** 
 - If you'd specify the addon source directory - which in turns creates a symlink - you'll have to enable Developer Mode in Windows 11 otherwise it's **not going to work**.
 
@@ -42,7 +50,7 @@ Remeber to *restart Blender* after updating the addon through the Bootstrapper t
     - You don't have to run Blender as Administrator when using the addon normally, only when updating the addon through the Bootstrapper.
   3. Setup file permissions for the Blender installation directory to allow the updater to modify files.
     - This is not recommended as it can be a security risk.
-### Procedure
+#### Procedure
 - Make sure you have [Git](https://git-scm.com/downloads) installed on your system.
 - Download the addon [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py)
 - Install the Bootstrapper in Blender by going to `Edit > Preferences > Add-ons > Install...` and selecting the Bootstrapper, which is a `.py` file.

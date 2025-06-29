@@ -10,3 +10,4 @@ sssekai_blender_io-*.zip
 private_test_*
 venv
 .DS_Store
+*.bundled.zip
