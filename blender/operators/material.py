@@ -7,7 +7,9 @@ from .utils import crc32
 from ..core.helpers import auto_connect_tex_vaule_nodes_by_name
 
 
-def set_generic_material_nodegroup(mat: bpy.types.Material, mode: str):
+def set_generic_material_nodegroup(
+    mat: bpy.types.Material, mode: str, custom_node_group: str = ""
+):
     if mode == "SKIP":
         return
     for node in mat.node_tree.nodes:
@@ -34,6 +36,8 @@ def set_generic_material_nodegroup(mat: bpy.types.Material, mode: str):
             node_group = set_nodegroup("SekaiGenericEmissive")
         case "COLORADD":
             node_group = set_nodegroup("SekaiGenericColorAdd")
+        case "CUSTOM":
+            node_group = set_nodegroup(custom_node_group)
     return node_group
 
 
@@ -52,6 +56,8 @@ class SSSekaiGenericMaterialSetModeOperator(bpy.types.Operator):
             if obj.type == "MESH":
                 for mat in obj.data.materials:
                     set_generic_material_nodegroup(
-                        mat, wm.sssekai_generic_material_import_mode
+                        mat,
+                        wm.sssekai_generic_material_import_mode,
+                        wm.sssekai_generic_material_import_mode_custom_group,
                     )
         return {"FINISHED"}

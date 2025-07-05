@@ -98,6 +98,7 @@ def auto_connect_tex_vaule_nodes_by_name(node_tree, dst):
                 node_tree.nodes[outputs[input]].outputs[0], dst.inputs[inputs[input]]
             )
         else:
+            # Allows inputs like "<Name> <Socket>" e.g. "_MainTex Alpha" to be connected
             if " " in input:
                 name, socket = input.split(" ")[:2]
                 if name in outputs:

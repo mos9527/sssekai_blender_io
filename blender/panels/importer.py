@@ -430,8 +430,20 @@ register_wm_props(
                 "MATERIAL",
                 5,
             ),
-            ("SKIP", T("Skip"), T("Skip importing the material"), 6),
+            ("SKIP", T("Skip"), T("Skip importing the material"), "CANCEL", 6),
+            (
+                "CUSTOM",
+                T("Custom"),
+                T("Use a custom material node group"),
+                "MODIFIER",
+                7,
+            ),
         ],
+    ),
+    sssekai_generic_material_import_mode_custom_group=StringProperty(
+        name=T("Custom Material Node Group"),
+        description=T("Name of the custom material node group to use"),
+        default="",
     ),
     sssekai_sekai_material_mode=EnumProperty(
         name=T("Material Mode"),
@@ -711,6 +723,11 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 def __draw_generic_material_options(row):
                     row.prop(wm, "sssekai_generic_material_import_mode", expand=True)
                     row = layout.row()
+                    if wm.sssekai_generic_material_import_mode == "CUSTOM":
+                        row.prop(
+                            wm, "sssekai_generic_material_import_mode_custom_group"
+                        )
+                        row = layout.row()
                     row.operator(SSSekaiGenericMaterialSetModeOperator.bl_idname)
                     row = layout.row()
 
