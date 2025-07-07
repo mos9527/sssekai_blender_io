@@ -202,7 +202,6 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
     bl_label = T("Import Hierarchy")
     bl_description = T("Import the selected Hierarchy from the selected asset bundle")
 
-    # Here's where the magic happens^^
     def execute(self, context):
         global sssekai_global
         wm = context.window_manager
@@ -220,11 +219,6 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
             wm.sssekai_hierarchy_import_bindpose,
             wm.sssekai_hierarchy_import_seperate_armatures,
         )
-        scene_path_map = {
-            path_id: (obj, mapping)
-            for obj, mapping in scene
-            for path_id, name in mapping.items()
-        }
         if wm.sssekai_hierarchy_import_mode == "SEKAI_CHARACTER":
             assert (
                 KEY_SEKAI_CHARACTER_ROOT in active_obj
@@ -250,6 +244,10 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         #   In that sense we only need to import the mesh and assign the modifier since parenting is already done
         imported_objects: List[Tuple[bpy.types.Object, List[PPtr[Material]], Mesh]] = []
         # Skinned Meshes
+        sm_mapping = {
+            sm_pathid: (armature_obj, bone_names)
+            for armature_obj, bone_names, sm_pathid in scene
+        }
         for node in hierarchy.nodes.values():
             game_object = node.game_object
             if game_object.m_SkinnedMeshRenderer:
@@ -266,9 +264,12 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     mesh_data, mesh_obj = import_mesh_data(
                         game_object.m_Name, mesh, bone_names
                     )
-                    root_bone = sm.m_Bones[0].m_PathID
-                    # Use the first bone as a heuristic
-                    armature_obj, _mapping = scene_path_map[root_bone]
+                    armature_obj, _mapping = sm_mapping.get(
+                        sm.object_reader.path_id, (None, None)
+                    )
+                    if not armature_obj:
+                        armature_obj = sm_mapping.get(0, None)
+                        assert armature_obj, "no armature found"
                     # Already in parent space
                     mesh_obj.parent = armature_obj
                     if wm.sssekai_hierarchy_import_seperate_armatures:
@@ -292,7 +293,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                         % (game_object.m_Name, str(e))
                     )
         # Static Meshes
-        for armature_obj, nodes in scene:
+        for armature_obj, nodes, _ in scene:
             if wm.sssekai_hierarchy_import_mode == "SEKAI_CHARACTER":
                 armature_obj.parent = active_obj
             for path_id, bone_name in nodes.items():

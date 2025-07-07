@@ -96,7 +96,7 @@ def import_scene_hierarchy(
     hierarchy: Hierarchy,
     use_bindpose: bool = False,
     seperate_armatures: bool = True,
-) -> List[Tuple[bpy.types.Object, Dict[int, str]]]:
+) -> List[Tuple[bpy.types.Object, Dict[int, str], int]]:
     """Imports Scene Hierarchy data into Blender as an Armature object
 
     Args:
@@ -120,7 +120,9 @@ def import_scene_hierarchy(
             or may not make this adjustment irrelavant.
 
     Returns:
-        List[Tuple[bpy.types.Object (Armature Object), Dict[int, str] (Nodes belonging to the Armature's bones)]]
+        List[Tuple[bpy.types.Object, Dict[int, str], int]]:
+            List of tuples containing the created Armature, a dictionary of bone IDs, the path ID of the Skinned Mesh Renderer
+            The SMR path ID can be 0 - in which case the armature is used for all Skinned Mesh Renderers in the hierarchy.
     """
     results = list()
 
@@ -258,7 +260,7 @@ def import_scene_hierarchy(
                 )
             else:
                 obj, child_bone_names = build_armature(child, bone_ids=bones)
-            results.append((obj, child_bone_names))
+            results.append((obj, child_bone_names, sm.object_reader.path_id))
     else:
         # Import the entire hierarchy as a single armature
         # Fails when:
@@ -269,8 +271,6 @@ def import_scene_hierarchy(
         for sm in sm_renderers:
             bone_ids |= {p.path_id for p in sm.m_Bones}
         if use_bindpose:
-            # XXX: CHECK NOT ENFORCED
-            # Sanity check - only allow this when the bindposes are the same
             bindpose = dict()
             for i in range(0, len(sm_renderers) - 1):
                 cur, next = sm_renderers[i], sm_renderers[i + 1]
@@ -283,7 +283,7 @@ def import_scene_hierarchy(
             )
         else:
             obj, bone_names = build_armature(hierarchy.root, bone_ids=bone_ids)
-        results.append((obj, bone_names))
+        results.append((obj, bone_names, 0))
 
     return results
 
