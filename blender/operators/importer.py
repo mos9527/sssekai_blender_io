@@ -55,6 +55,7 @@ from ..operators.material import (
     set_generic_material_nodegroup,
 )
 from .utils import crc32
+from tqdm import tqdm
 
 
 @register_class
@@ -248,7 +249,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
             sm_pathid: (armature_obj, bone_names)
             for armature_obj, bone_names, sm_pathid in scene
         }
-        for node in hierarchy.nodes.values():
+        for node in tqdm(hierarchy.nodes.values(), desc="Importing Skinned Meshes"):
             game_object = node.game_object
             if game_object.m_SkinnedMeshRenderer:
                 # bool ModelImporter::ImportSkinnedMesh
@@ -268,7 +269,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                         sm.object_reader.path_id, (None, None)
                     )
                     if not armature_obj:
-                        armature_obj = sm_mapping.get(0, None)
+                        armature_obj, _mapping = sm_mapping.get(0, (None, None))
                         assert armature_obj, "no armature found"
                     # Already in parent space
                     mesh_obj.parent = armature_obj
@@ -293,7 +294,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                         % (game_object.m_Name, str(e))
                     )
         # Static Meshes
-        for armature_obj, nodes, _ in scene:
+        for armature_obj, nodes, _ in tqdm(scene, desc="Importing Static Meshes"):
             if wm.sssekai_hierarchy_import_mode == "SEKAI_CHARACTER":
                 armature_obj.parent = active_obj
             for path_id, bone_name in nodes.items():
@@ -426,7 +427,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     imported = import_material_fallback(material)
             return imported
 
-        for obj, materials, mesh in imported_objects:
+        for obj, materials, mesh in tqdm(imported_objects, desc="Importing Materials"):
             for ppmat in materials:
                 if ppmat:
                     try:

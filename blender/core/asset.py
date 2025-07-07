@@ -38,6 +38,7 @@ from .math import (
 )
 from .consts import *
 from .. import logger
+from tqdm import tqdm
 
 
 def build_scene_hierarchy(env: Environment) -> List[Hierarchy]:
@@ -136,6 +137,7 @@ def import_scene_hierarchy(
         bindpose: Dict[int, uMatrix4x4] = None,
         bone_ids: Set[int] = None,
         visited=set(),
+        keep_only_bone_ids: bool = False,
     ) -> Tuple[bpy.types.Object, Dict[int, str]]:
         # Reserve bone_id nodes's names since they'd be used for vertex groups
         reserve_bonenames = dict()
@@ -160,7 +162,32 @@ def import_scene_hierarchy(
         pose_matrix = dict()
         pose_scales = dict()
         bone_names = dict()
+
+        bone_ids_keep = set()
+        if keep_only_bone_ids:
+            # Find the only path that leads to the bone_ids set
+            # i.e. ones that contributes to the final global transform, with or without bindpose
+            def dfs(bone: HierarchyNode):
+                if bone.path_id in bone_ids:
+                    return True
+                res = False
+                for child in bone.children:
+                    res |= dfs(child)
+                if res:
+                    bone_ids_keep.add(bone.path_id)
+                return res
+
+            dfs(root_bone)
+            for ch_root in bone_ids:
+                bone_ids_keep.add(ch_root)
+                for parent, child, _ in hierarchy.nodes[ch_root].children_recursive():
+                    # Add all children of the bone_ids to the keep set
+                    bone_ids_keep.add(child.path_id)
+
         for parent, child, _ in root_bone.children_recursive(visited=visited):
+            if keep_only_bone_ids and child.path_id not in bone_ids_keep:
+                # Skip bones that are not in the bone_ids set with this flag
+                continue
             if child.name in reserve_bonenames:
                 if child.path_id in bone_ids:
                     ebone = armature.edit_bones.new(child.name)
@@ -250,16 +277,21 @@ def import_scene_hierarchy(
         # This is useful when the Skinned Meshes have different bindposes
         # and cannot be combined into a single armature
         # NOTE: The entire hierarchy is replicated for each Skinned Mesh Renderer
-        for sm in sm_renderers:
-            child = hierarchy.root
+        logger.info(
+            f"Importing {len(sm_renderers)} Skinned Mesh Renderers as separate armatures"
+        )
+        for sm in tqdm(sm_renderers):
             bones = {p.path_id for p in sm.m_Bones}
+            parent = hierarchy.root
             if use_bindpose:
                 bindpose = bindpose_of(sm)
                 obj, child_bone_names = build_armature(
-                    child, bindpose=bindpose, bone_ids=bones
+                    parent, bindpose=bindpose, bone_ids=bones, keep_only_bone_ids=True
                 )
             else:
-                obj, child_bone_names = build_armature(child, bone_ids=bones)
+                obj, child_bone_names = build_armature(
+                    parent, bone_ids=bones, keep_only_bone_ids=True
+                )
             results.append((obj, child_bone_names, sm.object_reader.path_id))
     else:
         # Import the entire hierarchy as a single armature
