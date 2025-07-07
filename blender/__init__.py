@@ -97,16 +97,19 @@ class SSSekaiEnvironmentContainer:
     )
 
     def update_enums(self):
+        id_name = lambda path_id, name: (str(path_id), f"{name} ({path_id})")
         # [(identifier, name, description, icon, number), ...]
         self.enums.hierarchies = [
-            (str(path_id), hierarchy.name, "", "ARMATURE_DATA", index)
+            (*id_name(path_id, hierarchy.name), "", "ARMATURE_DATA", index)
             for index, (path_id, hierarchy) in enumerate(self.hierarchies.items())
         ]
         self.enums.hierarchies = sorted(self.enums.hierarchies, key=lambda x: x[1])
         self.enums.animators = [
             (
-                str(path_id),
-                animator.read().m_GameObject.read().m_Name,
+                *id_name(
+                    path_id,
+                    animator.read().m_GameObject.read().m_Name,
+                ),
                 "",
                 "DECORATE_ANIMATE",
                 index,
@@ -115,7 +118,7 @@ class SSSekaiEnvironmentContainer:
         ]
         self.enums.animators = sorted(self.enums.animators, key=lambda x: x[1])
         self.enums.animations = [
-            (str(path_id), animation.peek_name(), "", "ANIM_DATA", index)
+            (*id_name(path_id, animation.peek_name()), "", "ANIM_DATA", index)
             for index, (path_id, animation) in enumerate(self.animations.items())
         ]
         self.enums.animations = sorted(self.enums.animations, key=lambda x: x[1])
