@@ -131,7 +131,7 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
         # fmt: off
         selected = wm.sssekai_selected_hierarchy
         selected: bpy.types.EnumProperty
-        hierarchy = sssekai_global.cotainers[container].hierarchies[int(selected)]
+        hierarchy = sssekai_global.containers[container].hierarchies[int(selected)]
         assert hierarchy, "Hierarchy Data not found. Please ensure you've selected the container the hierarchy is in"
         armature = active_obj.data
         def find_by_script(game_object: GameObject, name: str):

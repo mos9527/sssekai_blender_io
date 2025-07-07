@@ -23,7 +23,6 @@ from .helpers import (
     auto_connect_shader_nodes_by_name,
     auto_setup_shader_node_driver,
     apply_pose_matrix,
-    set_obj_bone_parent,
 )
 from .math import (
     swizzle_matrix,
@@ -233,50 +232,33 @@ def import_scene_hierarchy(
             pbone.scale = swizzle_vector_scale(scale)
         return obj, bone_names
 
-    sm_roots = list()
+    sm_renderers = list()
+    # Skinned Mesh Roots
+    # SkinnedMesh's RootBone doesn't have to be the root of the hierarchy
+    # Nor does it influence the skinning in any way
+    # This is only used to determine skinned meshes in the hierarchy
     for path_id, node in hierarchy.nodes.items():
         if node.game_object and node.game_object.m_SkinnedMeshRenderer:
             sm: SkinnedMeshRenderer = node.game_object.m_SkinnedMeshRenderer.read()
             if sm.m_Mesh:
-                root = sm.m_RootBone.path_id
-                sm_roots.append((root, sm))
-    sm_roots.sort(key=lambda x: x[0])
+                sm_renderers.append(sm)
 
     if seperate_armatures:
-        # Collect Skinned Meshes in the hierarchy
-        # Their root bone's subtree is guaranteed to have AT LEAST one-to-one name to vertex group
-        # mappings.
-        # We'll cull these from the graph and import them separately
-        sm_culled = {path_id for path_id, sm in sm_roots}
-        bone_names_all = dict()
-        root, bone_names = build_armature(hierarchy.root, visited=sm_culled)
-        bone_names_all |= {k: (root, v) for k, v in bone_names.items()}
-        results.append((root, bone_names))
-        for sm_root, sm in sm_roots:
-            child = hierarchy.nodes[sm_root]
+        # Create new armatures for each Skinned Mesh Renderer
+        # This is useful when the Skinned Meshes have different bindposes
+        # and cannot be combined into a single armature
+        # NOTE: The entire hierarchy is replicated for each Skinned Mesh Renderer
+        for sm in sm_renderers:
+            child = hierarchy.root
             bones = {p.path_id for p in sm.m_Bones}
             if use_bindpose:
                 bindpose = bindpose_of(sm)
                 obj, child_bone_names = build_armature(
-                    child,
-                    bindpose=bindpose,
-                    bone_ids=bones,
-                    visited=sm_culled - {sm_root},
+                    child, bindpose=bindpose, bone_ids=bones
                 )
             else:
-                obj, child_bone_names = build_armature(
-                    child, bone_ids=bones, visited=sm_culled - {sm_root}
-                )
+                obj, child_bone_names = build_armature(child, bone_ids=bones)
             results.append((obj, child_bone_names))
-            bone_names_all |= {k: (obj, v) for k, v in child_bone_names.items()}
-        for i, (obj, _) in enumerate(results[1:]):
-            sm_root, sm = sm_roots[i]
-            child = hierarchy.nodes[sm_root]
-            bone_parent = hierarchy.parents.get(sm_root, None)
-            pa_root, pa_name = bone_names_all.get(bone_parent, (None, None))
-            if not pa_name:
-                logger.warning("Parent not found for %s" % child.name)
-            set_obj_bone_parent(obj, pa_name, pa_root)
     else:
         # Import the entire hierarchy as a single armature
         # Fails when:
@@ -284,27 +266,18 @@ def import_scene_hierarchy(
         # - The root bones are reused for *different* meshes with different weights
         # Otherwise for a single skinned mesh with a single bindpose this is fine
         bone_ids = set()
-        for sm_root, sm in sm_roots:
+        for sm in sm_renderers:
             bone_ids |= {p.path_id for p in sm.m_Bones}
         if use_bindpose:
             # XXX: CHECK NOT ENFORCED
             # Sanity check - only allow this when the bindposes are the same
             bindpose = dict()
-            for i in range(0, len(sm_roots) - 1):
-                cur, next = sm_roots[i], sm_roots[i + 1]
-                if cur[0] == next[0]:
-                    # Check matrices
-                    lhs, rhs = bindpose_of(cur[1]), bindpose_of(next[1])
-                    if lhs != rhs:
-                        root_name = hierarchy.nodes[cur[0]].name
-                        logger.warning(
-                            "Bindposes are not the same at %s. Seperation of armatures may be required!"
-                            % root_name
-                        )
-                bindpose |= bindpose_of(cur[1])
-                bindpose |= bindpose_of(next[1])
-            if len(sm_roots) == 1:
-                bindpose |= bindpose_of(sm_roots[0][1])
+            for i in range(0, len(sm_renderers) - 1):
+                cur, next = sm_renderers[i], sm_renderers[i + 1]
+                bindpose |= bindpose_of(cur)
+                bindpose |= bindpose_of(next)
+            if len(sm_renderers) == 1:
+                bindpose |= bindpose_of(sm_renderers[0])
             obj, bone_names = build_armature(
                 hierarchy.root, bindpose=bindpose, bone_ids=bone_ids
             )

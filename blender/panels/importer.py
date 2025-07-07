@@ -63,13 +63,13 @@ def update_environment(path: str):
         UnityPy.config.FALLBACK_VERSION_WARNED = True
         UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()
         sssekai_global.env = UnityPy.load(path)
-        sssekai_global.cotainers.clear()
+        sssekai_global.containers.clear()
         logger.debug("Building scene hierarchy")
         hierarchies = build_scene_hierarchy(sssekai_global.env)
         for hierarchy in hierarchies:
             root = hierarchy.root.game_object
             container = root.object_reader.container or EMPTY_CONTAINER
-            sssekai_global.cotainers[container].hierarchies[
+            sssekai_global.containers[container].hierarchies[
                 hierarchy.path_id
             ] = hierarchy
         logger.debug("Updating enums")
@@ -78,20 +78,20 @@ def update_environment(path: str):
             sssekai_global.env.objects,
         ):
             container = reader.container or EMPTY_CONTAINER
-            sssekai_global.cotainers[container].animations[reader.path_id] = reader
+            sssekai_global.containers[container].animations[reader.path_id] = reader
 
         for reader in filter(
             lambda obj: obj.type == ClassIDType.Animator, sssekai_global.env.objects
         ):
             container = reader.container or EMPTY_CONTAINER
-            sssekai_global.cotainers[container].animators[reader.path_id] = reader
+            sssekai_global.containers[container].animators[reader.path_id] = reader
 
-        for container in sssekai_global.cotainers.values():
+        for container in sssekai_global.containers.values():
             container.update_enums()
 
         sssekai_global.container_enum = [
             (container, container, "", "FILE_FOLDER", index)
-            for index, container in enumerate(sssekai_global.cotainers)
+            for index, container in enumerate(sssekai_global.containers)
         ]
         sssekai_global.container_enum = sorted(
             sssekai_global.container_enum, key=lambda x: x[1]
@@ -118,7 +118,7 @@ def enumerate_prop(container_selection_key: str, prop: str):
     def inner(obj: bpy.types.Object, context: bpy.types.Context):
         wm = context.window_manager
         container = getattr(wm, container_selection_key)
-        return getattr(sssekai_global.cotainers[container].enums, prop) or [EMPTY_OPT]
+        return getattr(sssekai_global.containers[container].enums, prop) or [EMPTY_OPT]
 
     return inner
 

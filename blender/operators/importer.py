@@ -212,7 +212,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
         container = wm.sssekai_selected_hierarchy_container
         selected = wm.sssekai_selected_hierarchy
         selected: bpy.types.EnumProperty
-        hierarchy = sssekai_global.cotainers[container].hierarchies[int(selected)]
+        hierarchy = sssekai_global.containers[container].hierarchies[int(selected)]
         logger.debug("Loading selected hierarchy: %s" % hierarchy.name)
         # Import the scene as an Armature
         scene = import_scene_hierarchy(
@@ -266,7 +266,8 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     mesh_data, mesh_obj = import_mesh_data(
                         game_object.m_Name, mesh, bone_names
                     )
-                    root_bone = sm.m_RootBone.path_id
+                    root_bone = sm.m_Bones[0].m_PathID
+                    # Use the first bone as a heuristic
                     armature_obj, _mapping = scene_path_map[root_bone]
                     # Already in parent space
                     mesh_obj.parent = armature_obj
@@ -485,7 +486,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         # XXX: Does TOS mean To String? Unity uses this nomenclature internally
         tos_leaf = dict()
         if wm.sssekai_animation_use_animator:
-            animator = sssekai_global.cotainers[
+            animator = sssekai_global.containers[
                 wm.sssekai_selected_animator_container
             ].animators[int(wm.sssekai_selected_animator)]
             animator = animator.read()
@@ -523,7 +524,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             tos_leaf = {crc32(v): k for k, v in tos_leaf.items()}
             bpy.ops.object.mode_set(mode="OBJECT")
         # Load Animation
-        anim = sssekai_global.cotainers[
+        anim = sssekai_global.containers[
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)
@@ -618,7 +619,7 @@ class SSSekaiBlenderImportSekaiCharacterFaceMotionOperator(bpy.types.Operator):
         # Set active object to the face
         bpy.context.view_layer.objects.active = face
         # Load Animation
-        anim = sssekai_global.cotainers[
+        anim = sssekai_global.containers[
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)
@@ -652,7 +653,7 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
         active_obj = context.active_object
         assert KEY_SEKAI_CAMERA_RIG in active_obj, "Active object must be a Camera Rig"
         # Load Animation
-        anim = sssekai_global.cotainers[
+        anim = sssekai_global.containers[
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)
@@ -693,7 +694,7 @@ class SSSekaiBlenderImportGlobalLightAnimationOperator(bpy.types.Operator):
         wm = context.window_manager
         ensure_sssekai_shader_blend()
         # Load Animation
-        anim = sssekai_global.cotainers[
+        anim = sssekai_global.containers[
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)
@@ -752,7 +753,7 @@ class SSSekaiBlenderImportCharacterLightAnimationOperator(bpy.types.Operator):
         ), "Active object must be a Character Controller"
         controler = active_obj[KEY_SEKAI_CHARACTER_LIGHT_OBJ]
         # Load Animation
-        anim = sssekai_global.cotainers[
+        anim = sssekai_global.containers[
             wm.sssekai_selected_animation_container
         ].animations[int(wm.sssekai_selected_animation)]
         logger.info("Loading Animation %s" % anim.m_Name)

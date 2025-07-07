@@ -125,7 +125,7 @@ class SSSekaiEnvironmentContainer:
 class SSSekaiGlobalEnvironment:
     # --- UnityPy
     env: Environment = None
-    cotainers: DefaultDict[str, SSSekaiEnvironmentContainer] = field(
+    containers: DefaultDict[str, SSSekaiEnvironmentContainer] = field(
         default_factory=lambda: defaultdict(SSSekaiEnvironmentContainer)
     )
     container_enum: List[Tuple[str, str, str, str, int]] = field(default_factory=list)
