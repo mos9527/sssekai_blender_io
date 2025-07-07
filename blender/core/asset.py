@@ -96,7 +96,7 @@ def build_scene_hierarchy(env: Environment) -> List[Hierarchy]:
 def import_scene_hierarchy(
     hierarchy: Hierarchy,
     use_bindpose: bool = False,
-    seperate_armatures: bool = True,
+    seperate_armatures: bool = False,
 ) -> List[Tuple[bpy.types.Object, Dict[int, str], int]]:
     """Imports Scene Hierarchy data into Blender as an Armature object
 
@@ -143,6 +143,11 @@ def import_scene_hierarchy(
         reserve_bonenames = dict()
         if bone_ids:
             for path_id in bone_ids:
+                if not path_id in hierarchy.nodes:
+                    logger.warning(
+                        "Bone ID %d not found in hierarchy nodes, skipping." % path_id
+                    )
+                    continue
                 bone = hierarchy.nodes[path_id]
                 reserve_bonenames[bone.name] = path_id
         # No scaling is ever applied here since otherwise scaling becomes

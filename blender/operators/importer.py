@@ -273,17 +273,6 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                         assert armature_obj, "no armature found"
                     # Already in parent space
                     mesh_obj.parent = armature_obj
-                    if wm.sssekai_hierarchy_import_seperate_armatures:
-                        # Otherwise armature only has an identity transform on its object
-                        # Will introduce issues with the mesh's parent space so we set it manually
-                        armature_bone = armature_obj.data.bones[0].name
-                        set_obj_bone_parent(mesh_obj, armature_bone, armature_obj)
-                        bpy.context.view_layer.update()
-                        # Keep the transform but parent to the armature w/o the bone
-                        M_world = mesh_obj.matrix_world.copy()
-                        mesh_obj.parent = armature_obj
-                        mesh_obj.parent_type = "OBJECT"
-                        mesh_obj.matrix_world = M_world
                     # Add an armature modifier
                     mesh_obj.modifiers.new("Armature", "ARMATURE").object = armature_obj
                     imported_objects.append((mesh_obj, sm.m_Materials, mesh))
@@ -294,10 +283,19 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                         % (game_object.m_Name, str(e))
                     )
         # Static Meshes
-        for armature_obj, nodes, _ in tqdm(scene, desc="Importing Static Meshes"):
+        if wm.sssekai_hierarchy_import_seperate_armatures:
+            # Only bones that can have effect on mesh skinning are kept in `scene` with this mode
+            # Create a complete Armature for the static ones
+            scene = import_scene_hierarchy(
+                hierarchy, wm.sssekai_hierarchy_import_bindpose, False
+            )
+        for armature_obj, nodes, sm_id in scene:
+            assert sm_id == 0, "bad importer state"
             if wm.sssekai_hierarchy_import_mode == "SEKAI_CHARACTER":
                 armature_obj.parent = active_obj
-            for path_id, bone_name in nodes.items():
+            for path_id, bone_name in tqdm(
+                nodes.items(), desc="Importing Static Meshes"
+            ):
                 node = hierarchy.nodes[path_id]
                 game_object = node.game_object
                 if game_object.m_MeshFilter:
@@ -428,6 +426,8 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
             return imported
 
         for obj, materials, mesh in tqdm(imported_objects, desc="Importing Materials"):
+            if wm.sssekai_generic_material_import_mode == "SKIP":
+                break
             for ppmat in materials:
                 if ppmat:
                     try:
