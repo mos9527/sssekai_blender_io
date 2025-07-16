@@ -271,7 +271,7 @@ def apply_pose_matrix(
 
     Args:
         dest (bpy.types.Object): target armature object
-        pose_matrix (Dict[str, blMatrix]): bone name to pose TRS matrix in Armature space
+        pose_matrix (Dict[str, blMatrix]): bone name to pose TRS matrix in Armature (World) space
         edit_mode (bool, optional): apply in Edit Mode. otherwise done in Pose Mode. this resets the pose-space transforms. Defaults to False.
     """
     bpy.context.view_layer.objects.active = dest

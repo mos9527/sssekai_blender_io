@@ -104,6 +104,14 @@ def swizzle_quaternion_ipo(ipo: List[int]):
     return [ipo[3], ipo[0], ipo[2], ipo[1]]
 
 
+def xform_to_matrix(t, q, s):
+    return blMatrix.LocRotScale(
+        swizzle_vector(t),
+        swizzle_quaternion(q),
+        swizzle_vector_scale(s),
+    )
+
+
 # See swizzle_quaternion4. This is the inverse of that since we're reproducing Unity's quaternion
 def euler3_to_quat_swizzled(x, y, z):
     # See https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html

@@ -47,7 +47,8 @@ from ..core.animation import (
     load_sekai_character_rim_light_animation,
 )
 from ..core.types import Hierarchy
-from ..core.math import blVector, blEuler
+from ..core.math import blVector, blEuler, blMatrix, xform_to_matrix
+from ..core.helpers import apply_pose_matrix
 from .. import register_class, register_wm_props, logger
 from .. import sssekai_global
 from ..operators.material import (
@@ -487,18 +488,41 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         # Build TOS
         # XXX: Does TOS mean To String? Unity uses this nomenclature internally
         tos_leaf = dict()
+        bind_xform = dict()
         if wm.sssekai_animation_use_animator:
             animator = sssekai_global.containers[
                 wm.sssekai_selected_animator_container
             ].animators[int(wm.sssekai_selected_animator)]
             animator = animator.read()
             avatar = animator.m_Avatar.read()
-            # Only take the leaf bone names for the same reason as stated in `import_hierarchy_as_armature`
+            # Only take the leaf bone names
             tos_leaf = {k: v.split("/")[-1] for k, v in avatar.m_TOS}
             if len(set(tos_leaf.values())) != len(tos_leaf):
                 logger.warning(
                     "Animator has multiple bones with the same name. Expect issues"
                 )
+            # Mecanim stores the bindpose when importing the model here
+            bind = avatar.m_Avatar.m_DefaultPose.data.m_X  # local space
+            bind_xform = {
+                tos_leaf[k]: xform_to_matrix(v.t, v.q, v.s)
+                for k, v in zip(avatar.m_Avatar.m_AvatarSkeleton.data.m_ID, bind)
+            }
+            bpy.ops.object.mode_set(mode="EDIT")
+            dfngen = armature_editbone_children_recursive(active_obj.data)
+            global_xform = dict()
+            for parent, child, depth in dfngen:  # to world space
+                u = parent.name if parent else ""
+                v = child.name
+                if v not in bind_xform:
+                    continue
+                mat = bind_xform[v]
+                if u in global_xform:
+                    mat = global_xform[u] @ mat
+                global_xform[v] = mat
+            # Update our bind transform with it
+            # XXX: Mesh MUST match the skeleton before this op (i.e. w/ Bake Identity Pose)
+            if global_xform:
+                apply_pose_matrix(active_obj, global_xform, True, True)
         else:
             # Again, this is only accessable in edit mode
             bpy.ops.object.mode_set(mode="EDIT")
@@ -535,7 +559,11 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         bpy.context.scene.render.fps = int(anim.SampleRate)
         logger.info("Sample Rate: %d FPS" % anim.SampleRate)
         action = load_armature_animation(
-            anim.Name, anim, active_obj, tos_leaf, wm.sssekai_animation_always_lerp
+            anim.Name,
+            anim,
+            active_obj,
+            tos_leaf,
+            wm.sssekai_animation_always_lerp,
         )
         # Set frame range
         bpy.context.scene.frame_end = max(

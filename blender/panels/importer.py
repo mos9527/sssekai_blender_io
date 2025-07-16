@@ -177,7 +177,7 @@ register_wm_props(
     sssekai_animation_use_animator=BoolProperty(
         name=T("Use Animator"),
         description=T(
-            "Use the selected Animator to import the Animation, instead of building the relations in runtime. NOTE: Does not restore bind pose yet!"
+            "Use the selected Animator to import the Animation, instead of building the relations in runtime."
         ),
         default=False,
     ),

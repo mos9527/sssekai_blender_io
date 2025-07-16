@@ -57,7 +57,7 @@ class HierarchyNode:
     ) -> Generator[Tuple["HierarchyNode", "HierarchyNode", int], None, None]:
         """Yields a tuple of (parent, child, depth) for each bone in the hierarchy.
 
-        The tree is traversed in depth-first order and from top to bottom.
+        The tree is traversed in depth-first pre-order
 
         Arguments:
             root: root node. leave None to use self
