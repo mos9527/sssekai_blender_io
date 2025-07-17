@@ -494,7 +494,14 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
                 wm.sssekai_selected_animator_container
             ].animators[int(wm.sssekai_selected_animator)]
             animator = animator.read()
-            avatar = animator.m_Avatar.read()
+            avatar = animator.m_Avatar
+            if not avatar.path_id:
+                self.report(
+                    {"ERROR"},
+                    T("Animator Avatar not found, cannot recover hierarchy"),
+                )
+                return {"CANCELLED"}
+            avatar.read()
             # Only take the leaf bone names
             tos_leaf = {k: v.split("/")[-1] for k, v in avatar.m_TOS}
             if len(set(tos_leaf.values())) != len(tos_leaf):
@@ -542,11 +549,13 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
                 ):
                     # Stub. Ignore this when a root bone is selected
                     continue
-                pa_path = tos_leaf.get(parent.name, "") if parent else ""
+                pa_path = (
+                    tos_leaf.get(parent[KEY_HIERARCHY_BONE_NAME], "") if parent else ""
+                )
                 if pa_path:
                     pa_path += "/"
-                leaf = child[KEY_HIERARCHY_BONE_NAME]
-                tos_leaf[leaf] = pa_path + leaf
+                # Blender bone names are guaranteed to be unique within their hierarchy
+                tos_leaf[child.name] = pa_path + child[KEY_HIERARCHY_BONE_NAME]
             tos_leaf = {crc32(v): k for k, v in tos_leaf.items()}
             bpy.ops.object.mode_set(mode="OBJECT")
         # Load Animation
@@ -556,6 +565,16 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         logger.info("Loading Animation %s" % anim.m_Name)
         anim = anim.read()
         anim = read_animation(anim)
+        # Check for Mecanim IK hashes
+        mecanim_ik = set(UNITY_MECANIM_RESERVED_TOS.keys()) & set(tos_leaf.keys())
+        if len(mecanim_ik) > 0:
+            self.report(
+                {"WARNING"},
+                "Mecanim IK bones found in the animation: %s. "
+                "This is not supported yet. Expect issues."
+                % ", ".join([UNITY_MECANIM_RESERVED_TOS[k] for k in mecanim_ik]),
+            )
+
         bpy.context.scene.render.fps = int(anim.SampleRate)
         logger.info("Sample Rate: %d FPS" % anim.SampleRate)
         action = load_armature_animation(

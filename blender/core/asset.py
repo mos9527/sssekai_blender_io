@@ -408,7 +408,8 @@ def import_mesh_data(
                 mesh.uv_layers.active = uv_layer
             for face in mesh.polygons:
                 for vtx, loop in zip(face.vertices, face.loop_indices):
-                    uv_layer.data[loop].uv = src_layer[vtx]
+                    # XXX: UVs with >2 components HOW?
+                    uv_layer.data[loop].uv = src_layer[vtx][:2]
 
     try_add_uv_map("UV0", set_active=True)
     for i in range(1, 8):
