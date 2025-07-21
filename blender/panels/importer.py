@@ -40,6 +40,7 @@ from ..operators.utils import (
     SSSekaiBlenderUtilCharaNeckAttachOperator,
     SSSekaiBlenderUtilCharaNeckMergeOperator,
     SSSekaiBlenderUtilArmatureBakeIdentityPoseOperator,
+    SSSekaiBlenderUtilArmatureBoneParentToWeightOperator,
 )
 
 from ..operators.sekai_rigidbody import (
@@ -845,6 +846,11 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                         row.operator(
                             SSSekaiBlenderUtilArmatureBakeIdentityPoseOperator.bl_idname,
                             icon="CONSTRAINT_BONE",
+                        )
+                        row = layout.row()
+                        row.operator(
+                            SSSekaiBlenderUtilArmatureBoneParentToWeightOperator.bl_idname,
+                            icon="GROUP_VERTEX",
                         )
 
         row = layout.row()

@@ -315,3 +315,43 @@ class SSSekaiBlenderUtilArmatureBakeIdentityPoseOperator(bpy.types.Operator):
         bpy.ops.pose.armature_apply(selected=False)
         bpy.ops.object.mode_set(mode="OBJECT")
         return {"FINISHED"}
+
+
+@register_class
+class SSSekaiBlenderUtilArmatureBoneParentToWeightOperator(bpy.types.Operator):
+    bl_idname = "sssekai.util_armature_bone_parent_to_weight_op"
+    bl_label = T("Bone Parent to Weight")
+    bl_description = T(
+        "Transforms bone parent relationships into vertex group weight. NOTE: This only applies to meshes without pre-existing vertex groups."
+    )
+
+    def execute(self, context):
+        active_obj = context.active_object
+        assert active_obj and active_obj.type == "ARMATURE", "Please select an armature"
+        children = []
+        # Deselect all objects
+        bpy.ops.object.select_all(action="DESELECT")
+        for child in active_obj.children:
+            if child.type == "MESH":
+                # Only add ones w/o vertex groups
+                if not child.vertex_groups and child.parent_bone:
+                    children.append((child, child.parent_bone))
+                    child.select_set(True)
+        bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        for child, bone in children:
+            child: bpy.types.Object
+            data: bpy.types.Mesh = child.data
+            # Create vertex group with the name of the bone
+            vgroup = child.vertex_groups.new(name=bone)
+            # Assign weight 1.0 to all vertices
+            for i, v in enumerate(data.vertices):
+                vgroup.add([i], 1.0, "ADD")
+            # Set the parent to the armature
+            child.parent = active_obj
+            child.parent_type = "OBJECT"
+            child.parent_bone = bone
+            child.modifiers.new("Armature", "ARMATURE").object = active_obj
+            # Add Modifier
+
+        return {"FINISHED"}
