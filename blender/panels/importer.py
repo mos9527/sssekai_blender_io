@@ -54,16 +54,18 @@ EMPTY_CONTAINER = "<default>"
 ALL_CONTAINER = "<all>"
 
 
-def update_environment(path: str):
+def update_environment(path: str, aux_path: str):
     global sssekai_global
 
     if path and os.path.exists(path):
-        if sssekai_global.env and sssekai_global.env.path == path:
+        if sssekai_global.env_path == path and sssekai_global.env_aux_path == aux_path:
             return
         logger.debug("Loading environment: %s" % path)
         UnityPy.config.FALLBACK_VERSION_WARNED = True
         UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()
         sssekai_global.env = UnityPy.load(path)
+        sssekai_global.env_path = path
+        sssekai_global.env_aux_path = aux_path
         sssekai_global.containers.clear()
         logger.debug("Building scene hierarchy")
         hierarchies = build_scene_hierarchy(sssekai_global.env)
@@ -97,6 +99,9 @@ def update_environment(path: str):
         sssekai_global.container_enum = sorted(
             sssekai_global.container_enum, key=lambda x: x[1]
         )
+        if os.path.exists(aux_path):
+            logger.debug("Loading auxiliary environment: %s" % aux_path)
+            sssekai_global.env.load_folder(aux_path)
     else:
         sssekai_global.container_enum.clear()
 
@@ -106,7 +111,10 @@ def enumerate_containers(obj: bpy.types.Object, context: bpy.types.Context):
 
     wm = context.window_manager
     try:
-        update_environment(wm.sssekai_selected_assetbundle_file)
+        update_environment(
+            wm.sssekai_selected_assetbundle_file,
+            wm.sssekai_selected_assetbundle_file_aux,
+        )
     except Exception as e:
         wm.sssekai_selected_assetbundle_file = ""
         raise e
@@ -165,6 +173,14 @@ register_wm_props(
         name=T("Directory"),
         description=T(
             "Where the asset bundle(s) are located. Every AssetBundle in this directory will be loaded (if possible)"
+        ),
+        subtype="DIR_PATH",
+    ),
+    sssekai_selected_assetbundle_file_aux=StringProperty(
+        name=T("Aux. Directory"),
+        description=T(
+            "Where the auxiliary asset bundle(s) are located. Useful for assets with dependencies that's stored elsewhere\n"
+            "NOTE: These files will NOT show up in the Asset Browser, but will be used by the addon if needed."
         ),
         subtype="DIR_PATH",
     ),
@@ -490,6 +506,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         layout.label(text=T("Select Directory"), icon="SETTINGS")
         row = layout.row()
         row.prop(wm, "sssekai_selected_assetbundle_file", icon="FILE_FOLDER")
+        row = layout.row()
+        row.prop(wm, "sssekai_selected_assetbundle_file_aux", icon="FILE_FOLDER")
         row = layout.row()
 
         row.label(text=T("Import Type"), icon="IMPORT")

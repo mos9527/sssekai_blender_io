@@ -395,7 +395,8 @@ def import_mesh_data(
                 )  # UV rewinding
                 face.smooth = True
             except ValueError as e:
-                logger.warning("Invalid face index %d (%s) - discarded." % (idx, e))
+                # logger.warning("Invalid face index %d (%s) - discarded." % (idx, e))
+                pass
     bm.to_mesh(mesh)
 
     # UV Map

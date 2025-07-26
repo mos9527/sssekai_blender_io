@@ -128,6 +128,9 @@ class SSSekaiEnvironmentContainer:
 class SSSekaiGlobalEnvironment:
     # --- UnityPy
     env: Environment = None
+    env_path: str = ""
+    env_aux_path: str = ""
+    # --- Containers
     containers: DefaultDict[str, SSSekaiEnvironmentContainer] = field(
         default_factory=lambda: defaultdict(SSSekaiEnvironmentContainer)
     )

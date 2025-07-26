@@ -446,7 +446,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                         traceback.print_exc()
                         logger.error(
                             "Failed to import Material %s: %s. Skipping."
-                            % (material.m_Name, str(e))
+                            % (ppmat.path_id, str(e))
                         )
             # Set material indices afterwards
             bpy.context.view_layer.objects.active = obj
