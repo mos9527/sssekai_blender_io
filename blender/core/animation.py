@@ -196,6 +196,7 @@ def load_fcurves(
         fcurve[index].keyframe_points.foreach_set("handle_right", p1)
         fcurve[index].keyframe_points.foreach_set("handle_left", p2)
         fcurve[index].update()
+    return fcurve
 
 
 def load_float_fcurve(
@@ -249,7 +250,7 @@ def load_quatnerion_fcurves(
             (i.e. lerping between them will not cause flips and the shortest path will always be taken).
         * Note it's *LERP* not *SLERP*. Blender fcurves does not specialize in quaternion interpolation.
         * Hence, with `interpolation`, you should always use `LINEAR` for the most accurate results.
-        * The curve's tangents are NOT used for this reason.
+        * - See also http://number-none.com/product/Hacking%20Quaternions/index.html
     """
     assert (
         type(bl_values[0]) == blQuaternion
@@ -355,11 +356,10 @@ def load_armature_animation(
         return erot_inv @ (vec - etrans)
 
     def to_pose_euler(name: str, euler: blEuler):
-        # XXX: Guess what...animators would wrap around the euler values
-        # and do animations in ranges like 0~69420 so it 'effectively' spins a lot
+        # Eulers don't have to be normalized - and can be animated that way.
         # Transforming euler w/ matrices - then converting to euler again would normalize it
-        # to -180~180 range.
-        # assume \theta = 2k\pi + \phi. we'd just add 2k\pi to the euler value
+        # to -180~180 range. We don't want that.
+        # Assume \theta = 2k\pi + \phi. we'd just add 2k\pi to the euler value
         etrans, erot = local_space_TR[name]
         erot: blQuaternion
         erot_inv = erot.conjugated()
