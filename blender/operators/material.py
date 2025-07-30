@@ -17,7 +17,9 @@ def set_generic_material_nodegroup(
             mat.node_tree.nodes.remove(node)
 
     def set_nodegroup(node_group_name: str):
-        node_group = mat.node_tree.nodes.new("ShaderNodeGroup")
+        node_group = mat.node_tree.nodes.get(node_group_name, None)
+        if not node_group:
+            node_group = mat.node_tree.nodes.new("ShaderNodeGroup")
         node_group.name = node_group_name
         node_group.node_tree = bpy.data.node_groups.get(node_group_name)
         auto_connect_tex_vaule_nodes_by_name(mat.node_tree, node_group)
