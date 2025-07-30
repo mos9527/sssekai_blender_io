@@ -360,10 +360,19 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 name, material, texture_cache, controller
             )
 
+        def import_material_fallback(material: Material, mode_override: str = ""):
+            name = material.m_Name
+            mat = import_all_material_inputs(name, material, texture_cache)
+            set_generic_material_nodegroup(
+                mat, mode_override or wm.sssekai_generic_material_import_mode
+            )
+            return mat
+
         def import_material_sekai_stage(material: Material):
             envs = dict(material.m_SavedProperties.m_TexEnvs)
             floats = dict(material.m_SavedProperties.m_Floats)
             name = material.m_Name
+            # TODO: Better way to detect these
             if "_LightMapTex" in envs:
                 if "Reflection_" in name:
                     return import_sekai_stage_lightmap_material(
@@ -379,15 +388,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                 )
             else:
                 # XXX: Some other permutations still exist
-                return import_all_material_inputs(name, material, texture_cache)
-
-        def import_material_fallback(material: Material, mode_override: str = ""):
-            name = material.m_Name
-            mat = import_all_material_inputs(name, material, texture_cache)
-            set_generic_material_nodegroup(
-                mat, mode_override or wm.sssekai_generic_material_import_mode
-            )
-            return mat
+                return import_material_fallback(material)
 
         def import_material(material: Material):
             imported = None
@@ -430,7 +431,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
             if wm.sssekai_generic_material_import_mode == "SKIP":
                 break
             for ppmat in materials:
-                if ppmat:
+                if ppmat.path_id:
                     try:
                         material: Material = ppmat.read()
                         imported = None

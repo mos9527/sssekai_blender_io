@@ -69,6 +69,9 @@ def update_environment(path: str, aux_path: str):
         sssekai_global.containers.clear()
         logger.debug("Building scene hierarchy")
         hierarchies = build_scene_hierarchy(sssekai_global.env)
+        if os.path.exists(aux_path):
+            logger.debug("Loading auxiliary environment: %s" % aux_path)
+            sssekai_global.env.load_folder(aux_path)
         for hierarchy in hierarchies:
             root = hierarchy.root.game_object
             container = root.object_reader.container or EMPTY_CONTAINER
@@ -99,9 +102,6 @@ def update_environment(path: str, aux_path: str):
         sssekai_global.container_enum = sorted(
             sssekai_global.container_enum, key=lambda x: x[1]
         )
-        if os.path.exists(aux_path):
-            logger.debug("Loading auxiliary environment: %s" % aux_path)
-            sssekai_global.env.load_folder(aux_path)
     else:
         sssekai_global.container_enum.clear()
 
