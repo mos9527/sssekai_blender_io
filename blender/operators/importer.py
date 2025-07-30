@@ -319,15 +319,16 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                         )
         # Import Materials
         # - This is done in a seperate procedure since there'd be some permuations depending on
-        # the user's preference (i.e. sssekai_hierarchy_import_mode)
-        texture_cache = dict()
-        material_cache = dict()
+        #   the user's preference (i.e. sssekai_hierarchy_import_mode)
+        # - Caching persists across imports, and is only reset when the source folder is reloaded
+        texture_cache = sssekai_global.texture_cache
+        material_cache = sssekai_global.material_cache
 
         # By principle this should be matched by their respective Shaders
         # But since there's no guarantee that the PathID would always match across versions therefore we'd pattern-match
         # the name and the properties to determine the correct importer
         def import_material_sekai_character(material: Material):
-            controller = next(
+            rim_light_controller = next(
                 filter(
                     lambda o: o.name.startswith("SekaiCharaRimLight"),
                     active_obj.children_recursive,
@@ -349,15 +350,11 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
                     material,
                     texture_cache,
                     armature_obj=armature_obj,
-                    rim_light_controller=controller,
+                    rim_light_controller=rim_light_controller,
                     head_bone_target="Head",
                 )
-
-            assert (
-                controller
-            ), "Rim Light controller not found on the active object's hierachy before Import!"
             return import_sekai_character_material(
-                name, material, texture_cache, controller
+                name, material, texture_cache, rim_light_controller=rim_light_controller
             )
 
         def import_material_fallback(material: Material, mode_override: str = ""):
@@ -373,6 +370,7 @@ class SSSekaiBlenderImportHierarchyOperator(bpy.types.Operator):
             floats = dict(material.m_SavedProperties.m_Floats)
             name = material.m_Name
             # TODO: Better way to detect these
+            # Naming schemes are not consistent in some of the newer assets
             if "_LightMapTex" in envs:
                 if "Reflection_" in name:
                     return import_sekai_stage_lightmap_material(

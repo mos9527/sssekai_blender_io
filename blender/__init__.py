@@ -154,6 +154,17 @@ class SSSekaiGlobalEnvironment:
 
     # --- Debug
     debug_link_shaders: bool = False
+    # --- Caching
+    texture_cache: Dict[int, bpy.types.Image] = field(default_factory=dict)
+    material_cache: Dict[int, bpy.types.Material] = field(default_factory=dict)
+
+    def reset_env(self):
+        self.env_path = ""
+        self.env_aux_path = ""
+        self.containers.clear()
+        self.container_enum.clear()
+        self.texture_cache.clear()
+        self.material_cache.clear()
 
 
 sssekai_global = SSSekaiGlobalEnvironment()

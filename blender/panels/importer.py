@@ -61,12 +61,12 @@ def update_environment(path: str, aux_path: str):
         if sssekai_global.env_path == path and sssekai_global.env_aux_path == aux_path:
             return
         logger.debug("Loading environment: %s" % path)
-        UnityPy.config.FALLBACK_VERSION_WARNED = True
+        UnityPy.config.SERIALIZED_FILE_PARSE_TYPETREE = False
         UnityPy.config.FALLBACK_UNITY_VERSION = sssekai_get_unity_version()
+        sssekai_global.reset_env()
         sssekai_global.env = UnityPy.load(path)
         sssekai_global.env_path = path
         sssekai_global.env_aux_path = aux_path
-        sssekai_global.containers.clear()
         logger.debug("Building scene hierarchy")
         hierarchies = build_scene_hierarchy(sssekai_global.env)
         if os.path.exists(aux_path):

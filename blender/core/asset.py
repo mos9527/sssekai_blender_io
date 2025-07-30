@@ -281,7 +281,7 @@ def import_scene_hierarchy(
         # Create new armatures for each Skinned Mesh Renderer
         # This is useful when the Skinned Meshes have different bindposes
         # and cannot be combined into a single armature
-        # NOTE: The entire hierarchy is replicated for each Skinned Mesh Renderer
+        # NOTE: The hierarchy that influences the skinning is replicated for each Skinned Mesh Renderer
         logger.info(
             f"Importing {len(sm_renderers)} Skinned Mesh Renderers as separate armatures"
         )
@@ -374,7 +374,7 @@ def import_mesh_data(
             if handler.m_BoneWeights:
                 boneWeight = handler.m_BoneWeights[vtx]
             else:
-                # Default to 1 otherwise the bone would not make any effect
+                # Default to 1 otherwise the bone would not have any effect on the skinning
                 # XXX: This is purly emprical to handle some edge cases.
                 boneWeight = [1.0 / len(boneIndex)] * len(boneIndex)
             for i in range(len(boneIndex)):
@@ -500,11 +500,11 @@ def make_material_texture_node(
         if ppTexture.m_Texture:
             texture: Texture2D = ppTexture.m_Texture.read()
             if texture_cache:
-                if not texture.m_Name in texture_cache:
-                    texture_cache[texture.m_Name] = import_texture(
+                if not texture.object_reader.path_id in texture_cache:
+                    texture_cache[texture.object_reader.path_id] = import_texture(
                         texture.m_Name, texture
                     )
-                image = texture_cache[texture.m_Name]
+                image = texture_cache[texture.object_reader.path_id]
             else:
                 image = import_texture(texture.m_Name, texture)
         else:
