@@ -224,7 +224,6 @@ def load_float_fcurve(
         data_path,
         curve,
         bl_values,
-        always_lerp=always_lerp,
         override_data_index=override_data_index,
     )
 
@@ -460,7 +459,6 @@ def load_sekai_keyshape_animation(
     name: str,
     data: Animation,
     crc_keyshape_table: dict,
-    always_lerp: bool = False,
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to any mesh
 
@@ -489,7 +487,6 @@ def load_sekai_keyshape_animation(
             curve,
             [keyframe.value / 100.0 for keyframe in curve.Data],
             swizzle_slope_func=lambda x: x / 100.0,
-            always_lerp=always_lerp,
         )
     return action
 
@@ -497,7 +494,6 @@ def load_sekai_keyshape_animation(
 def load_sekai_camera_animation(
     name: str,
     data: Animation,
-    always_lerp: bool = False,
     is_sub_camera: bool = False,
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to the camera rig
@@ -541,7 +537,6 @@ def load_sekai_camera_animation(
                 "rotation_euler",
                 curve,
                 [swizzle_euler(keyframe.value) for keyframe in curve.Data],
-                always_lerp=always_lerp,
             )
         if kBindTransformPosition in mainCam:
             curve = mainCam[kBindTransformPosition]
@@ -550,7 +545,6 @@ def load_sekai_camera_animation(
                 "location",
                 curve,
                 [swizzle_vector(keyframe.value) for keyframe in curve.Data],
-                always_lerp=always_lerp,
             )
     else:
         logger.warning(
@@ -565,7 +559,6 @@ def load_sekai_camera_animation(
                 curve,
                 [swizzle_param_camera(keyframe.value) for keyframe in curve.Data],
                 swizzle_slope_func=swizzle_param_camera,
-                always_lerp=always_lerp,
             )
         if kBindTransformScale in camParam:
             curve = camParam[kBindTransformScale]
@@ -575,7 +568,6 @@ def load_sekai_camera_animation(
                 curve,
                 [swizzle_param_camera(keyframe.value) for keyframe in curve.Data],
                 swizzle_slope_func=swizzle_param_camera,
-                always_lerp=always_lerp,
             )
     else:
         logger.warning(
@@ -601,7 +593,6 @@ def swizzle_euler_light_slope(euler: uVector3):
 def load_sekai_ambient_light_animation(
     name: str,
     data: Animation,
-    always_lerp: bool = False,
 ):
     """
     AmbientLight
@@ -620,18 +611,16 @@ def load_sekai_ambient_light_animation(
     curves = data.CurvesT[0]
     curve = curves.get(crc32(SEKAI_LIGHT_INTENSITY), None)
     if curve:
-        load_float_fcurve(
-            action, '["Ambient Intensity"]', curve, always_lerp=always_lerp
-        )
+        load_float_fcurve(action, '["Ambient Intensity"]', curve)
     curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_R), None)
     if curve:
-        load_float_fcurve(action, '["Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+        load_float_fcurve(action, '["Ambient Color"]', curve,  override_data_index=0)
     curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_G), None)
     if curve:
-        load_float_fcurve(action, '["Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+        load_float_fcurve(action, '["Ambient Color"]', curve,  override_data_index=1)
     curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_B), None)
     if curve:
-        load_float_fcurve(action, '["Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+        load_float_fcurve(action, '["Ambient Color"]', curve,  override_data_index=2)
     # fmt: on
     return action
 
@@ -639,7 +628,6 @@ def load_sekai_ambient_light_animation(
 def load_sekai_directional_light_animation(
     name: str,
     data: Animation,
-    always_lerp: bool = False,
 ) -> Tuple[bpy.types.Action, bpy.types.Action]:
     """
     DirectionalLight
@@ -667,21 +655,20 @@ def load_sekai_directional_light_animation(
         load_fcurves(
             action, 'rotation_euler', curve, 
             [swizzle_euler_light(keyframe.value) for keyframe in curve.Data], 
-            swizzle_slope_func=swizzle_euler_light_slope,
-            always_lerp=always_lerp
+            swizzle_slope_func=swizzle_euler_light_slope
         )
     directional_light_action = action
 
     action = create_action(name)
     curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_R), None)
     if curve:
-        load_float_fcurve(action, '["Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+        load_float_fcurve(action, '["Shadow Color"]', curve,  override_data_index=0)
     curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_G), None)
     if curve:
-        load_float_fcurve(action, '["Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+        load_float_fcurve(action, '["Shadow Color"]', curve,  override_data_index=1)
     curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_B), None)
     if curve:
-        load_float_fcurve(action, '["Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+        load_float_fcurve(action, '["Shadow Color"]', curve,  override_data_index=2)
     # fmt: on
     return action, directional_light_action
 
@@ -689,7 +676,6 @@ def load_sekai_directional_light_animation(
 def load_sekai_character_ambient_light_animation(
     name: str,
     data: Animation,
-    always_lerp: bool = False,
 ):
     """
     character_ambient_0474_02
@@ -713,17 +699,17 @@ def load_sekai_character_ambient_light_animation(
     curve = curves.get(crc32(SEKAI_LIGHT_INTENSITY), None)
     if curve:
         load_float_fcurve(
-            action, '["Character Ambient Intensity"]', curve, always_lerp=always_lerp
+            action, '["Character Ambient Intensity"]', curve
         )
     curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_R), None)
     if curve:
-        load_float_fcurve(action, '["Character Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+        load_float_fcurve(action, '["Character Ambient Color"]', curve,  override_data_index=0)
     curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_G), None)
     if curve:
-        load_float_fcurve(action, '["Character Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+        load_float_fcurve(action, '["Character Ambient Color"]', curve,  override_data_index=1)
     curve = curves.get(crc32(SEKAI_LIGHT_AMBIENT_COLOR_B), None)
     if curve:
-        load_float_fcurve(action, '["Character Ambient Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+        load_float_fcurve(action, '["Character Ambient Color"]', curve,  override_data_index=2)
     # TODO: Outlines
     # ---
     # fmt: on
@@ -733,7 +719,6 @@ def load_sekai_character_ambient_light_animation(
 def load_sekai_character_rim_light_animation(
     name: str,
     data: Animation,
-    always_lerp: bool = False,
 ) -> Tuple[bpy.types.Action, bpy.types.Action]:
     """
     character_rim_0474_01
@@ -767,28 +752,27 @@ def load_sekai_character_rim_light_animation(
         load_fcurves(
             action, 'rotation_euler', curve, 
             [swizzle_euler_light(keyframe.value, flipY=True) for keyframe in curve.Data],
-            swizzle_slope_func=swizzle_euler_light_slope,
-            always_lerp=always_lerp
+            swizzle_slope_func=swizzle_euler_light_slope
         )
     
     curve = curves.get(crc32(SEKAI_LIGHT_RIM_COLOR_R), None)
     if curve:
-        load_float_fcurve(action, '["Rim Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+        load_float_fcurve(action, '["Rim Color"]', curve,  override_data_index=0)
     curve = curves.get(crc32(SEKAI_LIGHT_RIM_COLOR_G), None)
     if curve:
-        load_float_fcurve(action, '["Rim Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+        load_float_fcurve(action, '["Rim Color"]', curve,  override_data_index=1)
     curve = curves.get(crc32(SEKAI_LIGHT_RIM_COLOR_B), None)
     if curve:
-        load_float_fcurve(action, '["Rim Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+        load_float_fcurve(action, '["Rim Color"]', curve,  override_data_index=2)
     curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_R), None)
     if curve:
-        load_float_fcurve(action, '["Rim Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=0)
+        load_float_fcurve(action, '["Rim Shadow Color"]', curve,  override_data_index=0)
     curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_G), None)
     if curve:
-        load_float_fcurve(action, '["Rim Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=1)
+        load_float_fcurve(action, '["Rim Shadow Color"]', curve,  override_data_index=1)
     curve = curves.get(crc32(SEKAI_LIGHT_SHADOW_COLOR_B), None)
     if curve:
-        load_float_fcurve(action, '["Rim Shadow Color"]', curve, always_lerp=always_lerp, override_data_index=2)
+        load_float_fcurve(action, '["Rim Shadow Color"]', curve,  override_data_index=2)
     # fmt: on
     return action
 

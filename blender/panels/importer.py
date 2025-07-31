@@ -208,6 +208,28 @@ register_wm_props(
     sssekai_animation_import_offset=IntProperty(
         name=T("Offset"), description=T("Animation Offset in frames"), default=0
     ),
+    sssekai_animation_import_resample_type=EnumProperty(
+        name=T("Resample Type"),
+        description=T(
+            "Type of resampling to perform on the animation. NOTE: Only works on Hierarchy Animations"
+        ),
+        items=[
+            (
+                "NONE",
+                T("No Resample"),
+                T("Do not resample the animation"),
+                "IPO_CONSTANT",
+                1,
+            ),
+            (
+                "DENSE",
+                T("Dense Resample"),
+                T("Resample every frame, then to be interpolated linearly"),
+                "IPO_LINEAR",
+                2,
+            ),
+        ],
+    ),
     sssekai_animation_always_lerp=BoolProperty(
         name=T("Always Lerp"),
         description=T(
@@ -580,6 +602,8 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_offset", icon="TIME")
                 row.prop(wm, "sssekai_animation_always_lerp", icon="IPO_LINEAR")
+                row = layout.row()
+                row.prop(wm, "sssekai_animation_import_resample_type", expand=True)
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_use_nla", icon="NLA")
                 row.prop(

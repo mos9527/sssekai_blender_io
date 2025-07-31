@@ -488,6 +488,7 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
         # XXX: Does TOS mean To String? Unity uses this nomenclature internally
         tos_leaf = dict()
         bind_xform = dict()
+        bpy.ops.object.mode_set(mode="EDIT")
         if wm.sssekai_animation_use_animator:
             animator = sssekai_global.containers[
                 wm.sssekai_selected_animator_container
@@ -513,7 +514,6 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
                 tos_leaf[k]: xform_to_matrix(v.t, v.q, v.s)
                 for k, v in zip(avatar.m_Avatar.m_AvatarSkeleton.data.m_ID, bind)
             }
-            bpy.ops.object.mode_set(mode="EDIT")
             dfngen = armature_editbone_children_recursive(active_obj.data)
             global_xform = dict()
             for parent, child, depth in dfngen:  # to world space
@@ -530,8 +530,6 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             if global_xform:
                 apply_pose_matrix(active_obj, global_xform, True, True)
         else:
-            # Again, this is only accessable in edit mode
-            bpy.ops.object.mode_set(mode="EDIT")
             dfngen = None
             if wm.sssekai_animation_root_bone:
                 ebone = active_obj.data.edit_bones.get(
@@ -556,7 +554,8 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
                 # Blender bone names are guaranteed to be unique within their hierarchy
                 tos_leaf[child.name] = pa_path + child[KEY_HIERARCHY_BONE_NAME]
             tos_leaf = {crc32(v): k for k, v in tos_leaf.items()}
-            bpy.ops.object.mode_set(mode="OBJECT")
+        tos_leaf[0] = active_obj.data.edit_bones[0].name  # Root bone is always 0
+        bpy.ops.object.mode_set(mode="OBJECT")
         # Load Animation
         anim = sssekai_global.containers[
             wm.sssekai_selected_animation_container
@@ -573,9 +572,27 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
                 "This is not supported yet. Expect issues."
                 % ", ".join([UNITY_MECANIM_RESERVED_TOS[k] for k in mecanim_ik]),
             )
+        match wm.sssekai_animation_import_resample_type:
+            case "NONE":
+                logger.info("Sample Rate: %d FPS" % anim.SampleRate)
+                logger.info("Using animation's sample rate as-is")
+                bpy.context.scene.render.fps = int(anim.SampleRate)
+            case "DENSE":
+                logger.info("Sample Rate: %d FPS" % anim.SampleRate)
+                target_fps = bpy.context.scene.render.fps
+                logger.info("Resampling to %d FPS" % target_fps)
 
-        bpy.context.scene.render.fps = int(anim.SampleRate)
-        logger.info("Sample Rate: %d FPS" % anim.SampleRate)
+                def arange(start, end, step):
+                    return [
+                        start + i * step for i in range(int((end - start) / step) + 1)
+                    ]
+
+                for k, v in anim.RawCurves.items():
+                    start, end = v.Data[0].time, v.Data[-1].time
+                    start = max(start, 0)
+                    times = arange(start, end, 1 / target_fps)
+                    v.Data = v.resample_dense(times).Data
+        logger.info("Loading Animation %s" % anim.Name)
         action = load_armature_animation(
             anim.Name,
             anim,
@@ -673,9 +690,7 @@ class SSSekaiBlenderImportSekaiCharacterFaceMotionOperator(bpy.types.Operator):
         logger.info("Loading Animation %s" % anim.m_Name)
         anim = anim.read()
         anim = read_animation(anim)
-        action = load_sekai_keyshape_animation(
-            anim.Name, anim, crc_table, wm.sssekai_animation_always_lerp
-        )
+        action = load_sekai_keyshape_animation(anim.Name, anim, crc_table)
         apply_action(
             morph.data.shape_keys,
             action,
@@ -712,7 +727,6 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
         action = load_sekai_camera_animation(
             anim.Name,
             anim,
-            wm.sssekai_animation_always_lerp,
             wm.sssekai_camera_import_is_sub_camera,
         )
         # Set frame range
@@ -754,9 +768,7 @@ class SSSekaiBlenderImportGlobalLightAnimationOperator(bpy.types.Operator):
         dir_light_obj = bpy.data.objects["SekaiDirectionalLight"]
         match wm.sssekai_animation_light_type:
             case "AMBIENT":
-                action = load_sekai_ambient_light_animation(
-                    anim.Name, anim, wm.sssekai_animation_always_lerp
-                )
+                action = load_sekai_ambient_light_animation(anim.Name, anim)
                 apply_action(
                     global_obj,
                     action,
@@ -765,9 +777,7 @@ class SSSekaiBlenderImportGlobalLightAnimationOperator(bpy.types.Operator):
                 )
             case "DIRECTIONAL":
                 global_action, directional_light_action = (
-                    load_sekai_directional_light_animation(
-                        anim.Name, anim, wm.sssekai_animation_always_lerp
-                    )
+                    load_sekai_directional_light_animation(anim.Name, anim)
                 )
                 apply_action(
                     global_obj,
@@ -811,9 +821,7 @@ class SSSekaiBlenderImportCharacterLightAnimationOperator(bpy.types.Operator):
         logger.info("Sample Rate: %d FPS" % anim.SampleRate)
         match wm.sssekai_animation_light_type:
             case "CHARACTER_RIM":
-                action = load_sekai_character_rim_light_animation(
-                    anim.Name, anim, wm.sssekai_animation_always_lerp
-                )
+                action = load_sekai_character_rim_light_animation(anim.Name, anim)
                 apply_action(
                     controler,
                     action,
@@ -821,9 +829,7 @@ class SSSekaiBlenderImportCharacterLightAnimationOperator(bpy.types.Operator):
                     wm.sssekai_animation_import_nla_always_new_track,
                 )
             case "CHARACTER_AMBIENT":
-                action = load_sekai_character_ambient_light_animation(
-                    anim.Name, anim, wm.sssekai_animation_always_lerp
-                )
+                action = load_sekai_character_ambient_light_animation(anim.Name, anim)
                 apply_action(
                     controler,
                     action,
