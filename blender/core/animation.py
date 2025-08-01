@@ -228,7 +228,7 @@ def load_float_fcurve(
     )
 
 
-def load_quatnerion_fcurves(
+def load_quaternion_fcurves(
     action: bpy.types.Action,
     data_path: str,
     curve: Curve,
@@ -345,9 +345,14 @@ def load_armature_animation(
     #     ps = fs
     # ---
     def to_pose_quaternion(name: str, quat: blQuaternion):
+        # Quaternions *may* be normalized, but in Unity runtime this is interpolated
+        # with Hermite splines in local space so the error is not noticeable.
+        # Here we'd apply an inverse rotation as well so it's in Pose Space and then
+        # linearly interpolated. Errors would accumulate.
+        # Hence, we normalize the quaternion before applying it.
         etrans, erot = local_space_TR[name]
         erot_inv = erot.conjugated()
-        return erot_inv @ quat
+        return erot_inv @ (quat.normalized())
 
     def to_pose_translation(name: str, vec: blVector):
         etrans, erot = local_space_TR[name]
@@ -395,7 +400,7 @@ def load_armature_animation(
             to_pose_quaternion(bone, swizzle_quaternion(keyframe.value))
             for keyframe in curve.Data
         ]
-        load_quatnerion_fcurves(
+        load_quaternion_fcurves(
             action, 'pose.bones["%s"].rotation_quaternion' % bone, curve, values
         )
     # Euler Rotations
