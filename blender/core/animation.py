@@ -27,6 +27,7 @@ from .math import (
     swizzle_vector_slope,
     swizzle_vector_scale,
     swizzle_vector_ipo,
+    arange,
 )
 from .helpers import create_empty, time_to_frame, create_action
 from .utils import crc32
@@ -249,7 +250,10 @@ def load_quaternion_fcurves(
             (i.e. lerping between them will not cause flips and the shortest path will always be taken).
         * Note it's *LERP* not *SLERP*. Blender fcurves does not specialize in quaternion interpolation.
         * Hence, with `interpolation`, you should always use `LINEAR` for the most accurate results.
-        * - See also http://number-none.com/product/Hacking%20Quaternions/index.html
+            See also http://number-none.com/product/Hacking%20Quaternions/index.html
+        * Unity interpolates quaternions with Hermite splines in local space - however keeping the slope consistent
+            isn't practical due to change of basis *then* renormalization.  It's recommended to resample the quaternion
+            curves as Dense curves first, then imported with this function.
     """
     assert (
         type(bl_values[0]) == blQuaternion
@@ -295,9 +299,9 @@ def load_armature_animation(
     tos_leaf: dict,
     always_lerp: bool = False,
 ):
-    """Converts an Animation object into Blender Action WITHOUT applying it to the armature
+    """Converts an Animation object into Blender Action.
 
-    To apply the animation, you must call `apply_action` with the returned action.
+    This handles *all* of animation import procedures from Unity to an Armature object.
 
     Args:
         name (str): name of the action
@@ -305,6 +309,9 @@ def load_armature_animation(
         target (bpy.types.Object): target armature object
         tos_leaf (dict): TOS. Animation *FULL* path CRC32 to *LEAF* bone name table
         always_lerp (bool, optional): always use linear interpolation. Defaults to False.
+
+    Note:
+        Quaternion curves are *ALWAYS* resampled. See `load_quaternion_fcurves` for details.
 
     Returns:
         bpy.types.Action: the created action
@@ -396,6 +403,14 @@ def load_armature_animation(
         if not bone:
             logger.warning("Quaternion: Failed to bind CRC32 %s to bone" % path)
             continue
+        # See Notes
+        # Resampling to every frame in Blender's FPS
+        # This is optionally custom if `sssekai_animation_import_use_scene_fps` is set,
+        # otherwise it uses the FPS of the imported animation.
+        start, end = curve.Data[0].time, curve.Data[-1].time
+        start = max(start, 0)
+        times = arange(start, end, 1 / bpy.context.scene.render.fps)
+        curve = curve.resample_dense(times)
         values = [
             to_pose_quaternion(bone, swizzle_quaternion(keyframe.value))
             for keyframe in curve.Data

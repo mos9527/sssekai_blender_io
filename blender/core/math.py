@@ -122,3 +122,7 @@ def euler3_to_quat_swizzled(x, y, z):
         @ blQuaternion((0, 1, 0), z)
     )  # Left multiplication
     return uQuaternion(quat.x, -quat.z, quat.y, quat.w)
+
+
+def arange(start, end, step):
+    return [start + i * step for i in range(int((end - start) / step) + 1)]

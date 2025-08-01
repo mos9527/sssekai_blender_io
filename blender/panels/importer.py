@@ -205,30 +205,15 @@ register_wm_props(
         ),
         default="",
     ),
+    sssekai_animation_import_use_scene_fps=BoolProperty(
+        name=T("Use Scene FPS"),
+        description=T(
+            "Use a custom FPS value for the imported animation, instead of the FPS of the imported animation itself"
+        ),
+        default=True,
+    ),
     sssekai_animation_import_offset=IntProperty(
         name=T("Offset"), description=T("Animation Offset in frames"), default=0
-    ),
-    sssekai_animation_import_resample_type=EnumProperty(
-        name=T("Resample Type"),
-        description=T(
-            "Type of resampling to perform on the animation, matching the Framerate of your Blender scene. NOTE: Only works on Hierarchy Animations"
-        ),
-        items=[
-            (
-                "NONE",
-                T("No Resample"),
-                T("Do not resample the animation"),
-                "IPO_CONSTANT",
-                1,
-            ),
-            (
-                "DENSE",
-                T("Dense Resample"),
-                T("Resample every frame, then to be interpolated linearly"),
-                "IPO_LINEAR",
-                2,
-            ),
-        ],
     ),
     sssekai_animation_always_lerp=BoolProperty(
         name=T("Always Lerp"),
@@ -603,8 +588,9 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
                 row.prop(wm, "sssekai_animation_import_offset", icon="TIME")
                 row.prop(wm, "sssekai_animation_always_lerp", icon="IPO_LINEAR")
                 row = layout.row()
-                row.prop(wm, "sssekai_animation_import_resample_type", expand=True)
-                row.prop(bpy.context.scene.render, "fps", text=T("Resample FPS"))
+                row.prop(wm, "sssekai_animation_import_use_scene_fps", icon="TIME")
+                if wm.sssekai_animation_import_use_scene_fps:
+                    row.prop(bpy.context.scene.render, "fps", text=T("Scene FPS"))
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_use_nla", icon="NLA")
                 row.prop(

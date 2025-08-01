@@ -572,27 +572,10 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
                 "This is not supported yet. Expect issues."
                 % ", ".join([UNITY_MECANIM_RESERVED_TOS[k] for k in mecanim_ik]),
             )
-        match wm.sssekai_animation_import_resample_type:
-            case "NONE":
-                logger.info("Sample Rate: %d FPS" % anim.SampleRate)
-                logger.info("Using animation's sample rate as-is")
-                bpy.context.scene.render.fps = int(anim.SampleRate)
-            case "DENSE":
-                logger.info("Sample Rate: %d FPS" % anim.SampleRate)
-                target_fps = bpy.context.scene.render.fps
-                logger.info("Resampling to %d FPS" % target_fps)
-
-                def arange(start, end, step):
-                    return [
-                        start + i * step for i in range(int((end - start) / step) + 1)
-                    ]
-
-                for k, v in anim.RawCurves.items():
-                    start, end = v.Data[0].time, v.Data[-1].time
-                    start = max(start, 0)
-                    times = arange(start, end, 1 / target_fps)
-                    v.Data = v.resample_dense(times).Data
         logger.info("Loading Animation %s" % anim.Name)
+        if not wm.sssekai_animation_import_use_scene_fps:
+            bpy.context.scene.render.fps = int(anim.SampleRate)
+            logger.info("Using animation Sample Rate: %d FPS" % anim.SampleRate)
         action = load_armature_animation(
             anim.Name,
             anim,
@@ -722,8 +705,9 @@ class SSSekaiBlenderImportSekaiCameraAnimationOperator(bpy.types.Operator):
         logger.info("Loading Animation %s" % anim.m_Name)
         anim = anim.read()
         anim = read_animation(anim)
-        bpy.context.scene.render.fps = int(anim.SampleRate)
-        logger.info("Sample Rate: %d FPS" % anim.SampleRate)
+        if not wm.sssekai_animation_import_use_scene_fps:
+            bpy.context.scene.render.fps = int(anim.SampleRate)
+            logger.info("Using animation Sample Rate: %d FPS" % anim.SampleRate)
         action = load_sekai_camera_animation(
             anim.Name,
             anim,
@@ -762,8 +746,9 @@ class SSSekaiBlenderImportGlobalLightAnimationOperator(bpy.types.Operator):
         logger.info("Loading Animation %s" % anim.m_Name)
         anim = anim.read()
         anim = read_animation(anim)
-        bpy.context.scene.render.fps = int(anim.SampleRate)
-        logger.info("Sample Rate: %d FPS" % anim.SampleRate)
+        if not wm.sssekai_animation_import_use_scene_fps:
+            bpy.context.scene.render.fps = int(anim.SampleRate)
+            logger.info("Using animation Sample Rate: %d FPS" % anim.SampleRate)
         global_obj = bpy.data.objects["SekaiShaderGlobals"]
         dir_light_obj = bpy.data.objects["SekaiDirectionalLight"]
         match wm.sssekai_animation_light_type:
@@ -817,8 +802,9 @@ class SSSekaiBlenderImportCharacterLightAnimationOperator(bpy.types.Operator):
         logger.info("Loading Animation %s" % anim.m_Name)
         anim = anim.read()
         anim = read_animation(anim)
-        bpy.context.scene.render.fps = int(anim.SampleRate)
-        logger.info("Sample Rate: %d FPS" % anim.SampleRate)
+        if not wm.sssekai_animation_import_use_scene_fps:
+            bpy.context.scene.render.fps = int(anim.SampleRate)
+            logger.info("Using animation Sample Rate: %d FPS" % anim.SampleRate)
         match wm.sssekai_animation_light_type:
             case "CHARACTER_RIM":
                 action = load_sekai_character_rim_light_animation(anim.Name, anim)
