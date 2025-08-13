@@ -1,3 +1,6 @@
+# FIXME. Exhibits very bad visual errors and is incredibly slow to simulate.
+# Mapping game values with brute forces seems like a no go...
+# TODO: Introduce helper operators to label/classifiy/seperate secondary animation bones?
 import bpy, math
 from bpy.app.translations import pgettext as T
 from ..core.types import Hierarchy
