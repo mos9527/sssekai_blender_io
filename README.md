@@ -22,35 +22,35 @@ Currently supported languages and maintainers:
 - 简体中文 (zh_HANS, mos9527)
 
 ## Installing & Updating
+`sssekai_blender_io` depends on [`sssekai`](https://github.com/mos9527/sssekai), which in turn uses [`UnityPy`](https://github.com/K0lb3/UnityPy) for Unity asset IO.
+
+For this reason, do NOT download the repo as zip and install as you won't be able to manage dependencies, or run at all without manual setup.
+
+The following methods are recommended for consuming the addon.
 ### With Addon Bundle
 Prebuilt bundles are not provided for binary ABI compatibility reasons. 
 
 [The Bundle Script](https://github.com/mos9527/sssekai_blender_io/blob/master/bundle.py) is provided to build a self-contained addon bundle for your Blender version. Please follow the instructions in the script to build the bundle.
 
 ### With the Bootstrapper
-**PLEASE NOTE:**
-The Bootstrapper is still a W.I.P and has bugs! Please report them in the [issues](https://github.com/mos9527/sssekai_blender_io/issues) tab if you encounter one.
+You can semi-automatically update the addon using the [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py).
 
-Use the **portable** version of Blender to avoid any issues with the Bootstrapper. You can download it [here](https://www.blender.org/download/).
-
-Remember to *restart Blender* after updating the addon through the Bootstrapper to see the changes.
-
-You can automatically update the addon using the [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py).
+**Portable** version of Blender is highly recommended when using the Bootstrapper. 
 
 #### Attention
 **To Windows 11 Users** 
 - If you'd specify the addon source directory - which in turns creates a symlink - you'll have to enable Developer Mode in Windows 11 otherwise it's **not going to work**.
 
 **To ones who have installed Blender to Program Files**
-- This would be the case if you'd install Blender through the offical MSI installer, or in some cases when Blender is installed through Steam - whilst using the default Steam Library location <sigh>
+- This would be the case if you'd install Blender through the offical MSI installer, or in some cases when Blender is installed through Steam - whilst using the default Steam Library location
 - Using a non-portable Blender installation makes the updater unable to modify addon files.
 - Either:
-  1. Download and use the portable version of Blender instead <as-you-should>
+  1. Download and use the portable version of Blender instead
   2. Or run Blender as Administrator when using the Bootstrapper.
     - You don't have to run Blender as Administrator when using the addon normally, only when updating the addon through the Bootstrapper.
   3. Setup file permissions for the Blender installation directory to allow the updater to modify files.
     - This is not recommended as it can be a security risk.
-#### Procedure
+#### To use the Bootstrapper
 - Make sure you have [Git](https://git-scm.com/downloads) installed on your system.
 - Download the addon [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py)
 - Install the Bootstrapper in Blender by going to `Edit > Preferences > Add-ons > Install...` and selecting the Bootstrapper, which is a `.py` file.
@@ -72,11 +72,12 @@ The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
   - Done. Also applies to generic Unity assets
 - Custom `Animator` for animation import
   - Path CRC32 table can now be done through `m_Avatar`
-  - TODO: Implement Animator bindpose
+- ~~Implement Animator bindpose~~
+  - Done. Usually not a requirement however.
 #### Rendering
-- Outline (World-space, normal offset + stencil masking)
+- One-key Outline Modifier(s) for Sekai characters (World-space, normal offset + stencil masking)
   - See also https://mos9527.com/posts/pjsk/shading-reverse-part-2/
-- 1-to-1 approximation of the game's lighting system
+- Accurate reproduction of the game's lighting
   - ~~Face light (SDF for v2, simple $N \cdot L$ for legacy)~~
     - ~~*NOTE*: Current SDF implementation does not handle relative light directions~~
     - Fixed. See also https://mos9527.com/en/posts/pjsk/shading-reverse-part-3/
@@ -85,7 +86,7 @@ The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
     - Fixed. See also https://mos9527.com/posts/pjsk/shading-reverse-part-2/
   - ~~Rim Light (`SekaiCharacterRimLight`)~~
   - ~~Ambient Light (`SekaiAmbientLight`, `SekaiCharacterAmbientLight`)~~
-  - ...
+  
 #### Effects
 - Post processing (PostEffectV2)
   - LUT. https://github.com/mos9527/blender-image-lut
@@ -96,11 +97,17 @@ The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
   - Saturation
   - See also https://mos9527.com/posts/pjsk/shading-reverse-part-1/
 - Sub-cameras (off-screen cameras)
+  - Animations can be imported
 - Blob shadows
-- Particles
+- Particles?
+  - Most probably WONTFIX.
 #### Animation
 - ~~Light animation~~
+  - Done. Applies to directional lights, rim lights and ambient lights
+  - **XXX:** Implementation shows severe performance regression with animated lights in Blender 4.0+
 - Effect animation
+  - Articulated (GameObject animations) ones work OOTB.
+  - Particles not at all supported.
 - Approximate Unity's IK system
   - Since [My Sekai](https://pjsekai.sega.jp/news/archive/index.html?hash=ecca5cb23ea530edb669fc0d2ae302fd0f374a4b) is a thing now and the chibi models are rigged with Unity's IK system.  
   - Also would be nice since all Unity games with humanoid characters use this system.
