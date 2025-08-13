@@ -212,16 +212,6 @@ register_wm_props(
         ),
         default=True,
     ),
-    sssekai_animation_import_offset=IntProperty(
-        name=T("Offset"), description=T("Animation Offset in frames"), default=0
-    ),
-    sssekai_animation_always_lerp=BoolProperty(
-        name=T("Always Lerp"),
-        description=T(
-            "Always interpolate keyframes linearly. Useful for densely packed keyframes"
-        ),
-        default=False,
-    ),
     sssekai_animation_import_use_nla=BoolProperty(
         name=T("Use NLA"),
         description=T(
@@ -334,36 +324,36 @@ register_wm_props(
             (
                 "SEKAI_MOTION",
                 T("Sekai Motion"),
-                T("Import the selected animation as a Project SEKAI Motion"),
+                T("(Project SEKAI) Import the selected animation as a character motion"),
                 "ARMATURE_DATA",
                 1,
             ),
             (
                 "SEKAI_FACE",
                 T("Sekai Face"),
-                T("Import the selected animation as a Project SEKAI Face Animation"),
+                T("(Project SEKAI) Import the selected animation as a character facial (Shapekey) animation"),
                 "SHAPEKEY_DATA",
                 2,
             ),
             (
                 "SEKAI_CAMERA",
                 T("Sekai Camera"),
-                T("Import the selected animation as a Project SEKAI Camera Animation"),
+                T("(Project SEKAI) Import the selected animation as a camera animation"),
                 "CAMERA_DATA",
                 3,
             ),
             (
                 "SEKAI_LIGHT",
                 T("Sekai Light"),
-                T("Import the selected animation as a Project SEKAI Light Animation"),
+                T("(Project SEKAI) Import the selected animation as a light animation"),
                 "LIGHT_DATA",
                 4,
             ),
             (
                 "GENERIC",
-                T("Generic Transform"),
+                T("Generic"),
                 T(
-                    "Import the selected animation as generic animation data applied on Transforms"
+                    "Import the selected animation as generic animation data applied on any imported Hierarchy"
                 ),
                 "ANIM_DATA",
                 5,
@@ -417,7 +407,7 @@ register_wm_props(
                 "BASIC_TOON",
                 T("Toon"),
                 T(
-                    "Import the base material as a basic toon material w/ simple NPR techniques"
+                    "Import the materials as a basic toon material w/ simple NPR techniques"
                 ),
                 "MATERIAL",
                 1,
@@ -426,7 +416,7 @@ register_wm_props(
                 "UNITY_PBR_STANDARD",
                 T("PBR Std."),
                 T(
-                    "(Currently, Same as Basic) Import the materials as a Unity PBR Standard Material"
+                    "Import the materials as a Unity Universal Render Pipeline (URP) Standard Material"
                 ),
                 "MATERIAL",
                 2,
@@ -435,7 +425,7 @@ register_wm_props(
                 "BASIC",
                 T("Basic"),
                 T(
-                    "Import the base material as a basic material with *ONLY* the diffuse map"
+                    "Import the materials with only the diffuse map"
                 ),
                 "MATERIAL",
                 3,
@@ -443,14 +433,14 @@ register_wm_props(
             (
                 "EMISSIVE",
                 T("Emissive"),
-                T("Import the base material as an emissive material"),
+                T("Import the materials as an Emissive material, ignoring lighting"),
                 "MATERIAL",
                 4,
             ),
             (
                 "COLORADD",
                 T("Color Add"),
-                T("Import the base material as a color add material"),
+                T("Import the materials effectively as Color Add overlays"),
                 "MATERIAL",
                 5,
             ),
@@ -458,7 +448,7 @@ register_wm_props(
             (
                 "CUSTOM",
                 T("Custom"),
-                T("Use a custom material node group"),
+                T("Use a custom material node group.\nNOTE: Check the Wiki on how to make custom node groups for any assets"),
                 "MODIFIER",
                 7,
             ),
@@ -477,7 +467,8 @@ register_wm_props(
                 "SEKAI",
                 T("SEKAI Auto"),
                 T(
-                    "Import the selected material as a Project SEKAI Material with auto setup. NOTE: Can be VERY slow due to Nodetree + Driver issues in Blender"
+                    "Import the selected material as a Project SEKAI Material with auto setup.\n" \
+                    "NOTE: Can be VERY slow due to Nodetree + Driver issues in Blender"
                 ),
                 "MATERIAL",
                 1,
@@ -584,9 +575,6 @@ class SSSekaiBlenderImportPanel(bpy.types.Panel):
         match import_type:
             case "IMPORT_ANIMATION":
                 row.label(text=T("Animation Options"), icon="ANIM_DATA")
-                row = layout.row()
-                row.prop(wm, "sssekai_animation_import_offset", icon="TIME")
-                row.prop(wm, "sssekai_animation_always_lerp", icon="IPO_LINEAR")
                 row = layout.row()
                 row.prop(wm, "sssekai_animation_import_use_scene_fps", icon="TIME")
                 if wm.sssekai_animation_import_use_scene_fps:

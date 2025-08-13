@@ -62,7 +62,6 @@ def load_fcurves(
     bl_values: List[float | blEuler | blVector | blQuaternion],
     swizzle_slope_func: callable = None,
     swizzle_ipo_func: callable = None,
-    always_lerp: bool = False,
     override_data_index: int = 0,
 ):
     """Creates an arbitrary amount of FCurves for a sssekai Curve
@@ -74,7 +73,6 @@ def load_fcurves(
         bl_values (List[float | blEuler | blVector | blQuaternion]): values in Blender types
         swizzle_slope_func (callable, optional): swizzle function applied on the slope values. Read the note below
         swizzle_ipo_func (callable, optional): swizzle function applied on the interpolation order with multiple values (e.g. XYZ). Defaults to None.
-        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
         override_data_index (int, optional): override the data index. only used when value type is float. Defaults to 0.
 
     Notes on swizzle_slope_func, swizzle_ipo_func:
@@ -140,8 +138,6 @@ def load_fcurves(
                     swizzle_ipo_func(
                         keyframe.interpolation_segment(keyframe, keyframe.next)
                     )[index]
-                    if not always_lerp
-                    else Interpolation.Linear
                 )
                 for keyframe in curve.Data
             ],
@@ -205,7 +201,6 @@ def load_float_fcurve(
     data_path: str,
     curve: Curve,
     bl_values: List[float] = None,
-    always_lerp: bool = False,
     override_data_index: int = 0,
 ):
     """Helper function that creates an FCurve for a sssekai Float Curve
@@ -215,7 +210,6 @@ def load_float_fcurve(
         data_path (str): data path
         curve (Curve): curve data
         bl_values (List[float], optional): values in Blender types. will be extracted from curve if not provided. Defaults to None.
-        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
         override_data_index (int, optional): override the data index. Defaults to 0.
 
     """
@@ -297,7 +291,6 @@ def load_armature_animation(
     anim: Animation,
     target: bpy.types.Object,
     tos_leaf: dict,
-    always_lerp: bool = False,
 ):
     """Converts an Animation object into Blender Action.
 
@@ -308,7 +301,6 @@ def load_armature_animation(
         anim (Animation): animation data
         target (bpy.types.Object): target armature object
         tos_leaf (dict): TOS. Animation *FULL* path CRC32 to *LEAF* bone name table
-        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
 
     Note:
         Quaternion curves are *ALWAYS* resampled. See `load_quaternion_fcurves` for details.
@@ -435,7 +427,6 @@ def load_armature_animation(
             'pose.bones["%s"].rotation_euler' % bone,
             curve,
             values,
-            always_lerp=always_lerp,
         )
     # Translations
     for path, curve in anim.Curves[kBindTransformPosition].items():
@@ -452,7 +443,6 @@ def load_armature_animation(
             'pose.bones["%s"].location' % bone,
             curve,
             values,
-            always_lerp=always_lerp,
         )
     # Scale
     for path, curve in anim.Curves[kBindTransformScale].items():
@@ -467,7 +457,6 @@ def load_armature_animation(
             curve,
             values,
             swizzle_slope_func=swizzle_vector_scale,
-            always_lerp=always_lerp,
         )
     return action
 
@@ -488,9 +477,6 @@ def load_sekai_keyshape_animation(
         name (str): name of the action
         data (Animation): animation data
         crc_keyshape_table (dict): Animation path CRC32 value to Blend Shape name table
-        frame_offset (int): frame offset
-        action (bpy.types.Action, optional): existing action to append to. Defaults to None
-        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
 
     Returns:
         bpy.types.Action: the created action
@@ -523,8 +509,7 @@ def load_sekai_camera_animation(
     Args:
         name (str): name of the action
         data (Animation): animation data
-        always_lerp (bool, optional): always use linear interpolation. Defaults to False.
-
+    
     Returns:
         bpy.types.Action: the created action
     """

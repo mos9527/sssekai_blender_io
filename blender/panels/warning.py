@@ -6,8 +6,8 @@ from bpy.app.translations import pgettext as T
 WARNING_TEXT = """!This is a Work in Progress
 All functions are subject to change without notice
 and does not represent the final state of the addon
-?Generic Unity games besides Project SEKAI
-are supported intentionally, however with lower priority.
+?Generic Unity assets besides Project SEKAI ones
+are supported with "Generic"-titled options.
 ?In doubt, please refer to the wiki or the issues page
 *Links are available here""".split("\n")
 

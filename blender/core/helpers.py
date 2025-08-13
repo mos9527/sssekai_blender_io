@@ -185,8 +185,8 @@ def auto_setup_shader_node_driver(node_group, target_obj, target_bone=None):
     pass
 
 
-def time_to_frame(time: float, frame_offset: int = 0):
-    return time * bpy.context.scene.render.fps + frame_offset
+def time_to_frame(time: float):
+    return time * bpy.context.scene.render.fps
 
 
 def create_action(name: str):

@@ -581,7 +581,6 @@ class SSSekaiBlenderImportHierarchyAnimationOperaotr(bpy.types.Operator):
             anim,
             active_obj,
             tos_leaf,
-            wm.sssekai_animation_always_lerp,
         )
         # Set frame range
         bpy.context.scene.frame_end = max(
