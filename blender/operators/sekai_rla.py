@@ -116,7 +116,7 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
             # Always use NLAs
             # Resample is unnecessary here since we don't have slope information anyways, lerping
             # it ourselves before letting Blender handle the rest will actually introduce errors.            
-            action = load_armature_animation(anim.Name, anim, body_obj, tos_crc_table, quat_skip_resample=False)
+            action = load_armature_animation(anim.Name, anim, body_obj, tos_crc_table, quat_skip_resample=True)
             try:
                 logger.info("Armature Frame range: %d - %d" % (tick_min, tick_max))
                 apply_action(body_obj, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
