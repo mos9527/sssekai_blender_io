@@ -114,7 +114,9 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                     inSlope=uQuaternion(0,0,0,1), outSlope=uQuaternion(0,0,0,1)
                 ))
             # Always use NLAs
-            action = load_armature_animation(anim.Name, anim, body_obj, tos_crc_table, True)
+            # Resample is unnecessary here since we don't have slope information anyways, lerping
+            # it ourselves before letting Blender handle the rest will actually introduce errors.            
+            action = load_armature_animation(anim.Name, anim, body_obj, tos_crc_table, quat_skip_resample=False)
             try:
                 logger.info("Armature Frame range: %d - %d" % (tick_min, tick_max))
                 apply_action(body_obj, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
@@ -153,7 +155,7 @@ class SSSekaiBlenderImportRLASegmentOperator(bpy.types.Operator):
                         curve = anim.get_curve(binding_of(SEKAI_BLENDSHAPE_CRC, inv_mod_crc_table[shape_name]))
                         curve.Data.append(KeyframeHelper(frame,0,shapeValue,isDense=True,inSlope=0,outSlope=0))
                 # Always use NLAs
-                action = load_sekai_keyshape_animation(anim.Name, anim, morph_crc_table, True)
+                action = load_sekai_keyshape_animation(anim.Name, anim, morph_crc_table)
                 try:
                     logger.info("Face Frame range: %d - %d" % (tick_min, tick_max))
                     apply_action(morph.data.shape_keys, action, wm.sssekai_animation_import_use_nla, wm.sssekai_animation_import_nla_always_new_track)
@@ -214,12 +216,12 @@ NOTE: NLA tracks will be used regardless of the option specified!"""
             logger.error("Failed to load RLA bundle: %s" % e)
             return {"CANCELLED"}
         sssekai_global.rla_selected_raw_clip = entry
-        min_tick, max_tick = 1e10, 0
+        min_tick, max_tick = 1e20, 0
         sssekai_global.rla_clip_charas.clear()
         for tick, data in sssekai_global.rla_clip_data:
             if data["type"] == "MotionCaptureData":
                 for chunk in data["data"]:
-                    min_tick = min(min_tick, chunk["timestamp"])
+                    min_tick = min(min_tick, chunk["timestamp"])                    
                     max_tick = max(max_tick, chunk["timestamp"])
                     sssekai_global.rla_clip_charas.add(chunk["id"])
         base_tick = sssekai_global.rla_header["baseTicks"]

@@ -291,6 +291,7 @@ def load_armature_animation(
     anim: Animation,
     target: bpy.types.Object,
     tos_leaf: dict,
+    quat_skip_resample: bool = False
 ):
     """Converts an Animation object into Blender Action.
 
@@ -301,6 +302,7 @@ def load_armature_animation(
         anim (Animation): animation data
         target (bpy.types.Object): target armature object
         tos_leaf (dict): TOS. Animation *FULL* path CRC32 to *LEAF* bone name table
+        quat_skip_resample (bool, optional): If True, skips quaternion resampling. Defaults to False.
 
     Note:
         Quaternion curves are *ALWAYS* resampled. See `load_quaternion_fcurves` for details.
@@ -402,7 +404,8 @@ def load_armature_animation(
         start, end = curve.Data[0].time, curve.Data[-1].time
         start = max(start, 0)
         times = arange(start, end, 1 / bpy.context.scene.render.fps)
-        curve = curve.resample_dense(times)
+        if not quat_skip_resample:
+            curve = curve.resample_dense(times)
         values = [
             to_pose_quaternion(bone, swizzle_quaternion(keyframe.value))
             for keyframe in curve.Data
