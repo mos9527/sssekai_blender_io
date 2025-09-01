@@ -13,7 +13,7 @@ bl_info = {
 
 import sys, os
 
-REQUIRED_SSSEKAI_MIN_VERSION = (0, 7, 54)
+REQUIRED_SSSEKAI_MIN_VERSION = (0, 7, 58)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 try:
