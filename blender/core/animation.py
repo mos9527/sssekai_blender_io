@@ -517,9 +517,15 @@ def load_sekai_camera_animation(
         bpy.types.Action: the created action
     """
     action = create_action(name)
-
+    
+    EPS = 1e-3
+    # The *real* fix would be animating params with a custom property 
+    # since animating the scale would 'accidentally' scale things.
+    # Postive values are *generally* fine as they don't change the basis - but as seen
+    # in https://github.com/mos9527/sssekai_blender_io/issues/24 floating point
+    # can always be surprising.
     def swizzle_param_camera(param: blVector):
-        return blVector((abs(param.x), param.y, param.z))
+        return blVector((max(abs(param.x), EPS), max(abs(param.y), EPS), max(abs(param.z), EPS)))
 
     if is_sub_camera:
         mainCam = data.CurvesT.get(
