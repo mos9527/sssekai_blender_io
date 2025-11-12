@@ -11,10 +11,8 @@ class SSSekaiBlenderRendererApplyRecommendedSettingsOperator(bpy.types.Operator)
 
     def execute(self, context):
         wm = context.window_manager
-        if context.scene.render.engine == "BLENDER_EEVEE_NEXT":
-            context.scene.eevee.use_raytracing = True
+        if context.scene.render.engine == "BLENDER_EEVEE_NEXT":            
             context.scene.view_settings.view_transform = "Standard"
-        elif context.scene.render.engine == "BLENDER_EEVEE":
-            context.scene.eevee.use_ssr = True
+        elif context.scene.render.engine == "BLENDER_EEVEE":            
             context.scene.view_settings.view_transform = "Standard"
         return {"FINISHED"}

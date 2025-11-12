@@ -32,26 +32,6 @@ class SSSekaiRendererPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(context.scene.render, "engine")
         row = layout.row()
-        if context.scene.render.engine == "BLENDER_EEVEE":
-            row.label(
-                text=T(
-                    "Screen Space Reflections (SSR) is required for reflective surfaces to work."
-                ),
-            )
-            row = layout.row()
-            row.prop(context.scene.eevee, "use_ssr")
-            row = layout.row()
-        elif context.scene.render.engine == "BLENDER_EEVEE_NEXT":
-            row.prop(context.scene.eevee, "use_raytracing")
-            row = layout.row()
-            if not context.scene.eevee.use_raytracing:
-                row.label(
-                    text=T(
-                        "Raytracing enables SSR (Screen Space Reflections) which is required for reflective surfaces to work."
-                    ),
-                    icon="INFO",
-                )
-                row = layout.row()
         row.prop(context.scene.view_settings, "view_transform")
         row = layout.row()
         if not context.scene.view_settings.view_transform == "Standard":
