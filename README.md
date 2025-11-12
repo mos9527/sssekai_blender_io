@@ -3,7 +3,7 @@
 
 Blender importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク), and generic Unity AssetBundle files.
 
-Supports Blender 3.x and up.
+Blender 3.6+, 4.0+ and 5.0+ are supported.
 
 ## Documentation
 **ATTENTION:** The Wiki is undergoing revisions and is not up-to-date. Please wait for further notice.
@@ -60,6 +60,18 @@ You can semi-automatically update the addon using the [Bootstrapper](https://git
 - You can come back to the Bootstrapper to update the addon at any time.
 
 The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
+
+## Notes UnityPy
+The following patches has been submitted to upstream UnityPy which may remedy some quirks with certain assets.
+- https://github.com/K0lb3/UnityPy/pull/342
+- https://github.com/K0lb3/UnityPy/pull/338
+- https://github.com/K0lb3/UnityPy/pull/334
+
+However an offical release including these patches has not been made yet. To remedy, you can install UnityPy from source in Blender's Python,
+
+```bash
+pip install git+https://github.com/K0lb3/UnityPy.git
+```
 
 ### Known Issues
 - ~~Doesn't handle scenes with multiple objects of the same name.~~

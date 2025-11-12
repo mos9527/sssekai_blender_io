@@ -459,6 +459,11 @@ def import_mesh_data(
             keyshape_hash_tbl, ensure_ascii=False
         )
     bm.free()
+    # Reset Shape Key values to 0 (Blender 5.0.0+ quirk)
+    if obj.data.shape_keys:
+        for key_block in obj.data.shape_keys.key_blocks:
+            if key_block.name != "Basis":
+                key_block.value = 0.0
     return mesh, obj
 
 
@@ -543,7 +548,7 @@ def make_material_value_node(
 ):
     node = None
     if type(value) == ColorRGBA:
-        node = material.node_tree.nodes.new("ShaderNodeCombineRGB")
+        node = material.node_tree.nodes.new("ShaderNodeCombineXYZ")
         node.inputs[0].default_value = value.r
         node.inputs[1].default_value = value.g
         node.inputs[2].default_value = value.b
