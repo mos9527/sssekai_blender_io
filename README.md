@@ -6,12 +6,11 @@ Blender importer for Project SEKAI (JP: プロジェクトセカイ カラフル
 Blender 3.6+, 4.0+ and 5.0+ are supported.
 
 ## Documentation
-**ATTENTION:** The Wiki is undergoing revisions and is not up-to-date. Please wait for further notice.
 
 Read the [wiki page](https://github.com/mos9527/sssekai_blender_io/wiki) for more!
 
 ## Supported Languages
-PRs are welcome for additions. 
+PRs are always welcome for adding new translations or updating existing ones!
 - You can find the translation file [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations.py).
 - The script used to generate the translation file is [here](https://github.com/mos9527/sssekai_blender_io/tree/master/translations_codegen.py). Run this in the root of this repo, with any Python 3.8+ interpreter to update the translation file. Existing translations will be preserved.
 
@@ -27,10 +26,6 @@ Currently supported languages and maintainers:
 For this reason, do NOT download the repo as zip and install as you won't be able to manage dependencies, or run at all without manual setup.
 
 The following methods are recommended for consuming the addon.
-### With Addon Bundle
-Prebuilt bundles are not provided for binary ABI compatibility reasons. 
-
-[The Bundle Script](https://github.com/mos9527/sssekai_blender_io/blob/master/bundle.py) is provided to build a self-contained addon bundle for your Blender version. Please follow the instructions in the script to build the bundle.
 
 ### With the Bootstrapper
 You can semi-automatically update the addon using the [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py).
@@ -61,11 +56,14 @@ You can semi-automatically update the addon using the [Bootstrapper](https://git
 
 The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
 
+### With Addon Bundle
+Prebuilt bundles are not provided for binary ABI compatibility reasons. 
+
+[The Bundle Script](https://github.com/mos9527/sssekai_blender_io/blob/master/bundle.py) is provided to build a self-contained addon bundle for your Blender version. Please follow the instructions in the script to build the bundle.
+
 ## Notes UnityPy
 The following patches has been submitted to upstream UnityPy which may remedy some quirks with certain assets.
 - https://github.com/K0lb3/UnityPy/pull/342
-- https://github.com/K0lb3/UnityPy/pull/338
-- https://github.com/K0lb3/UnityPy/pull/334
 
 However an offical release including these patches has not been made yet. To remedy, you can install UnityPy from source in Blender's Python,
 

@@ -2,9 +2,6 @@ import bpy
 from .. import register_class
 from bpy.app.translations import pgettext as T
 
-from ..operators.renderer import SSSekaiBlenderRendererApplyRecommendedSettingsOperator
-
-
 @register_class
 class SSSekaiRendererPanel(bpy.types.Panel):
     bl_idname = "OBJ_PT_sssekai_renderer"
@@ -18,7 +15,7 @@ class SSSekaiRendererPanel(bpy.types.Panel):
         row = layout.row()
         row.label(
             text=T(
-                "Generally EEVEE is recommended for previewing assets (available before 4.2) for better performance."
+                "EEVEE is the recommended for Unity assets, and would be the only option for Toon shaders."
             ),
             icon="INFO",
         )
@@ -37,9 +34,7 @@ class SSSekaiRendererPanel(bpy.types.Panel):
         if not context.scene.view_settings.view_transform == "Standard":
             row.label(
                 text=T(
-                    "View Transform should be set to Standard since the assets are authored in SRGB space."
+                    "For NPR assets, 'Standard' view transform is always recommended."
                 ),
                 icon="INFO",
             )
-        row = layout.row()
-        row.operator(SSSekaiBlenderRendererApplyRecommendedSettingsOperator.bl_idname)
