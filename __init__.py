@@ -4,7 +4,7 @@ bl_info = {
     "version": (0, 1, 2),
     "blender": (3, 6, 0),
     "location": "View3D > Sidebar > SSSekai",
-    "description": "Project SEKAI / Generic Unity Game Asset Importer for Blender",
+    "description": "Unity Game Asset Importer for Blender",
     "warning": "",
     "wiki_url": "https://github.com/mos9527/sssekai_blender_io/wiki",
     "tracker_url": "https://github.com/mos9527/sssekai_blender_io",

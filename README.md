@@ -43,8 +43,7 @@ You can semi-automatically update the addon using the [Bootstrapper](https://git
   1. Download and use the portable version of Blender instead
   2. Or run Blender as Administrator when using the Bootstrapper.
     - You don't have to run Blender as Administrator when using the addon normally, only when updating the addon through the Bootstrapper.
-  3. Setup file permissions for the Blender installation directory to allow the updater to modify files.
-    - This is not recommended as it can be a security risk.
+  3. Setup file permissions for the Blender installation directory to allow the updater to modify files.    
 #### To use the Bootstrapper
 - Make sure you have [Git](https://git-scm.com/downloads) installed on your system.
 - Download the addon [Bootstrapper](https://github.com/mos9527/sssekai_blender_io/blob/master/bootstrap.py)
@@ -59,7 +58,28 @@ The addon will be accessible in the sidebar (`N` key) in the `SSSekai` tab.
 ### With Addon Bundle
 Prebuilt bundles are not provided for binary ABI compatibility reasons. 
 
-[The Bundle Script](https://github.com/mos9527/sssekai_blender_io/blob/master/bundle.py) is provided to build a self-contained addon bundle for your Blender version. Please follow the instructions in the script to build the bundle.
+[The Bundle Script](https://github.com/mos9527/sssekai_blender_io/blob/master/bundle.py) is provided to build a self-contained addon bundle for your Blender version. 
+
+Python and Git are required to run this script. 
+
+Run this script with the *same* version of Python that Blender uses, or use the interpreter bundled with Blender. 
+As mismatching Python ABIs may cause crashes in Blender.
+
+Example usage:
+```bash
+    # You need to Clone this repo beforehand. A downloaded `ZIP` file will NOT work
+    # as Git functions are used to determine the files to bundle.
+
+    python bundle.py
+    # Creates `sssekai_blender_io.bundled.zip` on master branch
+
+    python bundle.py --branch master --no-ext --outfile release
+    # Creates `release.bundled.zip` on master branch without external dependencies
+```
+
+The produced ZIP file can be installed as-is like any other addon in Blender.
+
+* See also https://github.com/mos9527/sssekai_blender_io/issues/9
 
 ## Notes UnityPy
 The following patches has been submitted to upstream UnityPy which may remedy some quirks with certain assets.

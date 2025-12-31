@@ -1,24 +1,3 @@
-"""Bundle the Addon into a ZIP file, complete with external dependencies.
-
-NOTE: Python and Git are required to run this script.
-NOTE: Run this script with the *same* version of Python that Blender uses.
-Or use the interpreter bundled with Blender. As mismatching Python/glibc ABIs may cause crashes in Blender.
-
-Example usage:
-    # You need to Clone this repo beforehand. A downloaded `ZIP` file will NOT work
-    # as Git functions are used to determine the files to bundle.
-
-    python bundle.py
-    # Creates `sssekai_blender_io.bundled.zip` on master branch
-
-    python bundle.py --branch master --no-ext --outfile release
-    # Creates `release.bundled.zip` on master branch without external dependencies
-
-The produced ZIP file can be installed as-is like any other addon in Blender.
-
-* See also https://github.com/mos9527/sssekai_blender_io/issues/9
-"""
-
 import zipfile, os, argparse, shutil, sys
 
 PIPTEMP_DIR = ".temp"
