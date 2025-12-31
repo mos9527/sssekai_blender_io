@@ -454,16 +454,14 @@ def import_mesh_data(
                     morpedVtx = data.m_Shapes.vertices[morphedVtxIndex]
                     targetVtx: bpy.types.ShapeKeyPoint = shape_key.data[morpedVtx.index]
                     targetVtx.co += swizzle_vector(morpedVtx.vertex)
+            # Reset Shape Key values to 0 _now_ (Blender 5.0.0+ quirk)
+            # Otherwise, subsequent `shape_key_add` would accumulate the changes
+            shape_key.value = 0.0
         # Like boneHash, do the same thing with blend shapes
         mesh[KEY_SHAPEKEY_HASH_TABEL] = json.dumps(
             keyshape_hash_tbl, ensure_ascii=False
         )
     bm.free()
-    # Reset Shape Key values to 0 (Blender 5.0.0+ quirk)
-    if obj.data.shape_keys:
-        for key_block in obj.data.shape_keys.key_blocks:
-            if key_block.name != "Basis":
-                key_block.value = 0.0
     return mesh, obj
 
 

@@ -6,6 +6,18 @@ from .consts import DEFAULT_BONE_SIZE
 from .. import logger, register_wm_props, register_class, sssekai_global
 from bpy.app.translations import pgettext as T
 
+# https://developer.blender.org/docs/release_notes/4.4/upgrading/slotted_actions/
+def create_action_fcurve(action : bpy.types.Action, id_type : str, data_path: str, index: int = -1) -> bpy.types.FCurve:
+    """Creates a new action F-Curve"""
+    if not action.layers:
+        action.layers.new(name="Base Layer")
+    if not action.layers[0].strips:
+        action.layers[0].strips.new(type='KEYFRAME')
+    if not action.slots:
+        action.slots.new(id_type=id_type, name="Base Slot")
+    fcurves = action.layers[0].strips[0].channelbag(action.slots[0], ensure=True).fcurves
+    fcurve = fcurves.new(data_path, index=index)
+    return fcurve
 
 def get_enum_search_op_name(wm_name: str):
     return f"search.{wm_name}"

@@ -29,7 +29,7 @@ from .math import (
     swizzle_vector_ipo,
     arange,
 )
-from .helpers import create_empty, time_to_frame, create_action
+from .helpers import time_to_frame, create_action, create_action_fcurve
 from .utils import crc32
 from .consts import *
 from .. import logger
@@ -63,6 +63,7 @@ def load_fcurves(
     swizzle_slope_func: callable = None,
     swizzle_ipo_func: callable = None,
     override_data_index: int = 0,
+    id_type: str = "OBJECT",
 ):
     """Creates an arbitrary amount of FCurves for a sssekai Curve
 
@@ -76,10 +77,8 @@ def load_fcurves(
         override_data_index (int, optional): override the data index. only used when value type is float. Defaults to 0.
 
     Notes on swizzle_slope_func, swizzle_ipo_func:
-        Swizzling `g(x) = kx` would be STRICTLY linear and `f(x), f'(x)` are known, this implies that:
-        `F(x) = g(f(x))`->`F'(x) = g'(f(x)) * f'(x) = k * f'(x) = g(f'(x))`
-
-        Meaning swizzling the slope values would make them correct.
+        These only work with values that transforms with a Jacobian of 1 or -1 (which is the case for TRS transforms with
+        a change of basis).
 
         Affine transform (non-Scale, Shear) in 3D space only needs the swizzling on the slope values since
         affine transforms don't affect slopes.
@@ -116,10 +115,10 @@ def load_fcurves(
     frames = [finite(time_to_frame(keyframe.time)) for keyframe in curve.Data]
     if num_curves > 1:
         fcurve = [
-            action.fcurves.new(data_path=data_path, index=i) for i in range(num_curves)
+            create_action_fcurve(action,id_type, data_path=data_path, index=i) for i in range(num_curves)            
         ]
     else:
-        fcurve = [action.fcurves.new(data_path=data_path, index=override_data_index)]
+        fcurve = [create_action_fcurve(action, id_type, data_path=data_path, index=override_data_index)]
     for index in range(num_curves):
         curve_data = [0] * (len(frames) * 2)
         curve_data[::2] = frames
@@ -202,6 +201,7 @@ def load_float_fcurve(
     curve: Curve,
     bl_values: List[float] = None,
     override_data_index: int = 0,
+    id_type: str = "OBJECT",
 ):
     """Helper function that creates an FCurve for a sssekai Float Curve
 
@@ -220,6 +220,7 @@ def load_float_fcurve(
         curve,
         bl_values,
         override_data_index=override_data_index,
+        id_type=id_type,
     )
 
 
@@ -253,7 +254,7 @@ def load_quaternion_fcurves(
         type(bl_values[0]) == blQuaternion
     ), "Values must be in Blender Quaternion type"
     frames = [time_to_frame(keyframe.time) for keyframe in curve.Data]
-    fcurve = [action.fcurves.new(data_path=data_path, index=i) for i in range(4)]
+    fcurve = [create_action_fcurve(action, "OBJECT", data_path=data_path, index=i) for i in range(4)]
     curve_datas = list()
     for i in range(4):
         curve_data = [0] * (len(frames) * 2)
@@ -471,6 +472,7 @@ def load_sekai_keyshape_animation(
     name: str,
     data: Animation,
     crc_keyshape_table: dict,
+    curve_key : int = SEKAI_BLENDSHAPE_CRC,
 ):
     """Converts an Animation object into Blender Action WITHOUT applying it to any mesh
 
@@ -488,7 +490,7 @@ def load_sekai_keyshape_animation(
         KeyShape value range [0,100]
     """
     action = create_action(name)
-    for attr, curve in data.CurvesT[SEKAI_BLENDSHAPE_CRC].items():
+    for attr, curve in data.CurvesT[curve_key].items():
         bsName = crc_keyshape_table[str(attr)]
         load_fcurves(
             action,
@@ -496,6 +498,7 @@ def load_sekai_keyshape_animation(
             curve,
             [keyframe.value / 100.0 for keyframe in curve.Data],
             swizzle_slope_func=lambda x: x / 100.0,
+            id_type="KEY"
         )
     return action
 
