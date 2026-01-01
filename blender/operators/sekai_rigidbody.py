@@ -136,6 +136,7 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
         selected: bpy.types.EnumProperty
         hierarchy = sssekai_global.containers[container].hierarchies[int(selected)]
         assert hierarchy, "Hierarchy Data not found. Please ensure you've selected the container the hierarchy is in"
+        context.scene.frame_current = 0
         armature = active_obj.data
         def find_by_script(game_object: GameObject, name: str):
             for comp in game_object.m_Components:
@@ -197,13 +198,6 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
         capsuleColliders = [swizzle_data(collider) for collider in capsuleColliders]
         panelColliders = [swizzle_data(collider) for collider in panelColliders]
         bpy.context.view_layer.objects.active = active_obj
-        # Reset the pose
-        bpy.ops.object.mode_set(mode="POSE")
-        Position_world = active_obj.pose.bones.get("Position").matrix
-        bpy.ops.pose.select_all(action="SELECT")
-        bpy.ops.pose.transforms_clear()
-        bpy.ops.pose.select_all(action="DESELECT")
-        bpy.ops.object.mode_set(mode="EDIT")
         # Attach passive rigidbodies to the bones
         for name, path_id, script_name, bone, obj in sphereColliders:
             next_sphere_rb = create_sphere_rigidbody(name + "_SPHERE", DEFAULT_SPRINGBONE_SIZE)
@@ -233,18 +227,6 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
             springBoneRbsFlatten[spring_name] = next_spring_rb
         for root, rbs in springBoneRbs.items():
             rbs = sorted(rbs, key=lambda x: nodeDepths[x[0]])
-        # Detach the pivot bones and keep the transform
-        bpy.context.view_layer.objects.active = active_obj
-        bpy.ops.object.mode_set(mode="EDIT")
-        for pivot_name in springNodeNames:
-            # Keep the root one since it's the one that's actually parented to the armature
-            if pivot_name not in springRootNames:
-                armature.edit_bones.get(pivot_name).parent = None
-        # For each subtree of spring bones, disable self-collision
-        for root,rbs in springBoneRbs.items():
-            for i,(name,rb) in enumerate(rbs):
-                rb : bpy.types.Object
-                rb.rigid_body.collision_collections[0] = i & 1
         # Connect these with rigidbody constraints
         # Pivot*Spring ~ Pivot*Spring ~ ...
         # [*] fixed [~] spring
@@ -275,20 +257,32 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
                 spring_name, spring_path_id, spring_script_name, spring_params, spring_obj = springBoneDict[spring]
                 set_spring_constraint(spring_rb, next_pivot_rb, spring_params)
         # Reparent the rigidbodies to the armature's Position bone
+        
+        # Detach the pivot bones and keep the transform
+        bpy.context.view_layer.objects.active = active_obj
+        bpy.ops.object.mode_set(mode="EDIT")
+        for pivot_name in springNodeNames:
+            # Keep the root one since it's the one that's actually parented to the armature
+            if pivot_name not in springRootNames:
+                armature.edit_bones.get(pivot_name).parent = None
+        # For each subtree of spring bones, disable self-collision
+        for root,rbs in springBoneRbs.items():
+            for i,(name,rb) in enumerate(rbs):
+                rb : bpy.types.Object
+                rb.rigid_body.collision_collections[0] = i & 1
         bpy.context.view_layer.update()
         def set_parent_keep_transform(obj : bpy.types.Object,  bone : str, parent: bpy.types.Object):
             bpy.context.view_layer.objects.active = obj
-            bpy.ops.object.mode_set(mode="OBJECT")
-            world = obj.matrix_world
+            bpy.ops.object.mode_set(mode="OBJECT")            
             obj.parent = parent
             obj.parent_type = "BONE"
             obj.parent_bone = bone  
-            obj.matrix_parent_inverse = Position_world.inverted() @ world
+            obj.matrix_parent_inverse = parent.matrix_world.inverted() @ obj.matrix_world
         for pivot, pivot_rb in pivotRbs.items():
             if pivot not in springRootNames:
                 set_parent_keep_transform(pivot_rb, "Position", active_obj)
         for spring, spring_rb in springBoneRbsFlatten.items():
-            set_parent_keep_transform(spring_rb, "Position", active_obj)
+            set_parent_keep_transform(spring_rb, "Position", active_obj)        
         # Apply the poses of the rigidbodies back to the pose bones
         bpy.context.view_layer.update()
         bpy.context.view_layer.objects.active = active_obj
