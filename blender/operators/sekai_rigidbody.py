@@ -118,10 +118,12 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
     bl_idname = "sssekai.hierarchy_add_sekai_rigid_bodies"
     bl_label = T("Apply Rigid Bodies")
     bl_description = T(
-        """Secondary animations! NOTE: This feature is very experimental and does not guarantee visual correctness. 
-        To use, select the armature in the View Layer *AND* the addon's Asset Selector and run this operator
-        *BEFORE* you'd apply Attach/Animation/Modifers to it as this operator REQUIRES the armature to be in Bind Pose
-        TL;DR Merge the armatures and then run this operator before anything else."""
+        """EXPREIMENTAL: Adds Rigid Body colliders to simulate Sekai's Spring Bone (physics)."""
+        """The addon can interpret the Spring Bone data in Sekai models and correspondingly create"""
+        """Spring bone (chains) to simulate the secondary animations."""        
+        """NOTE: It's HIGHLY ADVISED to apply AFTER importing armatures, i.e. do this as the LAST step"""
+        """of your import process."""
+        """NOTE: Backup your original object (armature) before applying this, as it modifies the bone structure."""
     )
 
     def execute(self, context):
@@ -271,13 +273,16 @@ class SSSekaiBlenderHierarchyAddSekaiRigidBodiesOperator(bpy.types.Operator):
                 rb : bpy.types.Object
                 rb.rigid_body.collision_collections[0] = i & 1
         bpy.context.view_layer.update()
+
+        # Parent is always the Position bone
+        position_matrix = active_obj.pose.bones.get("Position").matrix
         def set_parent_keep_transform(obj : bpy.types.Object,  bone : str, parent: bpy.types.Object):
             bpy.context.view_layer.objects.active = obj
             bpy.ops.object.mode_set(mode="OBJECT")            
             obj.parent = parent
             obj.parent_type = "BONE"
             obj.parent_bone = bone  
-            obj.matrix_parent_inverse = parent.matrix_world.inverted() @ obj.matrix_world
+            obj.matrix_parent_inverse = position_matrix.inverted() @ obj.matrix_world
         for pivot, pivot_rb in pivotRbs.items():
             if pivot not in springRootNames:
                 set_parent_keep_transform(pivot_rb, "Position", active_obj)

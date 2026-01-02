@@ -1,9 +1,12 @@
 # sssekai_blender_io
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
+<img width="2561" height="1493" alt="image" src="https://github.com/user-attachments/assets/70e8cf6a-9c0f-42ce-aec8-d59be41761d9" />
+
 Blender importer for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク), and generic Unity AssetBundle files.
 
 Blender 3.6+, 4.0+ and 5.0+ are supported.
+
 
 ## Documentation
 

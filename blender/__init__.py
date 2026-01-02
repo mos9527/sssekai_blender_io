@@ -5,7 +5,7 @@ from logging import getLogger
 from typing import List, Dict, DefaultDict
 from dataclasses import dataclass, field
 from collections import defaultdict
-
+from .. import bl_info
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger = getLogger("sssekai")
 
