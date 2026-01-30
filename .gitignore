@@ -11,3 +11,4 @@ private_test_*
 venv
 .DS_Store
 *.bundled.zip
+.vs/
